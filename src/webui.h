@@ -2,7 +2,7 @@
 #include <Arduino.h>
 
 const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Shelly</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Hermit OS</title>
 <style>
 :root{--bg:#0f1419;--c:#1a2129;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--b:#2a333c}
 *{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
@@ -29,7 +29,7 @@ nav a.a{background:var(--a)}.tab{display:none}.tab.a{display:block}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff}
 code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
-<header><h1 id="t">Shelly</h1><span class="l" id="ver"></span></header>
+<header><h1 id="t">Hermit OS</h1><span class="l" id="ver"></span></header>
 <main>
 <nav><a data-t="st" class="a">Status</a><a data-t="sw">Schalter</a><a data-t="wh">Aktionen</a><a data-t="wf">WLAN</a><a data-t="sy">System</a><a data-t="rp">RPC</a></nav>
 
@@ -143,7 +143,7 @@ async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0'],
 showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
-const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent=d.model+' · '+d.ver+' · '+d.id;document.title=d.name||d.id;
+const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Hermit OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
 $('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveSw(){run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});

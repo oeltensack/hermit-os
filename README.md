@@ -1,4 +1,6 @@
-# Shelly Gen1 OS
+# Hermit OS 🐚
+
+*Wie ein Einsiedlerkrebs, der in ein altes Schneckenhaus zieht: neues Leben für alte Shelly-Gehäuse.*
 
 Eigene Firmware für **Shelly 1** und **Shelly 1PM** (Gen1, ESP8266, 2 MB Flash).
 Die Geräte sprechen damit die **RPC-API von Shelly Gen2/Gen3**. Scripte auf Plus-/Pro-/Gen3-Geräten
@@ -15,10 +17,10 @@ können sie genauso ansprechen wie ein neues Shelly, und die alten Geräte melde
 - Startzustand: off, on, restore_last, match_input; Auto-An/Auto-Aus; `toggle_after`
 - 1PM: Wirkleistung über HLW8012 (CF an GPIO5), Energiezähler (alle 15 min ins Flash), NTC-Temperatur, Abschaltung bei Überlast/Übertemperatur
 - Gen1-kompatibel: `/relay/0?turn=on&timer=10`, `/status`, `/meter/0`, `/shelly`
-- WLAN mit DHCP/statisch; ohne Verbindung nach 60 s Access-Point `shelly1-<mac>` auf **192.168.33.1** mit Captive-Portal
+- WLAN mit DHCP/statisch; ohne Verbindung nach 60 s Access-Point `hermit-1-<mac>` bzw. `hermit-1pm-<mac>` auf **192.168.33.1** mit Captive-Portal
 - Weboberfläche auf Deutsch, RPC-Konsole, OTA-Update über die Weboberfläche (`/update`)
 - Optional Passwort (Benutzer `admin`, Digest- oder Basic-Auth)
-- mDNS: `shelly1-<mac>.local`, Dienst `_shelly._tcp`
+- mDNS: `hermit-1-<mac>.local` bzw. `hermit-1pm-<mac>.local`, Dienst `_shelly._tcp`
 
 ## Pinbelegung
 
@@ -47,7 +49,7 @@ GPIO0 beim Einschalten auf GND legen, dann
 
 ```bash
 esptool.py --port /dev/ttyUSB0 erase_flash
-esptool.py --port /dev/ttyUSB0 write_flash -fm dout 0x0 shelly1pm.bin
+esptool.py --port /dev/ttyUSB0 write_flash -fm dout 0x0 hermit-1pm.bin
 ```
 
 Die Belegung der Stiftleiste (3V3, GND, RX, TX, GPIO0) steht auf der Platine bzw. in der Tasmota-Doku zum jeweiligen Gerät.
@@ -56,11 +58,11 @@ Die Belegung der Stiftleiste (3V3, GND, RX, TX, GPIO0) steht auf der Platine bzw
 Danach in Tasmota unter „Firmware-Update“ die passende `.bin` dieser Firmware hochladen. Die Seriell-Variante ist der sichere Weg,
 falls dabei etwas schiefgeht.
 
-Spätere Updates: Weboberfläche → System → Firmware, oder `curl -F firmware=@shelly1pm.bin http://<ip>/update`.
+Spätere Updates: Weboberfläche → System → Firmware, oder `curl -F firmware=@hermit-1pm.bin http://<ip>/update`.
 
 ## Ersteinrichtung
 
-1. Nach dem Flashen öffnet das Gerät den AP `shelly1-xxxxxxxxxxxx` bzw. `shelly1pm-…` (offen).
+1. Nach dem Flashen öffnet das Gerät den AP `hermit-1-xxxxxxxxxxxx` bzw. `hermit-1pm-…` (offen).
 2. Verbinden, `http://192.168.33.1` öffnen, Reiter **WLAN**, SSID und Passwort eintragen.
 3. Der AP geht 2 Minuten nach erfolgreicher Verbindung aus.
 

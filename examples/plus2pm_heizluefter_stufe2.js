@@ -1,5 +1,5 @@
 // =====================================================================
-// Heizlüfter – Stufe 2 über Shelly 1PM (Shelly Gen1 OS)
+// Heizlüfter – Stufe 2 über Shelly 1PM (Hermit OS)
 // Läuft als ZUSÄTZLICHES Script auf dem Shelly Plus 2PM, neben dem
 // bestehenden Heizlüfter-Script. Das Logik-Script bleibt unverändert.
 //

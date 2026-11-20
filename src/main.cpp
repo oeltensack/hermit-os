@@ -1,4 +1,4 @@
-// Shelly Gen1 OS – Shelly-Gen2-kompatible Firmware fuer Shelly 1 / 1PM (ESP8266)
+// Hermit OS – Shelly-Gen2-kompatible Firmware fuer Shelly 1 / 1PM (ESP8266)
 // RPC-API wie Gen2 (/rpc/Switch.Set, POST /rpc JSON-RPC), Webhooks, Gen1-Kompat-API,
 // WLAN mit AP-Fallback (192.168.33.1), OTA, Energiezaehler, Uebertemperatur/-leistung.
 
@@ -18,7 +18,7 @@
 #include "webui.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.1.0"
+#define FW_VERSION "1.2.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -502,7 +502,7 @@ void deviceInfo(JsonObject o) {
   if (cfg.name.length()) o["name"] = cfg.name; else o["name"] = nullptr;
   o["id"] = devId; o["mac"] = macStr; o["slot"] = 0;
   o["model"] = DEV_MODEL; o["gen"] = 2;
-  o["fw_id"] = String("shelly-gen1-os/") + FW_VERSION;
+  o["fw_id"] = String("hermit-os/") + FW_VERSION;
   o["ver"] = FW_VERSION; o["app"] = DEV_APP;
   o["auth_en"] = cfg.authPass.length() > 0;
   if (cfg.authPass.length()) o["auth_domain"] = devId; else o["auth_domain"] = nullptr;
@@ -581,7 +581,7 @@ void sysStatus(JsonObject o) {
 void sysConfig(JsonObject o) {
   JsonObject d = o["device"].to<JsonObject>();
   if (cfg.name.length()) d["name"] = cfg.name; else d["name"] = nullptr;
-  d["mac"] = macStr; d["fw_id"] = String("shelly-gen1-os/") + FW_VERSION;
+  d["mac"] = macStr; d["fw_id"] = String("hermit-os/") + FW_VERSION;
   o["location"]["tz"] = cfg.tz;
   o["sntp"]["server"] = cfg.sntp;
   o["ui"]["led"] = cfg.led;
@@ -1065,7 +1065,7 @@ void setup() {
   digitalWrite(PIN_LED, HIGH);
 #endif
   Serial.begin(115200);
-  Serial.println(F("\nShelly Gen1 OS " FW_VERSION));
+  Serial.println(F("\nHermit OS " FW_VERSION));
   Serial.printf("Flash: Header %u KB, Chip %u KB, OTA frei %u KB\n",
                 ESP.getFlashChipSize() / 1024, ESP.getFlashChipRealSize() / 1024, ESP.getFreeSketchSpace() / 1024);
   if (ESP.getFlashChipRealSize() < ESP.getFlashChipSize())

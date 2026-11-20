@@ -1,5 +1,5 @@
 // Script fuer Shelly Gen2/Gen3:
-// Das eigene Relais (switch:0) wird auf ein altes Shelly 1/1PM mit Shelly Gen1 OS gespiegelt.
+// Das eigene Relais (switch:0) wird auf ein altes Shelly 1/1PM mit Hermit OS gespiegelt.
 // Anpassen: IP des Altgeraets.
 
 let ALT = "http://192.168.0.50";
