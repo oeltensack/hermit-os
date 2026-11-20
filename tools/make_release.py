@@ -4,7 +4,7 @@
 Aufruf im Projektverzeichnis:  python3 tools/make_release.py
 Danach committen und pushen – die Geraete finden die neue Version ueber update.json.
 """
-import gzip, hashlib, json, re, shutil, subprocess, pathlib
+import gzip, hashlib, json, re, shutil, subprocess, pathlib, zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in update.json
@@ -43,3 +43,27 @@ with gzip.open(bindir / "hermit-loader.bin.gz", "wb", compresslevel=9) as g:
 
 (ROOT / "update.json").write_text(json.dumps({"version": version, "files": files}, indent=2) + "\n")
 print(f"update.json fuer Version {version} geschrieben")
+
+# Pro Modell eine Zip: Firmware (+Add-on-Variante), Loader, Flash-Tool, Anleitung
+MODELS = {
+    "Shelly-1":      ["hermit-1", "hermit-1-addon"],
+    "Shelly-1PM":    ["hermit-1pm", "hermit-1pm-addon"],
+    "Shelly-Plug-S": ["hermit-plugs"],
+    "Shelly-Duo":    ["hermit-duo"],
+}
+dist = ROOT / "dist"
+dist.mkdir(exist_ok=True)
+for f in dist.glob("*.zip"):
+    f.unlink()
+for model, names in MODELS.items():
+    top = f"Hermit-OS-{version}-{model}"
+    out = dist / f"{top}.zip"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for n in names:
+            z.write(bindir / f"{n}.bin", f"{top}/bin/{n}.bin")
+            z.write(bindir / f"{n}.bin.gz", f"{top}/bin/{n}.bin.gz")
+        z.write(bindir / "hermit-loader.bin.gz", f"{top}/bin/hermit-loader.bin.gz")
+        z.write(ROOT / "tools" / "hermit_flash.py", f"{top}/tools/hermit_flash.py")
+        z.write(ROOT / "README.md", f"{top}/README.md")
+    print("  ", out.name)
+

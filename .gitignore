@@ -2,3 +2,4 @@
 .vscode/
 
 tools/.cache/
+dist/
