@@ -25,7 +25,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 5px;bord
 .ck{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--fg);font-size:14px}.ck input{width:auto}
 pre{background:var(--bg);padding:10px;border-radius:6px;overflow:auto;font-size:12px;max-height:340px;white-space:pre-wrap}
 nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 11px;border-radius:6px;background:var(--c);font-size:13px;cursor:pointer}
-nav a.a{background:var(--a)}.tab{display:none}.tab.a{display:block}
+nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.tab.a{display:block}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff}
 code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
@@ -40,6 +40,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="pm"><div class="v" id="en">–</div><div class="l">Energie</div></div>
 <div class="pm"><div class="v" id="tc">–</div><div class="l">Temperatur</div></div>
 <div><div class="v" id="in">–</div><div class="l">Eingang SW</div></div>
+<div class="ao"><div class="v" id="ex">–</div><div class="l" id="exl">Add-on-Taster</div></div>
 <div><div class="v" id="rs">–</div><div class="l">WLAN</div></div>
 <div><div class="v" id="ip">–</div><div class="l">IP</div></div>
 <div><div class="v" id="up">–</div><div class="l">Laufzeit</div></div>
@@ -64,12 +65,21 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <h2 style="margin-top:20px">Eingang SW</h2>
 <div class="row"><div><label>Typ</label><select id="i_type"><option value="switch">Schalter</option><option value="button">Taster</option></select></div>
 <div><label class="ck" style="margin-top:34px"><input type="checkbox" id="i_invert">Eingang invertieren</label></div></div>
-<button class="bt" onclick="saveSw()">Speichern</button></div></section>
+<button class="bt" onclick="saveSw()">Speichern</button></div>
+<div class="card ao"><h2>Add-on-Taster (input:100)</h2>
+<div class="l">Taster zwischen DATA und GND des Add-ons.</div>
+<label>Name</label><input id="x_name">
+<div class="row"><div><label>Typ</label><select id="x_type"><option value="button">Taster</option><option value="switch">Schalter</option></select></div>
+<div><label>Wirkung aufs Relais</label><select id="x_rel"><option value="none">Keine (nur Ereignis/Aktion)</option><option value="momentary">Umschalten bei Druck</option><option value="flip">Umschalten bei jeder Flanke</option><option value="follow">Relais folgt</option></select></div></div>
+<label class="ck"><input type="checkbox" id="x_inv">Eingang invertieren</label>
+<label class="ck"><input type="checkbox" id="x_out">Add-on-Ausgang invertieren (wenn der Eingang dauerhaft „gedrückt“ zeigt)</label>
+<button class="bt" onclick="saveEx()">Speichern</button></div></section>
 
 <section class="tab" id="wh"><div class="card"><h2>Aktionen (Webhooks)</h2>
 <table id="hooks"></table></div>
 <div class="card"><h2>Neue Aktion</h2>
 <div class="row"><div><label>Ereignis</label><select id="h_ev"></select></div><div><label>Name</label><input id="h_name"></div>
+<div id="h_cidw" style="display:none"><label>Eingang</label><select id="h_cid"><option value="0">SW (input:0)</option><option value="100">Add-on (input:100)</option></select></div>
 <div id="h_thrw" style="display:none"><label>Schwelle (W)</label><input id="h_thr" type="number"></div></div>
 <label>URLs (eine pro Zeile, max. 5)</label><textarea id="h_urls" placeholder="http://192.168.0.60/rpc/Switch.Set?id=0&on=true"></textarea>
 <div class="l" style="margin-top:6px">Platzhalter: <code>${event}</code> <code>${output}</code> <code>${input}</code> <code>${apower}</code> <code>${aenergy}</code> <code>${tC}</code> <code>${id}</code> <code>${name}</code> <code>${ip}</code></div>
@@ -118,7 +128,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <button class="bt" onclick="sendRpc()">Senden</button><pre id="r_o"></pre></div></section>
 </main><div id="toast"></div>
 <script>
-const $=i=>document.getElementById(i);let PM=false,SUP=[];
+const $=i=>document.getElementById(i);let PM=false,AO=false,SUP=[];
 let Q=Promise.resolve();function rpc(m,p){const r=Q.then(()=>rpc0(m,p));Q=r.catch(()=>{});return r}
 async function rpc0(m,p){const r=await fetch('/rpc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:Date.now()%1e6,method:m,params:p||{}})});const j=await r.json();if(j.error)throw new Error(j.error.message||('Fehler '+j.error.code));return j.result}
 function toast(t,bad){const e=$('toast');e.textContent=t;e.style.background=bad?'#b33':'#2a7a3a';e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',2800)}
@@ -130,7 +140,7 @@ document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelec
 async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0'];
 $('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':'AUS';PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
-$('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0'].state?'AN':'AUS';
+$('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0'].state?'AN':'AUS';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 $('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
@@ -142,16 +152,18 @@ async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0'],
 ['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
 showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
+const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
 const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Hermit OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
 $('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
+function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
 function saveSw(){run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
 await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked}})},'Gespeichert')}
 async function loadHooks(){await run(async()=>{if(!SUP.length){const s=await rpc('Webhook.ListSupported');SUP=Object.keys(s.types);$('h_ev').innerHTML=SUP.map(e=>`<option>${e}</option>`).join('')}
-const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
-$('h_ev').onchange=()=>$('h_thrw').style.display=$('h_ev').value.includes('power_')?'':'none';
-function addh(){run(async()=>{const p={event:$('h_ev').value,name:$('h_name').value,enable:true,urls:$('h_urls').value.split('\n').map(s=>s.trim()).filter(Boolean)};const t=$('h_thr').value;if(t!=='')p.threshold=+t;await rpc('Webhook.Create',p);$('h_urls').value='';$('h_name').value='';loadHooks()},'Aktion angelegt')}
+const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
+$('h_ev').onchange=()=>{const v=$('h_ev').value;$('h_thrw').style.display=v.includes('power_')?'':'none';$('h_cidw').style.display=AO&&v.startsWith('input.')?'':'none'};
+function addh(){run(async()=>{const p={event:$('h_ev').value,cid:AO&&$('h_ev').value.startsWith('input.')?+$('h_cid').value:0,name:$('h_name').value,enable:true,urls:$('h_urls').value.split('\n').map(s=>s.trim()).filter(Boolean)};const t=$('h_thr').value;if(t!=='')p.threshold=+t;await rpc('Webhook.Create',p);$('h_urls').value='';$('h_name').value='';loadHooks()},'Aktion angelegt')}
 function delh(id){run(async()=>{await rpc('Webhook.Delete',{id});loadHooks()})}
 function tgl(id,en){run(()=>rpc('Webhook.Update',{id,enable:en}))}
 function scan(){run(async()=>{$('scan').textContent='Suche …';try{const r=await rpc('WiFi.Scan');$('w_list').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(n=>`<option value="${esc(n.ssid)}">${n.rssi} dBm</option>`).join('');toast(r.results.length+' Netze gefunden')}finally{$('scan').textContent='Netze suchen'}})}

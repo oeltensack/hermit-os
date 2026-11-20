@@ -29,3 +29,18 @@
 #else
   #error "DEVICE_SHELLY1 oder DEVICE_SHELLY1PM definieren"
 #endif
+
+// Variante mit Shelly-Temperatur-Add-on (Gen1), genutzt als externer Tastereingang input:100.
+// Das Add-on fuehrt die Datenleitung ueber Optokoppler: GPIO0 = Ausgang (Leitung freigeben),
+// GPIO3 = Eingang. Taster zwischen DATA und GND des Add-ons.
+#if defined(WITH_ADDON)
+  #define HAS_ADDON      1
+  #define PIN_ADDON_OUT  0
+  #define PIN_ADDON_IN   3
+  #undef  HAS_LED
+  #define HAS_LED        0     // GPIO0 wird vom Add-on belegt
+  #define DEV_MODEL_STR  DEV_MODEL "-ADDON"
+#else
+  #define HAS_ADDON      0
+  #define DEV_MODEL_STR  DEV_MODEL
+#endif

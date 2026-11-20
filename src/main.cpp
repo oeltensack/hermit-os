@@ -18,12 +18,13 @@
 #include "webui.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.2.0"
+#define FW_VERSION "1.3.0"
 #endif
 
 // ======================= Konfiguration =======================
 struct Hook {
   int id = 0;
+  int cid = 0;
   bool enable = true;
   String event, name;
   std::vector<String> urls;
@@ -43,6 +44,11 @@ struct Cfg {
   String inMode = "follow";        // follow | flip | momentary | detached
   String inType = "switch";        // switch | button
   bool inInvert = false;
+  String exName;                   // Add-on-Taster (input:100)
+  String exType = "button";        // switch | button
+  bool exInvert = false;
+  bool exOutLow = false;           // Add-on-Ausgang invertiert (Leitung mit LOW freigeben)
+  String exRelay = "none";         // none | momentary | flip | follow
   bool autoOn = false;  float autoOnDelay = 60;
   bool autoOff = false; float autoOffDelay = 60;
   float powerLimit = 3500;
@@ -78,6 +84,9 @@ static const char* METHODS[] = {
   "Switch.ResetCounters", "Switch.Calibrate",
 #endif
   "Input.GetStatus", "Input.GetConfig", "Input.SetConfig",
+#if HAS_ADDON
+  "SensorAddon.GetPeripherals",
+#endif
   "Sys.GetStatus", "Sys.GetConfig", "Sys.SetConfig",
   "WiFi.GetStatus", "WiFi.GetConfig", "WiFi.SetConfig", "WiFi.Scan",
   "Webhook.List", "Webhook.Create", "Webhook.Update", "Webhook.Delete",
@@ -101,9 +110,8 @@ time_t timerStartedAt = 0;
 
 volatile bool inPulse = false;
 volatile uint8_t inActiveLevel = HIGH;
-uint32_t inLastActiveMs = 0, inCandMs = 0, pressStartMs = 0, lastReleaseMs = 0;
+uint32_t inLastActiveMs = 0, inCandMs = 0;
 bool inState = false, inCand = false;
-uint8_t pushCount = 0;
 int bootEdges = 0;
 
 volatile uint32_t cfLastUs = 0, cfSumUs = 0, cfCnt = 0;
@@ -148,6 +156,7 @@ void saveCfg() {
   d["static"] = cfg.staticIp; d["ip"] = cfg.ip; d["mask"] = cfg.mask; d["gw"] = cfg.gw; d["dns"] = cfg.dns;
   d["appass"] = cfg.apPass; d["swname"] = cfg.swName; d["inname"] = cfg.inName;
   d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert;
+  d["exname"] = cfg.exName; d["extype"] = cfg.exType; d["exinv"] = cfg.exInvert; d["exout"] = cfg.exOutLow; d["exrel"] = cfg.exRelay;
   d["aon"] = cfg.autoOn; d["aond"] = cfg.autoOnDelay; d["aoff"] = cfg.autoOff; d["aoffd"] = cfg.autoOffDelay;
   d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led;
   d["auth"] = cfg.authPass; d["tz"] = cfg.tz; d["sntp"] = cfg.sntp;
@@ -155,7 +164,7 @@ void saveCfg() {
   JsonArray ha = d["hooks"].to<JsonArray>();
   for (auto& h : cfg.hooks) {
     JsonObject o = ha.add<JsonObject>();
-    o["id"] = h.id; o["en"] = h.enable; o["ev"] = h.event; o["name"] = h.name;
+    o["id"] = h.id; o["cid"] = h.cid; o["en"] = h.enable; o["ev"] = h.event; o["name"] = h.name;
     JsonArray u = o["urls"].to<JsonArray>();
     for (auto& s : h.urls) u.add(s);
     if (h.hasThr) o["thr"] = h.thr;
@@ -177,6 +186,8 @@ void loadCfg() {
   cfg.apPass = jstr(d["appass"], ""); cfg.swName = jstr(d["swname"], ""); cfg.inName = jstr(d["inname"], "");
   cfg.initialState = jstr(d["initial"], cfg.initialState); cfg.inMode = jstr(d["inmode"], cfg.inMode);
   cfg.inType = jstr(d["intype"], cfg.inType); cfg.inInvert = d["ininv"] | false;
+  cfg.exName = jstr(d["exname"], ""); cfg.exType = jstr(d["extype"], cfg.exType);
+  cfg.exInvert = d["exinv"] | false; cfg.exOutLow = d["exout"] | false; cfg.exRelay = jstr(d["exrel"], cfg.exRelay);
   cfg.autoOn = d["aon"] | false; cfg.autoOnDelay = d["aond"] | 60.0f;
   cfg.autoOff = d["aoff"] | false; cfg.autoOffDelay = d["aoffd"] | 60.0f;
   cfg.powerLimit = d["plim"] | cfg.powerLimit; cfg.tempLimit = d["tlim"] | cfg.tempLimit;
@@ -189,7 +200,7 @@ void loadCfg() {
   cfg.hooks.clear();
   for (JsonObjectConst o : d["hooks"].as<JsonArrayConst>()) {
     Hook h;
-    h.id = o["id"] | 0; h.enable = o["en"] | true; h.event = jstr(o["ev"], ""); h.name = jstr(o["name"], "");
+    h.id = o["id"] | 0; h.cid = o["cid"] | 0; h.enable = o["en"] | true; h.event = jstr(o["ev"], ""); h.name = jstr(o["name"], "");
     for (JsonVariantConst u : o["urls"].as<JsonArrayConst>()) h.urls.push_back(jstr(u, ""));
     if (o["thr"].is<float>()) { h.hasThr = true; h.thr = o["thr"]; }
     h.armed = (h.event != "switch.power_below");
@@ -223,8 +234,10 @@ bool loadRelayState() {
 }
 
 // ======================= Ereignisse / Webhooks =======================
+int h_cid_tmp = 0;
 String expandUrl(String u, const String& ev) {
   u.replace("${event}", ev);
+  u.replace("${cid}", String(h_cid_tmp));
   u.replace("${output}", relayOn ? "true" : "false");
   u.replace("${input}", inState ? "true" : "false");
   u.replace("${id}", devId);
@@ -237,13 +250,14 @@ String expandUrl(String u, const String& ev) {
 }
 
 void fireHook(const Hook& h, const String& ev) {
+  h_cid_tmp = h.cid;
   for (auto& u : h.urls)
     if (httpQueue.size() < 12) httpQueue.push_back(expandUrl(u, ev));
 }
 
-void fireEvent(const String& ev) {
+void fireEvent(const String& ev, int cid = 0) {
   for (auto& h : cfg.hooks)
-    if (h.enable && h.event == ev) fireHook(h, ev);
+    if (h.enable && h.event == ev && h.cid == cid) fireHook(h, ev);
 }
 
 void processQueue() {
@@ -324,24 +338,43 @@ void resetWifiAndReboot() {
   rebootAt = millis() + 500;
 }
 
+struct BtnState { uint32_t pressMs = 0, relMs = 0; uint8_t pushes = 0; };
+BtnState bs0, bs100;
+
+// Ereignisse eines Eingangs (Schalter: toggle_on/off, Taster: down/up/push/doublepush/longpush)
+void btnEdge(int cid, const String& type, bool st, BtnState& b) {
+  uint32_t now = millis();
+  if (type == "button") {
+    if (st) { b.pressMs = now; fireEvent("input.button_down", cid); }
+    else {
+      fireEvent("input.button_up", cid);
+      if (now - b.pressMs >= 1000) { b.pushes = 0; fireEvent("input.button_longpush", cid); }
+      else { b.pushes++; b.relMs = now; }
+    }
+  } else {
+    fireEvent(st ? "input.toggle_on" : "input.toggle_off", cid);
+  }
+}
+
+void btnTick(int cid, bool st, BtnState& b) {
+  if (b.pushes && !st && millis() - b.relMs > 350) {
+    fireEvent(b.pushes >= 2 ? "input.button_doublepush" : "input.button_push", cid);
+    b.pushes = 0;
+  }
+}
+
+// Relaisaktion eines Eingangs: follow | flip | momentary | detached/none
+void inputAction(const String& mode, bool st, const char* src) {
+  if (mode == "follow") setRelay(st, src);
+  else if (mode == "flip") setRelay(!relayOn, src);
+  else if (mode == "momentary") { if (st) setRelay(!relayOn, src); }
+}
+
 void onInputEdge(bool st) {
   uint32_t now = millis();
   if (now < 60000 && ++bootEdges >= 10) { resetWifiAndReboot(); return; }
-
-  if (cfg.inType == "button") {
-    if (st) { pressStartMs = now; fireEvent("input.button_down"); }
-    else {
-      fireEvent("input.button_up");
-      if (now - pressStartMs >= 1000) { pushCount = 0; fireEvent("input.button_longpush"); }
-      else { pushCount++; lastReleaseMs = now; }
-    }
-  } else {
-    fireEvent(st ? "input.toggle_on" : "input.toggle_off");
-  }
-
-  if (cfg.inMode == "follow") setRelay(st, "switch");
-  else if (cfg.inMode == "flip") setRelay(!relayOn, "switch");
-  else if (cfg.inMode == "momentary") { if (st) setRelay(!relayOn, "button"); }
+  btnEdge(0, cfg.inType, st, bs0);
+  inputAction(cfg.inMode, st, cfg.inMode == "momentary" ? "button" : "switch");
 }
 
 bool sampleInput(uint32_t now) {
@@ -354,11 +387,35 @@ void handleInput() {
   bool raw = sampleInput(now);
   if (raw != inCand) { inCand = raw; inCandMs = now; }
   if (inCand != inState && now - inCandMs >= 40) { inState = inCand; onInputEdge(inState); }
-  if (pushCount && !inState && now - lastReleaseMs > 350) {
-    fireEvent(pushCount >= 2 ? "input.button_doublepush" : "input.button_push");
-    pushCount = 0;
-  }
+  btnTick(0, inState, bs0);
 }
+
+// ---- Add-on-Taster (input:100) ----
+#if HAS_ADDON
+bool exState = false, exCand = false;
+uint32_t exCandMs = 0;
+
+void addonRelease() { digitalWrite(PIN_ADDON_OUT, cfg.exOutLow ? LOW : HIGH); }
+
+bool readAddon() {
+  bool pressed = digitalRead(PIN_ADDON_IN) == LOW;   // Taster zieht DATA nach GND
+  return cfg.exInvert ? !pressed : pressed;
+}
+
+void handleAddon() {
+  uint32_t now = millis();
+  bool raw = readAddon();
+  if (raw != exCand) { exCand = raw; exCandMs = now; }
+  if (exCand != exState && now - exCandMs >= 30) {
+    exState = exCand;
+    btnEdge(100, cfg.exType, exState, bs100);
+    inputAction(cfg.exRelay, exState, "addon");
+  }
+  btnTick(100, exState, bs100);
+}
+#else
+void handleAddon() {}
+#endif
 
 // ======================= Leistungsmessung / Temperatur =======================
 #if HAS_PM
@@ -501,7 +558,7 @@ void handleWifi() {
 void deviceInfo(JsonObject o) {
   if (cfg.name.length()) o["name"] = cfg.name; else o["name"] = nullptr;
   o["id"] = devId; o["mac"] = macStr; o["slot"] = 0;
-  o["model"] = DEV_MODEL; o["gen"] = 2;
+  o["model"] = DEV_MODEL_STR; o["gen"] = 2;
   o["fw_id"] = String("hermit-os/") + FW_VERSION;
   o["ver"] = FW_VERSION; o["app"] = DEV_APP;
   o["auth_en"] = cfg.authPass.length() > 0;
@@ -553,6 +610,15 @@ void switchConfig(JsonObject o) {
 }
 
 void inputStatus(JsonObject o) { o["id"] = 0; o["state"] = inState; }
+#if HAS_ADDON
+void addonStatus(JsonObject o) { o["id"] = 100; o["state"] = exState; }
+void addonConfig(JsonObject o) {
+  o["id"] = 100;
+  if (cfg.exName.length()) o["name"] = cfg.exName; else o["name"] = nullptr;
+  o["type"] = cfg.exType; o["invert"] = cfg.exInvert;
+  o["addon_out_invert"] = cfg.exOutLow; o["relay_action"] = cfg.exRelay;
+}
+#endif
 void inputConfig(JsonObject o) {
   o["id"] = 0;
   if (cfg.inName.length()) o["name"] = cfg.inName; else o["name"] = nullptr;
@@ -604,7 +670,7 @@ void wifiConfig(JsonObject o) {
 }
 
 void hookJson(JsonObject o, const Hook& h) {
-  o["id"] = h.id; o["cid"] = 0; o["enable"] = h.enable; o["event"] = h.event; o["name"] = h.name;
+  o["id"] = h.id; o["cid"] = h.cid; o["enable"] = h.enable; o["event"] = h.event; o["name"] = h.name;
   JsonArray u = o["urls"].to<JsonArray>();
   for (auto& s : h.urls) u.add(s);
   if (h.hasThr) o["threshold"] = h.thr;
@@ -622,6 +688,10 @@ String applyHook(Hook& h, JsonVariantConst p) {
     if (!eventSupported(ev)) return "Unbekanntes Ereignis: " + ev;
     h.event = ev;
   }
+  if (p["cid"].is<int>()) h.cid = p["cid"];
+  if (h.event.startsWith("input.")) {
+    if (h.cid != 0 && !(HAS_ADDON && h.cid == 100)) return HAS_ADDON ? "cid: 0 (SW) oder 100 (Add-on)" : "cid muss 0 sein";
+  } else h.cid = 0;
   if (p["enable"].is<bool>()) h.enable = p["enable"];
   if (p["name"].is<const char*>()) h.name = p["name"].as<const char*>();
   if (p["urls"].is<JsonArrayConst>()) {
@@ -652,12 +722,18 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     JsonObject o = out.to<JsonObject>();
     sysStatus(o["sys"].to<JsonObject>()); wifiStatus(o["wifi"].to<JsonObject>());
     switchStatus(o["switch:0"].to<JsonObject>()); inputStatus(o["input:0"].to<JsonObject>());
+#if HAS_ADDON
+    addonStatus(o["input:100"].to<JsonObject>());
+#endif
     return 0;
   }
   if (m == "shelly.getconfig") {
     JsonObject o = out.to<JsonObject>();
     sysConfig(o["sys"].to<JsonObject>()); wifiConfig(o["wifi"].to<JsonObject>());
     switchConfig(o["switch:0"].to<JsonObject>()); inputConfig(o["input:0"].to<JsonObject>());
+#if HAS_ADDON
+    addonConfig(o["input:100"].to<JsonObject>());
+#endif
     return 0;
   }
   if (m == "shelly.listmethods") {
@@ -688,9 +764,10 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
 
   // ---- Switch / Input: nur id 0 ----
-  if (m.startsWith("switch.") || m.startsWith("input.")) {
-    if ((p["id"] | 0) != 0) ERR(-103, "Ungültige id – Gerät hat nur id 0");
-  }
+  int pid = p["id"] | 0;
+  if (m.startsWith("switch.") && pid != 0) ERR(-103, "Ungültige id – Schalter hat nur id 0");
+  if (m.startsWith("input.") && pid != 0 && !(HAS_ADDON && pid == 100))
+    ERR(-103, HAS_ADDON ? "Ungültige id – Eingänge: 0 (SW), 100 (Add-on)" : "Ungültige id – Eingang hat nur id 0");
   if (m == "switch.set") {
     if (!p["on"].is<bool>()) ERR(-103, "Parameter on (true/false) fehlt");
     bool on = p["on"];
@@ -768,6 +845,37 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     out["factor"] = cfg.pwrCal;
     out["source"] = cfg.calSrc;
     out["default"] = PWR_CAL_DEFAULT;
+    return 0;
+  }
+#endif
+#if HAS_ADDON
+  if (pid == 100) {
+    if (m == "input.getstatus") { addonStatus(out.to<JsonObject>()); return 0; }
+    if (m == "input.getconfig") { addonConfig(out.to<JsonObject>()); return 0; }
+    if (m == "input.setconfig") {
+      JsonVariantConst c = p["config"];
+      if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
+      if (c["name"].is<const char*>()) cfg.exName = c["name"].as<const char*>();
+      if (c["type"].is<const char*>()) {
+        String v = c["type"].as<const char*>();
+        if (v != "switch" && v != "button") ERR(-103, "type: switch|button");
+        cfg.exType = v;
+      }
+      if (c["relay_action"].is<const char*>()) {
+        String v = c["relay_action"].as<const char*>();
+        if (v != "none" && v != "momentary" && v != "flip" && v != "follow") ERR(-103, "relay_action: none|momentary|flip|follow");
+        cfg.exRelay = v;
+      }
+      if (c["invert"].is<bool>()) cfg.exInvert = c["invert"];
+      if (c["addon_out_invert"].is<bool>()) { cfg.exOutLow = c["addon_out_invert"]; addonRelease(); }
+      saveCfg();
+      exCand = exState = readAddon();
+      out["restart_required"] = false;
+      return 0;
+    }
+  }
+  if (m == "sensoraddon.getperipherals") {
+    out["digital_in"]["input:100"].to<JsonObject>();
     return 0;
   }
 #endif
@@ -1011,7 +1119,11 @@ void gen1Status() {
 #if HAS_TEMP
   if (!isnan(tempC)) { d["temperature"] = r1(tempC); d["overtemperature"] = overtemp; }
 #endif
-  d["inputs"].to<JsonArray>().add<JsonObject>()["input"] = inState ? 1 : 0;
+  JsonArray ins = d["inputs"].to<JsonArray>();
+  ins.add<JsonObject>()["input"] = inState ? 1 : 0;
+#if HAS_ADDON
+  ins.add<JsonObject>()["input"] = exState ? 1 : 0;
+#endif
   d["mac"] = macStr; d["uptime"] = millis() / 1000;
   d["ram_free"] = ESP.getFreeHeap();
   sendJson(200, d);
@@ -1064,7 +1176,11 @@ void setup() {
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);
 #endif
+#if HAS_ADDON
+  Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY);   // RX (GPIO3) gehoert dem Add-on
+#else
   Serial.begin(115200);
+#endif
   Serial.println(F("\nHermit OS " FW_VERSION));
   Serial.printf("Flash: Header %u KB, Chip %u KB, OTA frei %u KB\n",
                 ESP.getFlashChipSize() / 1024, ESP.getFlashChipRealSize() / 1024, ESP.getFreeSketchSpace() / 1024);
@@ -1084,6 +1200,14 @@ void setup() {
   loadCal();
   loadCfg();
   loadEnergy();
+
+#if HAS_ADDON
+  pinMode(PIN_ADDON_OUT, OUTPUT);
+  addonRelease();
+  pinMode(PIN_ADDON_IN, INPUT_PULLUP);
+  delay(20);
+  exState = exCand = readAddon();
+#endif
 
   // Eingang
   inActiveLevel = cfg.inInvert ? LOW : HIGH;
@@ -1123,6 +1247,7 @@ void loop() {
   if (mdnsUp) MDNS.update();
   handleWifi();
   handleInput();
+  handleAddon();
   handleTimer();
   handlePm();
   handleTemp();

@@ -86,6 +86,28 @@ Möglichkeiten (Weboberfläche → System → Leistung kalibrieren, oder per RPC
 Der Faktor liegt in einer eigenen Datei und bleibt bei Firmware-Updates **und** Werkseinstellungen erhalten.
 `Switch.GetConfig` zeigt ihn unter `pm_calibration`.
 
+## Variante mit Add-on (externer Taster)
+
+Für Shelly 1 / 1PM mit dem **Shelly-Temperatur-Add-on (Gen1)** gibt es eigene Firmware-Dateien:
+`bin/hermit-1-addon.bin` und `bin/hermit-1pm-addon.bin`. Das Add-on wird nicht für Sensoren genutzt,
+sondern als **zusätzlicher, potenzialfreier Tastereingang**.
+
+- Anschluss: Taster zwischen **DATA** und **GND** des Add-ons
+- Erscheint wie beim Plus-Add-on als `input:100` (`Input.GetStatus?id=100`, `SensorAddon.GetPeripherals`)
+- Typ Taster oder Schalter, Ereignisse `input.button_push/doublepush/longpush/down/up` bzw. `input.toggle_on/off`
+  mit `cid: 100` als Webhook
+- Wirkung aufs Relais wählbar: keine (Standard), umschalten bei Druck, umschalten bei jeder Flanke, folgen
+- Pinbelegung: GPIO0 = Add-on-Ausgang (Leitung freigeben), GPIO3 = Eingang. Beim 1PM entfällt dadurch die LED,
+  die serielle Ausgabe läuft nur noch auf TX.
+- Zeigt der Eingang dauerhaft „gedrückt“, in den Einstellungen „Add-on-Ausgang invertieren“ setzen;
+  ist der Zustand vertauscht, „Eingang invertieren“.
+
+Webhook für den Add-on-Taster per RPC:
+
+```
+/rpc/Webhook.Create?event="input.button_push"&cid=100&urls=["http://192.168.0.60/rpc/Switch.Toggle?id=0"]
+```
+
 ## Zusammenspiel mit Gen2/Gen3-Scripten
 
 **Altgerät aus einem Script schalten:**
