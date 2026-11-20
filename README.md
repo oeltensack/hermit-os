@@ -92,6 +92,17 @@ falls dabei etwas schiefgeht.
 
 Spätere Updates: Weboberfläche → System → Firmware, oder `curl -F firmware=@hermit-1pm.bin http://<ip>/update`.
 
+## Hermit OS Flasher (grafisch)
+
+Doppelklick auf **`Hermit-Flasher.pyw`** (Windows, Python 3 installiert) öffnet die Oberfläche:
+
+- **Netz durchsuchen** findet Shelly 1/1PM/Plug S/Duo mit Original-Firmware, Tasmota, Loader oder Hermit OS
+- **Gerät prüfen** zeigt, was läuft und welche Firmware installiert wird
+- Firmware automatisch oder von Hand wählen, Add-on-Variante, Passwort, eigene .bin
+- **Hermit OS installieren** – Fortschritt im Protokoll
+
+Alternativ: `python tools/hermit_flash_gui.py`. Unter Linux ggf. `python3-tk` installieren.
+
 ## Flash-Tool: `tools/hermit_flash.py`
 
 Schreibt Hermit OS über WLAN auf einen Shelly 1 / 1PM und erkennt selbst, was gerade läuft:
