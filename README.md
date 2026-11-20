@@ -108,6 +108,30 @@ Webhook für den Add-on-Taster per RPC:
 /rpc/Webhook.Create?event="input.button_push"&cid=100&urls=["http://192.168.0.60/rpc/Switch.Toggle?id=0"]
 ```
 
+## Automatische Updates
+
+Die Geräte lesen `update.json` aus diesem Repo und holen sich die Datei ihrer Variante
+(`hermit-1`, `hermit-1pm`, `hermit-1-addon`, `hermit-1pm-addon`).
+
+- Weboberfläche → System → Automatische Updates: **Aus**, **Nur prüfen** (Standard) oder **Automatisch installieren**
+- Prüfung 2 min nach dem Start und täglich zur eingestellten Stunde (Standard 3 Uhr)
+- Installiert wird **nur bei ausgeschaltetem Relais**; ist es an, wird es in der Stunde alle 10 min erneut versucht
+- Vor dem Umschalten wird die **SHA-256** aus `update.json` geprüft; bei Abweichung bleibt die alte Firmware
+- API wie Gen2: `Shelly.CheckForUpdate`, `Shelly.Update` (`{"stage":"stable"}` oder `{"url":"…"}`),
+  `Sys.GetStatus` → `available_updates`
+- Einstellungen per RPC: `Sys.SetConfig` mit `{"config":{"updates":{"mode":"install","hour":3,"url":"…","token":"…"}}}`
+
+**Privates Repo:** Die Geräte brauchen dann einen GitHub-Token (fine-grained, nur Leserecht „Contents“ auf dieses Repo),
+einzutragen unter „GitHub-Token“. Alternativ das Repo öffentlich machen oder `update.json` + `bin/` auf einem eigenen
+Webserver ablegen und die URL anpassen.
+
+**Neue Version veröffentlichen:** Version in `platformio.ini` erhöhen, dann
+
+```bash
+python3 tools/make_release.py   # baut alle Varianten, füllt bin/ und schreibt update.json
+git add -A && git commit -m "Version x.y.z" && git push
+```
+
 ## Zusammenspiel mit Gen2/Gen3-Scripten
 
 **Altgerät aus einem Script schalten:**

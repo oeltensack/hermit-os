@@ -114,7 +114,15 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="row"><button class="bt" onclick="calib({factor:+$('y_fac').value})">Faktor setzen</button>
 <button class="bt g" onclick="calib({reset:true})">Standard wiederherstellen</button>
 <button class="bt g" onclick="rstc()">Energiezähler nullen</button></div></div>
-<div class="card"><h2>Firmware</h2>
+<div class="card"><h2>Automatische Updates</h2>
+<div class="v" id="u_st" style="font-size:16px">–</div><div class="l" id="u_info"></div>
+<div class="row"><div><label>Modus</label><select id="u_mode"><option value="off">Aus</option><option value="check">Nur prüfen und anzeigen</option><option value="install">Automatisch installieren</option></select></div>
+<div><label>Uhrzeit (Stunde)</label><input id="u_hour" type="number" min="0" max="23"></div></div>
+<label>Update-Quelle (update.json)</label><input id="u_url">
+<label>GitHub-Token (nur bei privatem Repo)</label><input id="u_tok" type="password">
+<div class="l">Installiert wird nur bei ausgeschaltetem Relais. Die Firmware wird vor dem Umschalten per SHA-256 geprüft.</div>
+<div class="row"><button class="bt" onclick="saveUpd()">Speichern</button><button class="bt g" onclick="chkUpd()">Jetzt prüfen</button><button class="bt g" id="u_inst" onclick="instUpd()">Jetzt installieren</button></div></div>
+<div class="card"><h2>Firmware manuell</h2>
 <form method="POST" action="/update" enctype="multipart/form-data"><input type="file" name="firmware" accept=".bin">
 <button class="bt">Hochladen &amp; flashen</button></form></div>
 <div class="card"><h2>Neustart</h2><div class="row">
@@ -155,7 +163,7 @@ $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_s
 const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
 const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Hermit OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
-$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
+showUpd(c.sys.updates,d.ver);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
 function saveSw(){run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
@@ -173,6 +181,13 @@ function setAuth(clear){run(async()=>{if(!clear&&!$('y_auth').value)throw new Er
 const CSRC={default:'Standard (wie Tasmota BL0937)',reference:'mit Referenzlast kalibriert',tasmota:'aus Tasmota übernommen',manual:'manuell gesetzt'};
 function showCal(c){if(!c)return;$('y_cf').textContent=c.factor.toFixed(4)+' W/Hz · '+(CSRC[c.source]||c.source)+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
 function calib(p){run(async()=>{p.id=0;const r=await rpc('Switch.Calibrate',p);showCal(r);toast('Faktor: '+r.factor.toFixed(4)+' W/Hz')})}
+function showUpd(u,ver){if(!u)return;$('u_mode').value=u.mode;$('u_hour').value=u.hour;$('u_url').value=u.url;$('u_tok').placeholder=u.token_set?'gesetzt – leer lassen = unverändert':'kein Token';
+$('u_st').textContent=u.available?'Neue Version '+u.available+' verfügbar':'Aktuell ('+ver+')';$('u_inst').style.display=u.available?'':'none';
+$('u_info').textContent='Variante '+u.variant+(u.last_check?' · zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE'):'')+(u.last_error?' · '+u.last_error:'')+(u.state!='idle'?' · '+u.state:'')}
+async function loadUpd(){const c=await rpc('Sys.GetConfig');const d=await rpc('Shelly.GetDeviceInfo');showUpd(c.updates,d.ver)}
+function saveUpd(){run(async()=>{const u={mode:$('u_mode').value,hour:+$('u_hour').value,url:$('u_url').value};if($('u_tok').value)u.token=$('u_tok').value;await rpc('Sys.SetConfig',{config:{updates:u}});$('u_tok').value='';await loadUpd()},'Gespeichert')}
+function chkUpd(){run(async()=>{const r=await rpc('Shelly.CheckForUpdate');await loadUpd();toast(r.stable?'Neue Version '+r.stable.version:'Firmware ist aktuell')})}
+function instUpd(){if(confirm('Update jetzt installieren? Das Gerät startet danach neu.'))run(async()=>{await rpc('Shelly.Update',{stage:'stable'});toast('Update läuft – Gerät startet gleich neu')})}
 function rstc(){if(confirm('Energiezähler nullen?'))run(()=>rpc('Switch.ResetCounters',{id:0}),'Zähler genullt')}
 function sendRpc(){run(async()=>{const t=$('r_p').value.trim();const p=t?JSON.parse(t):{};try{$('r_o').textContent=JSON.stringify(await rpc($('r_m').value,p),null,2)}catch(e){$('r_o').textContent='Fehler: '+e.message}})}
 function init(){loadCfg().catch(()=>setTimeout(init,3000))}

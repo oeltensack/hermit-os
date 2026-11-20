@@ -40,7 +40,10 @@
   #undef  HAS_LED
   #define HAS_LED        0     // GPIO0 wird vom Add-on belegt
   #define DEV_MODEL_STR  DEV_MODEL "-ADDON"
+  #define DEV_VARIANT    DEV_PREFIX "-addon"
 #else
   #define HAS_ADDON      0
   #define DEV_MODEL_STR  DEV_MODEL
+  #define DEV_VARIANT    DEV_PREFIX
 #endif
+// DEV_VARIANT = Schluessel in update.json und Name der .bin (z. B. hermit-1pm-addon)

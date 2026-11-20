@@ -7,6 +7,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <ESP8266HTTPClient.h>
+#include <bearssl/bearssl_hash.h>
 #include <ESP8266mDNS.h>
 #include <WiFiClientSecureBearSSL.h>
 #include <DNSServer.h>
@@ -18,7 +19,7 @@
 #include "webui.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.3.0"
+#define FW_VERSION "1.4.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -59,6 +60,11 @@ struct Cfg {
   String authPass;
   String tz = "CET-1CEST,M3.5.0,M10.5.0/3";
   String sntp = "pool.ntp.org";
+  // Auto-Update
+  String updUrl = "https://raw.githubusercontent.com/oeltensack/hermit-os/main/update.json";
+  String updToken;                 // optional: GitHub-Token fuer privates Repo
+  String updMode = "check";        // off | check | install
+  int updHour = 3;                 // taegliche Pruefung um diese Stunde
   std::vector<Hook> hooks;
   int nextHookId = 1;
   int hookRev = 0;
@@ -79,6 +85,7 @@ static const char* EVENTS[] = {
 static const char* METHODS[] = {
   "Shelly.GetDeviceInfo", "Shelly.GetStatus", "Shelly.GetConfig", "Shelly.ListMethods",
   "Shelly.Reboot", "Shelly.FactoryReset", "Shelly.SetAuth",
+  "Shelly.CheckForUpdate", "Shelly.Update",
   "Switch.Set", "Switch.Toggle", "Switch.GetStatus", "Switch.GetConfig", "Switch.SetConfig",
 #if HAS_PM
   "Switch.ResetCounters", "Switch.Calibrate",
@@ -160,6 +167,7 @@ void saveCfg() {
   d["aon"] = cfg.autoOn; d["aond"] = cfg.autoOnDelay; d["aoff"] = cfg.autoOff; d["aoffd"] = cfg.autoOffDelay;
   d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led;
   d["auth"] = cfg.authPass; d["tz"] = cfg.tz; d["sntp"] = cfg.sntp;
+  d["uurl"] = cfg.updUrl; d["utok"] = cfg.updToken; d["umode"] = cfg.updMode; d["uhour"] = cfg.updHour;
   d["hnext"] = cfg.nextHookId; d["hrev"] = cfg.hookRev; d["rev"] = cfg.cfgRev;
   JsonArray ha = d["hooks"].to<JsonArray>();
   for (auto& h : cfg.hooks) {
@@ -196,6 +204,8 @@ void loadCfg() {
   float old = d["pcal"] | 0.0f;
   if (old > 0 && fabsf(old - 12.53f) > 0.001f && !LittleFS.exists("/calib")) { cfg.pwrCal = old; cfg.calSrc = "reference"; saveCal(); }
   cfg.authPass = jstr(d["auth"], ""); cfg.tz = jstr(d["tz"], cfg.tz); cfg.sntp = jstr(d["sntp"], cfg.sntp);
+  cfg.updUrl = jstr(d["uurl"], cfg.updUrl); cfg.updToken = jstr(d["utok"], "");
+  cfg.updMode = jstr(d["umode"], cfg.updMode); cfg.updHour = d["uhour"] | cfg.updHour;
   cfg.nextHookId = d["hnext"] | 1; cfg.hookRev = d["hrev"] | 0; cfg.cfgRev = d["rev"] | 0;
   cfg.hooks.clear();
   for (JsonObjectConst o : d["hooks"].as<JsonArrayConst>()) {
@@ -554,6 +564,142 @@ void handleWifi() {
   }
 }
 
+// ======================= Auto-Update =======================
+// update.json (im Repo-Hauptverzeichnis):
+// {"version":"1.4.0","files":{"hermit-1pm":{"url":"bin/hermit-1pm.bin","sha256":"…"}, …}}
+// Relative URLs werden relativ zur update.json aufgeloest.
+String updAvailVer, updAvailUrl, updAvailSha, updLastErr, updState = "idle";
+time_t updLastCheck = 0;
+bool updPendingInstall = false, updPendingCheck = false;
+String updManualUrl;
+uint32_t updNextTryMs = 0, updBootCheckMs = 120000;
+int updDoneDay = -1;
+
+int verCmp(const String& a, const String& b) {
+  int ia = 0, ib = 0;
+  for (int k = 0; k < 3; k++) {
+    long va = 0, vb = 0;
+    while (ia < (int)a.length() && isdigit(a[ia])) va = va * 10 + (a[ia++] - '0');
+    while (ib < (int)b.length() && isdigit(b[ib])) vb = vb * 10 + (b[ib++] - '0');
+    if (va != vb) return va < vb ? -1 : 1;
+    if (ia < (int)a.length()) ia++;
+    if (ib < (int)b.length()) ib++;
+  }
+  return 0;
+}
+
+String resolveUrl(const String& base, const String& rel) {
+  if (rel.startsWith("http://") || rel.startsWith("https://")) return rel;
+  int q = base.lastIndexOf('/');
+  return (q > 8 ? base.substring(0, q + 1) : base + "/") + rel;
+}
+
+// Oeffnet HTTP(S)-Verbindung; Client muss bis http.end() leben
+bool updOpen(HTTPClient& http, std::unique_ptr<WiFiClient>& cl, const String& url) {
+  if (url.startsWith("https://")) {
+    auto* sc = new BearSSL::WiFiClientSecure();
+    sc->setInsecure();            // Zertifikat wird nicht geprueft – Integritaet ueber SHA-256
+    sc->setBufferSizes(16384, 512);
+    cl.reset(sc);
+  } else cl.reset(new WiFiClient());
+  http.setTimeout(15000);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  if (!http.begin(*cl, url)) return false;
+  http.setUserAgent("HermitOS/" FW_VERSION);
+  if (cfg.updToken.length()) http.addHeader("Authorization", "token " + cfg.updToken);
+  return true;
+}
+
+bool updCheck() {
+  updLastErr = "";
+  if (!cfg.updUrl.length()) { updLastErr = "Keine Update-URL"; return false; }
+  if (WiFi.status() != WL_CONNECTED) { updLastErr = "Kein WLAN"; return false; }
+  HTTPClient http; std::unique_ptr<WiFiClient> cl;
+  if (!updOpen(http, cl, cfg.updUrl)) { updLastErr = "URL ungültig"; return false; }
+  int code = http.GET();
+  if (code != 200) { updLastErr = "update.json: HTTP " + String(code); http.end(); return false; }
+  String body = http.getString();
+  http.end();
+  JsonDocument d;
+  if (deserializeJson(d, body)) { updLastErr = "update.json ungültig"; return false; }
+  JsonVariantConst f = d["files"][DEV_VARIANT];
+  updLastCheck = time(nullptr);
+  updAvailVer = ""; updAvailUrl = ""; updAvailSha = "";
+  String ver = jstr(d["version"], "");
+  if (!ver.length() || !f["url"].is<const char*>()) { updLastErr = "Keine Datei für " DEV_VARIANT; return false; }
+  if (verCmp(ver, FW_VERSION) > 0) {
+    updAvailVer = ver;
+    updAvailUrl = resolveUrl(cfg.updUrl, f["url"].as<const char*>());
+    updAvailSha = jstr(f["sha256"], "");
+    updAvailSha.toLowerCase();
+  }
+  return true;
+}
+
+// Laedt und flasht; prueft SHA-256 vor dem Aktivieren. Gibt Fehlertext zurueck oder "".
+String updInstall(const String& url, const String& sha) {
+  if (relayOn) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
+  updState = "downloading";
+  HTTPClient http; std::unique_ptr<WiFiClient> cl;
+  if (!updOpen(http, cl, url)) { updState = "idle"; return "URL ungültig"; }
+  int code = http.GET();
+  if (code != 200) { http.end(); updState = "idle"; return "Download: HTTP " + String(code); }
+  int len = http.getSize();
+  if (len <= 0) { http.end(); updState = "idle"; return "Unbekannte Dateigröße"; }
+  if (!Update.begin(len)) { http.end(); updState = "idle"; return "Zu wenig Platz für Update"; }
+  br_sha256_context ctx; br_sha256_init(&ctx);
+  WiFiClient* st = http.getStreamPtr();
+  uint8_t buf[1024];
+  int left = len;
+  uint32_t last = millis();
+  while (left > 0 && millis() - last < 20000) {
+    size_t av = st->available();
+    if (!av) { if (!http.connected()) break; delay(1); continue; }
+    int n = st->readBytes(buf, av > sizeof(buf) ? sizeof(buf) : av);
+    if (n <= 0) continue;
+    br_sha256_update(&ctx, buf, n);
+    if (Update.write(buf, n) != (size_t)n) break;
+    left -= n; last = millis();
+    yield();
+  }
+  http.end();
+  if (left > 0) { Update.end(false); updState = "idle"; return "Download abgebrochen"; }
+  uint8_t h[32]; br_sha256_out(&ctx, h);
+  char hex[65]; for (int i = 0; i < 32; i++) sprintf(hex + i * 2, "%02x", h[i]);
+  if (sha.length() && sha != hex) { Update.end(false); updState = "idle"; return "SHA-256 stimmt nicht – Update verworfen"; }
+  if (!Update.end(true)) { updState = "idle"; return "Flash-Fehler " + String(Update.getError()); }
+  updState = "done";
+  rebootAt = millis() + 500;
+  return "";
+}
+
+// Zeitplan: Pruefung kurz nach dem Start und einmal taeglich zur eingestellten Stunde
+void handleUpdate() {
+  uint32_t now = millis();
+  if (updPendingCheck) { updPendingCheck = false; updCheck(); }
+  if (updPendingInstall) {
+    updPendingInstall = false;
+    String url = updManualUrl.length() ? updManualUrl : updAvailUrl;
+    String sha = updManualUrl.length() ? String("") : updAvailSha;
+    updManualUrl = "";
+    if (url.length()) { updLastErr = updInstall(url, sha); }
+    return;
+  }
+  if (cfg.updMode == "off" || WiFi.status() != WL_CONNECTED) return;
+  if (updBootCheckMs && now > updBootCheckMs) { updBootCheckMs = 0; updCheck(); }
+  if (!validTime()) return;
+  time_t t = time(nullptr); struct tm lt; localtime_r(&t, &lt);
+  if (lt.tm_hour == cfg.updHour && lt.tm_yday != updDoneDay && (int32_t)(now - updNextTryMs) >= 0) {
+    updNextTryMs = now + 600000UL;              // alle 10 min erneut, solange die Stunde laeuft
+    if (!updAvailVer.length()) updCheck();
+    if (updAvailVer.length() && cfg.updMode == "install") {
+      if (relayOn) { updLastErr = "Update wartet: Relais ist an"; return; }
+      updLastErr = updInstall(updAvailUrl, updAvailSha);
+    }
+    if (!updAvailVer.length() || cfg.updMode != "install") updDoneDay = lt.tm_yday;
+  }
+}
+
 // ======================= Status-Objekte =======================
 void deviceInfo(JsonObject o) {
   if (cfg.name.length()) o["name"] = cfg.name; else o["name"] = nullptr;
@@ -641,7 +787,8 @@ void sysStatus(JsonObject o) {
   o["flash_id"] = String(ESP.getFlashChipId(), HEX);
   o["ota_free"] = ESP.getFreeSketchSpace();
   o["cfg_rev"] = cfg.cfgRev; o["webhook_rev"] = cfg.hookRev;
-  o["available_updates"].to<JsonObject>();
+  JsonObject au = o["available_updates"].to<JsonObject>();
+  if (updAvailVer.length()) au["stable"]["version"] = updAvailVer;
 }
 
 void sysConfig(JsonObject o) {
@@ -651,6 +798,11 @@ void sysConfig(JsonObject o) {
   o["location"]["tz"] = cfg.tz;
   o["sntp"]["server"] = cfg.sntp;
   o["ui"]["led"] = cfg.led;
+  JsonObject u = o["updates"].to<JsonObject>();
+  u["url"] = cfg.updUrl; u["mode"] = cfg.updMode; u["hour"] = cfg.updHour;
+  u["token_set"] = cfg.updToken.length() > 0; u["variant"] = DEV_VARIANT;
+  u["state"] = updState; u["last_error"] = updLastErr;
+  u["last_check"] = (long)updLastCheck; u["available"] = updAvailVer;
 }
 
 void wifiStatus(JsonObject o) {
@@ -739,6 +891,24 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "shelly.listmethods") {
     JsonArray a = out["methods"].to<JsonArray>();
     for (auto s : METHODS) a.add(s);
+    return 0;
+  }
+  if (m == "shelly.checkforupdate") {
+    if (!updCheck()) ERR(-114, updLastErr);
+    if (updAvailVer.length()) out["stable"]["version"] = updAvailVer;
+    else out.to<JsonObject>();
+    return 0;
+  }
+  if (m == "shelly.update") {
+    // {"stage":"stable"} oder {"url":"http(s)://…/hermit-1pm.bin"}
+    if (relayOn) ERR(-114, "Relais ist an – Update nur bei ausgeschaltetem Relais");
+    if (p["url"].is<const char*>()) updManualUrl = p["url"].as<const char*>();
+    else {
+      if (!updAvailVer.length() && !updCheck()) ERR(-114, updLastErr);
+      if (!updAvailVer.length()) ERR(-114, "Firmware ist aktuell");
+    }
+    updPendingInstall = true;
+    out.set(nullptr);
     return 0;
   }
   if (m == "shelly.reboot") {
@@ -907,6 +1077,15 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     if (c["location"]["tz"].is<const char*>()) { cfg.tz = c["location"]["tz"].as<const char*>(); timeChg = true; }
     if (c["sntp"]["server"].is<const char*>()) { cfg.sntp = c["sntp"]["server"].as<const char*>(); timeChg = true; }
     if (c["ui"]["led"].is<bool>()) { cfg.led = c["ui"]["led"]; updateLed(); }
+    JsonVariantConst uc = c["updates"];
+    if (uc["url"].is<const char*>()) cfg.updUrl = uc["url"].as<const char*>();
+    if (uc["token"].is<const char*>()) cfg.updToken = uc["token"].as<const char*>();
+    if (uc["mode"].is<const char*>()) {
+      String v = uc["mode"].as<const char*>();
+      if (v != "off" && v != "check" && v != "install") ERR(-103, "updates.mode: off|check|install");
+      cfg.updMode = v;
+    }
+    if (uc["hour"].is<int>()) { int h = uc["hour"]; if (h < 0 || h > 23) ERR(-103, "updates.hour: 0–23"); cfg.updHour = h; }
     saveCfg();
     if (timeChg && WiFi.status() == WL_CONNECTED) configTime(cfg.tz.c_str(), cfg.sntp.c_str());
     out["restart_required"] = false;
@@ -1253,6 +1432,7 @@ void loop() {
   handleTemp();
   handleLed();
   processQueue();
+  handleUpdate();
   if (rebootAt && (int32_t)(millis() - rebootAt) >= 0) {
     saveEnergy();
     delay(100);
