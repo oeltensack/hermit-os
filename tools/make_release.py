@@ -34,5 +34,10 @@ for env, name in VARIANTS.items():
         g.write(data)
     files[name] = {"url": f"bin/{name}.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
 
+# Hermit Loader (nicht in update.json – nur fuer den Wechsel von Tasmota)
+shutil.copy(ROOT / ".pio" / "build" / "loader" / "firmware.bin", bindir / "hermit-loader.bin")
+with gzip.open(bindir / "hermit-loader.bin.gz", "wb", compresslevel=9) as g:
+    g.write((bindir / "hermit-loader.bin").read_bytes())
+
 (ROOT / "update.json").write_text(json.dumps({"version": version, "files": files}, indent=2) + "\n")
 print(f"update.json fuer Version {version} geschrieben")

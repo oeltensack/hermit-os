@@ -60,6 +60,19 @@ falls dabei etwas schiefgeht.
 
 Spätere Updates: Weboberfläche → System → Firmware, oder `curl -F firmware=@hermit-1pm.bin http://<ip>/update`.
 
+## Von Tasmota direkt zu Hermit OS (Hermit Loader)
+
+Ist in Tasmota zu wenig Platz für Hermit OS („Not enough space“), geht es ohne tasmota-minimal über den
+**Hermit Loader** (`bin/hermit-loader.bin.gz`, ca. 230 KB):
+
+1. Tasmota → Firmware-Update → `hermit-loader.bin.gz` hochladen
+2. Der Loader verbindet sich mit dem im ESP gespeicherten WLAN; klappt das nicht, öffnet er den AP
+   `hermit-loader-xxxxxx` → `http://192.168.33.1` → WLAN eintragen
+3. Im Loader die passende Hermit-`.bin` hochladen (`hermit-1.bin`, `hermit-1pm.bin`, `…-addon.bin`)
+4. Hermit OS startet und übernimmt das WLAN aus dem Loader automatisch
+
+Der Loader steuert die Relais nicht an.
+
 ## Ersteinrichtung
 
 1. Nach dem Flashen öffnet das Gerät den AP `hermit-1-xxxxxxxxxxxx` bzw. `hermit-1pm-…` (offen).

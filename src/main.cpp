@@ -1,3 +1,4 @@
+#ifndef HERMIT_LOADER   // Hermit Loader wird separat gebaut (src/loader.cpp)
 // Hermit OS – Shelly-Gen2-kompatible Firmware fuer Shelly 1 / 1PM (ESP8266)
 // RPC-API wie Gen2 (/rpc/Switch.Set, POST /rpc JSON-RPC), Webhooks, Gen1-Kompat-API,
 // WLAN mit AP-Fallback (192.168.33.1), OTA, Energiezaehler, Uebertemperatur/-leistung.
@@ -19,7 +20,7 @@
 #include "webui.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.4.1"
+#define FW_VERSION "1.5.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -345,6 +346,7 @@ IRAM_ATTR void inIsr() {
 
 void resetWifiAndReboot() {
   cfg.ssid = ""; cfg.pass = ""; cfg.staticIp = false;
+  ESP.eraseConfig();                 // auch WLAN-Speicher des ESP leeren (sonst Uebernahme beim Start)
   saveCfg();
   rebootAt = millis() + 500;
 }
@@ -921,6 +923,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
   if (m == "shelly.factoryreset") {
     LittleFS.remove("/config.json"); LittleFS.remove("/energy"); LittleFS.remove("/relay");
+    ESP.eraseConfig();
     rebootAt = millis() + 500;
     out.set(nullptr);
     return 0;
@@ -1401,6 +1404,15 @@ void setup() {
 
   loadCal();
   loadCfg();
+  if (!cfg.ssid.length()) {          // WLAN-Daten vom Hermit Loader bzw. Tasmota uebernehmen
+    struct station_config sc;
+    if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {
+      char ss[33] = {0}, pw[65] = {0};
+      memcpy(ss, sc.ssid, 32); memcpy(pw, sc.password, 64);
+      cfg.ssid = ss; cfg.pass = pw;
+      saveCfg();
+    }
+  }
   loadEnergy();
 
 #if HAS_ADDON
@@ -1462,3 +1474,5 @@ void loop() {
     ESP.restart();
   }
 }
+
+#endif  // HERMIT_LOADER
