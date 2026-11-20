@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug S (Gen1) schreiben.
+hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug S / Duo (Gen1) schreiben.
 
 Erkennt automatisch, was auf dem Geraet laeuft:
   * Original-Shelly-Firmware (Mongoose OS)  -> mg2hermit: angepasstes mg2tasmota laedt Hermit OS
@@ -28,7 +28,7 @@ CACHE = pathlib.Path(__file__).resolve().parent / ".cache"
 MG2X_URL = "http://ota.tasmota.com/tasmota/shelly/mg2tasmota-{model}.zip"
 MG2X_OLD = b"https://ota.tasmota.com/tasmota/release/tasmota.bin"   # in mg2tasmota einkompiliert (51 Zeichen)
 GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "hermit-1pm"),
-               "SHPLG-S": ("ShellyPlugS", "hermit-plugs")}
+               "SHPLG-S": ("ShellyPlugS", "hermit-plugs"), "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo")}
 
 
 def log(msg):
@@ -134,13 +134,15 @@ def variant_from(dev, kind, info, addon):
         name = str(t.get("NAME", "")).lower()
         if "plug s" in name:
             v = "hermit-plugs"
+        elif "duo" in name and "rgbw" not in name:
+            v = "hermit-duo"
         elif "1pm" in name:
             v = "hermit-1pm"
         elif "shelly 1" in name:
             v = "hermit-1"
     if v and addon:
-        if v == "hermit-plugs":
-            die("Plug S hat keinen Add-on-Anschluss")
+        if v in ("hermit-plugs", "hermit-duo"):
+            die("Plug S / Duo haben keinen Add-on-Anschluss")
         v += "-addon"
     return v
 
@@ -345,7 +347,7 @@ def main():
     log(f"Gefunden: {names[kind]}  →  installiere {variant}")
     if kind == "stock":
         log("Hinweis: mg2hermit überschreibt den Bootloader per OTA. Bricht der Vorgang ab, hilft im Zweifel nur")
-        log("Flashen per Kabel. Relais bleibt während des Vorgangs aus.")
+        log("Flashen per Kabel." + (" Lampe während des Vorgangs nicht ausschalten." if "duo" in variant else " Relais bleibt während des Vorgangs aus."))
     if not args.yes and input("Fortfahren? [j/N] ").strip().lower() not in ("j", "ja", "y", "yes"):
         sys.exit(0)
     fw = load_bin(args, variant)

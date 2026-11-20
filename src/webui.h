@@ -25,7 +25,9 @@ table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 5px;bord
 .ck{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--fg);font-size:14px}.ck input{width:auto}
 pre{background:var(--bg);padding:10px;border-radius:6px;overflow:auto;font-size:12px;max-height:340px;white-space:pre-wrap}
 nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 11px;border-radius:6px;background:var(--c);font-size:13px;cursor:pointer}
-nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.vi{display:none}.tab.a{display:block}
+nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.lt{display:none}
+input[type=range]{padding:0;height:28px;accent-color:var(--a)}
+#ctr{background:linear-gradient(90deg,#ffb15a,#fff,#cfe3ff);border-radius:6px}.vi{display:none}.tab.a{display:block}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff}
 code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
@@ -48,14 +50,18 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div><div class="v" id="up">–</div><div class="l">Laufzeit</div></div>
 <div><div class="v" id="fl">–</div><div class="l">Flash</div></div>
 </div></div><div class="l" id="src" style="margin-top:12px"></div></div>
+<div class="card lt"><h2>Licht</h2>
+<label>Helligkeit: <b id="brv">–</b></label><input type="range" id="bri" min="1" max="100" onchange="setL({brightness:+this.value})" oninput="$('brv').textContent=this.value+' %'">
+<label>Farbtemperatur: <b id="ctv">–</b></label><input type="range" id="ctr" min="2700" max="6500" step="50" onchange="setL({ct:+this.value})" oninput="$('ctv').textContent=this.value+' K'">
+<div class="row"><button class="bt g" onclick="setL({ct:2700})">Warmweiß</button><button class="bt g" onclick="setL({ct:4000})">Neutral</button><button class="bt g" onclick="setL({ct:6500})">Tageslicht</button></div></div>
 <div class="card"><h2>Zeitschaltung</h2><div class="row">
 <div><label>Einschalten für (s)</label><input id="ta" type="number" min="1" value="60"></div></div>
 <button class="bt" onclick="pulse()">Für Dauer einschalten</button></div>
 </section>
 
-<section class="tab" id="sw"><div class="card"><h2>Schalter</h2>
+<section class="tab" id="sw"><div class="card"><h2 id="swh">Schalter</h2>
 <label>Name</label><input id="s_name">
-<div class="row"><div><label>Eingangsmodus</label><select id="s_in_mode">
+<div class="row"><div class="so"><label>Eingangsmodus</label><select id="s_in_mode">
 <option value="follow">Folgen (Schalter = Relais)</option><option value="flip">Umschalten bei jeder Flanke</option>
 <option value="momentary">Taster (toggle bei Druck)</option><option value="detached">Getrennt (nur Ereignis)</option></select></div>
 <div><label>Zustand nach Stromausfall</label><select id="s_initial_state">
@@ -64,11 +70,14 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div><label class="ck"><input type="checkbox" id="s_auto_on">Auto-An nach (s)</label><input id="s_auto_on_delay" type="number" step="0.1"></div></div>
 <div class="row"><div class="pm"><label>Abschaltleistung (W, 0 = aus)</label><input id="s_power_limit" type="number"></div>
 <div class="pm"><label>Abschalttemperatur (°C)</label><input id="s_temp_limit" type="number"></div></div>
-<h2 style="margin-top:20px">Eingang SW</h2>
+<div class="lt"><div class="row"><div><label>Überblendzeit (s)</label><input id="l_tr" type="number" step="0.1" min="0"></div>
+<div><label class="ck" style="margin-top:34px"><input type="checkbox" id="l_ctinv">Farbtemperatur-Kanal umkehren</label></div></div>
+<div class="l">WLAN-Reset: Lampe 5× kurz hintereinander aus- und einschalten (jeweils unter 6 s an).</div></div>
+<div class="io"><h2 style="margin-top:20px">Eingang SW</h2>
 <div class="row"><div><label>Typ</label><select id="i_type"><option value="switch">Schalter</option><option value="button">Taster</option></select></div>
 <div><label class="ck" style="margin-top:34px"><input type="checkbox" id="i_invert">Eingang invertieren</label></div></div>
 <label>Eingangsfilter</label><select id="i_filter"><option value="ac">Wechselspannung (50-Hz-Halbwellen überbrücken)</option><option value="dc">Nur Pegel (Gleichspannung / feste Pegel)</option></select>
-<button class="bt g" onclick="diag()">Eingang messen (roh)</button><pre id="i_diag" style="display:none"></pre>
+<button class="bt g" onclick="diag()">Eingang messen (roh)</button><pre id="i_diag" style="display:none"></pre></div>
 <button class="bt" onclick="saveSw()">Speichern</button></div>
 <div class="card ao"><h2>Add-on-Taster (input:100)</h2>
 <div class="l">Taster zwischen DATA und GND des Add-ons.</div>
@@ -152,18 +161,22 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function fmt(v,d,u){return v==null||isNaN(v)?'–':(+v).toFixed(d)+' '+u}
 function upt(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+h+'h '+m+'m'}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');if(a.dataset.t=='wh')loadHooks()});
-async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0'];
+let LT=false,LS=null;
+function showLT(){document.querySelectorAll('.lt').forEach(e=>e.style.display=LT?'block':'none');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');$('swh').textContent=LT?'Licht':'Schalter'}
+function setL(p){run(async()=>{p.id=0;if(LS&&!LS.output&&p.on==null)p.on=true;await rpc('CCT.Set',p);poll()})}
+async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0'];LT=!!s['cct:0'];LS=s['cct:0']||null;showLT();
+if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}if(document.activeElement!==$('ctr')){$('ctr').value=sw.ct;$('ctv').textContent=sw.ct+' K'}}
 $('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':'AUS';PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
-$('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0'].state?'AN':'AUS';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
+$('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 $('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
 document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
-$('btn').onclick=()=>run(async()=>{await rpc('Switch.Toggle',{id:0});poll()});
-function pulse(){run(async()=>{await rpc('Switch.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
+$('btn').onclick=()=>run(async()=>{await rpc(LT?'CCT.Toggle':'Switch.Toggle',{id:0});poll()});
+function pulse(){run(async()=>{await rpc(LT?'CCT.Set':'Switch.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
-async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0'],inp=c['input:0'];
+async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0'],inp=c['input:0']||{};LT=!!c['cct:0'];showLT();if(LT){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=sw.ct_invert}
 ['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
 showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
@@ -174,7 +187,8 @@ showUpd(c.sys.updates,d.ver);$('y_auth').placeholder=d.auth_en?'Passwort ist ges
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
 function diag(){run(async()=>{const r=await rpc('Input.Diag',{id:0});$('i_diag').style.display='block';$('i_diag').textContent='HIGH-Anteil: '+r.high_pct+' %\nFlanken in 200 ms: '+r.edges+'  (≈ '+r.approx_hz+' Hz)\nErkannter Zustand: '+(r.state?'AN':'AUS')+'  ·  Filter '+r.filter+(r.invert?' · invertiert':'')})}
-function saveSw(){run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
+function saveSw(){if(LT)return run(()=>rpc('CCT.SetConfig',{id:0,config:{name:$('s_name').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:+$('s_auto_on_delay').value,auto_off:$('s_auto_off').checked,auto_off_delay:+$('s_auto_off_delay').value,transition_duration:+$('l_tr').value,ct_invert:$('l_ctinv').checked}}),'Gespeichert');
+run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
 await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}})},'Gespeichert')}
 async function loadHooks(){await run(async()=>{if(!SUP.length){const s=await rpc('Webhook.ListSupported');SUP=Object.keys(s.types);$('h_ev').innerHTML=SUP.map(e=>`<option>${e}</option>`).join('')}
 const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}

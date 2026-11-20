@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.7.0"
+#define FW_VERSION "1.8.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -44,7 +44,7 @@ struct Cfg {
   String ip, mask, gw, dns;
   String apPass;
   String swName, inName;
-  String initialState = "off";     // off | on | restore_last | match_input
+  String initialState = DEF_INITIAL;     // off | on | restore_last | match_input
   String inMode = DEF_IN_MODE;     // follow | flip | momentary | detached
   String inType = DEF_IN_TYPE;     // switch | button
   bool inInvert = false;
@@ -62,6 +62,8 @@ struct Cfg {
   float pwrCal = PWR_CAL_DEFAULT;  // Watt pro Hz am CF-Pin (eigene Datei /calib)
   String calSrc = "default";       // default | reference | tasmota | manual
   bool led = true;
+  float transition = 0.5f;         // Licht: Ueberblendzeit in s
+  bool ctInvert = false;           // Licht: Farbtemperatur-Kanal umkehren
   String authPass;
   String tz = "CET-1CEST,M3.5.0,M10.5.0/3";
   String sntp = "pool.ntp.org";
@@ -77,7 +79,10 @@ struct Cfg {
 } cfg;
 
 static const char* EVENTS[] = {
-  "switch.on", "switch.off", "switch.overpower", "switch.overtemperature",
+  EV_ON, EV_OFF,
+#if !HAS_LIGHT
+  "switch.overpower", "switch.overtemperature",
+#endif
 #if HAS_PM
   "switch.power_above", "switch.power_below",
 #endif
@@ -140,6 +145,8 @@ bool overtemp = false, overpower = false;
 uint32_t lastPmMs = 0, lastTempMs = 0, lastEnergySaveMs = 0;
 
 std::vector<String> httpQueue;
+bool resetWifiPending = false;
+uint32_t pcycleClearAt = 6000;
 
 // ======================= Hilfen =======================
 static String jstr(JsonVariantConst v, const String& def) {
@@ -179,7 +186,7 @@ void saveCfg() {
   d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert; d["infilt"] = cfg.inFilter;
   d["exname"] = cfg.exName; d["extype"] = cfg.exType; d["exinv"] = cfg.exInvert; d["exout"] = cfg.exOutLow; d["exrel"] = cfg.exRelay;
   d["aon"] = cfg.autoOn; d["aond"] = cfg.autoOnDelay; d["aoff"] = cfg.autoOff; d["aoffd"] = cfg.autoOffDelay;
-  d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led;
+  d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led; d["trans"] = cfg.transition; d["ctinv"] = cfg.ctInvert;
   d["auth"] = cfg.authPass; d["tz"] = cfg.tz; d["sntp"] = cfg.sntp;
   d["uurl"] = cfg.updUrl; d["utok"] = cfg.updToken; d["umode"] = cfg.updMode; d["uhour"] = cfg.updHour;
   d["hnext"] = cfg.nextHookId; d["hrev"] = cfg.hookRev; d["rev"] = cfg.cfgRev;
@@ -214,6 +221,7 @@ void loadCfg() {
   cfg.autoOff = d["aoff"] | false; cfg.autoOffDelay = d["aoffd"] | 60.0f;
   cfg.powerLimit = d["plim"] | cfg.powerLimit; cfg.tempLimit = d["tlim"] | cfg.tempLimit;
   cfg.led = d["led"] | true;
+  cfg.transition = d["trans"] | cfg.transition; cfg.ctInvert = d["ctinv"] | false;
   // Uebernahme aus Version 1.0.0 (Faktor stand in config.json, Standard war falsch 12.53)
   float old = d["pcal"] | 0.0f;
   if (old > 0 && fabsf(old - 12.53f) > 0.001f && !LittleFS.exists("/calib")) { cfg.pwrCal = old; cfg.calSrc = "reference"; saveCal(); }
@@ -301,6 +309,80 @@ void processQueue() {
   }
 }
 
+// ======================= Licht (Duo) =======================
+#if HAS_LIGHT
+int lBri = 100, lCt = 4000;                  // Sollwerte (Helligkeit %, Farbtemperatur K)
+float curBri = 0, curCt = 4000, fromBri = 0, fromCt = 4000, toBri = 0, toCt = 4000;
+uint32_t fadeStart = 0, fadeMs = 0, lightSaveAt = 0;
+float nextTransition = -1;                   // einmalige Ueberblendzeit (CCT.Set transition_duration)
+extern bool relayOn;
+
+void lightWrite() {
+  float b = curBri / 100.0f;
+  int db = b <= 0 ? 0 : (int)(1023 * powf(b, 2.2f) + 0.5f);       // Gamma
+  if (curBri > 0 && db < 3) db = 3;
+  float warm = (6500.0f - curCt) / 3800.0f;
+  if (warm < 0) warm = 0; if (warm > 1) warm = 1;
+  if (cfg.ctInvert) warm = 1 - warm;
+  analogWrite(PIN_PWM_BRI, db);
+  analogWrite(PIN_PWM_CT, (int)(1023 * warm + 0.5f));
+}
+
+void lightUpdate() {                          // neues Ziel aus relayOn/lBri/lCt, sanft ueberblenden
+  fromBri = curBri; fromCt = curCt;
+  toBri = relayOn ? lBri : 0; toCt = lCt;
+  float t = nextTransition >= 0 ? nextTransition : cfg.transition;
+  nextTransition = -1;
+  fadeMs = (uint32_t)(t * 1000); fadeStart = millis();
+  if (!fadeMs) { curBri = toBri; curCt = toCt; lightWrite(); }
+}
+
+void saveLight() {
+  File f = LittleFS.open("/light", "w");
+  if (f) { f.printf("%d %d", lBri, lCt); f.close(); }
+}
+void loadLight() {
+  File f = LittleFS.open("/light", "r");
+  if (!f) return;
+  int b = f.parseInt(), c = f.parseInt();
+  f.close();
+  if (b >= 1 && b <= 100) lBri = b;
+  if (c >= 2700 && c <= 6500) lCt = c;
+  curCt = fromCt = toCt = lCt;
+}
+
+void handleLight() {
+  if (fadeMs) {
+    float k = (millis() - fadeStart) / (float)fadeMs;
+    if (k >= 1) { k = 1; fadeMs = 0; }
+    curBri = fromBri + (toBri - fromBri) * k;
+    curCt = fromCt + (toCt - fromCt) * k;
+    lightWrite();
+  }
+  if (lightSaveAt && (int32_t)(millis() - lightSaveAt) >= 0) { lightSaveAt = 0; saveLight(); }
+}
+
+// Werte setzen (ohne Ein/Aus); speichert verzoegert, um den Flash zu schonen
+void lightSet(int bri, int ct) {
+  if (bri >= 0) lBri = bri < 1 ? 1 : (bri > 100 ? 100 : bri);
+  if (ct >= 0) lCt = ct < 2700 ? 2700 : (ct > 6500 ? 6500 : ct);
+  lightSaveAt = millis() + 5000;
+}
+
+// Bei Lampen ohne Taster: WLAN-Reset durch 5x schnelles Aus/Ein am Wandschalter
+void powerCycleCheck() {
+  int n = 0;
+  File f = LittleFS.open("/pcycle", "r");
+  if (f) { n = f.parseInt(); f.close(); }
+  n++;
+  if (n >= 5) { LittleFS.remove("/pcycle"); resetWifiPending = true; return; }
+  f = LittleFS.open("/pcycle", "w");
+  if (f) { f.print(n); f.close(); }
+}
+#else
+void handleLight() {}
+#endif
+
 // ======================= Relais =======================
 void updateLed();
 
@@ -309,7 +391,12 @@ bool setRelay(bool on, const String& src, float toggleAfter = -1) {
   bool was = relayOn;
   relayOn = on;
   relaySrc = src;
+#if HAS_RELAY
   digitalWrite(PIN_RELAY, on ? HIGH : LOW);
+#endif
+#if HAS_LIGHT
+  lightUpdate();
+#endif
   if (on) overpower = false;
   timerActive = false;
   float ta = toggleAfter;
@@ -325,7 +412,7 @@ bool setRelay(bool on, const String& src, float toggleAfter = -1) {
   }
   if (was != on) {
     if (cfg.initialState == "restore_last") saveRelayState();
-    fireEvent(on ? "switch.on" : "switch.off");
+    fireEvent(on ? EV_ON : EV_OFF);
   }
   updateLed();
   return true;
@@ -357,9 +444,11 @@ void handleLed() {
 }
 
 // ======================= Eingang (AC-tauglich) =======================
+#if HAS_INPUT
 IRAM_ATTR void inIsr() {
   if (((GPI >> PIN_INPUT) & 1) == inActiveLevel) inPulse = true;
 }
+#endif
 
 void resetWifiAndReboot() {
   cfg.ssid = ""; cfg.pass = ""; cfg.staticIp = false;
@@ -408,12 +497,19 @@ void onInputEdge(bool st) {
 }
 
 bool sampleInput(uint32_t now) {
+#if !HAS_INPUT
+  return false;
+#else
   if (cfg.inFilter == "dc") { inPulse = false; return ((GPI >> PIN_INPUT) & 1) == inActiveLevel; }
   if (inPulse || (((GPI >> PIN_INPUT) & 1) == inActiveLevel)) { inPulse = false; inLastActiveMs = now; }
   return (now - inLastActiveMs) < 35;   // haelt bei 50-Hz-Halbwellen durch
+#endif
 }
 
 void handleInput() {
+#if !HAS_INPUT
+  return;
+#endif
   uint32_t now = millis();
   bool raw = sampleInput(now);
   if (raw != inCand) { inCand = raw; inCandMs = now; }
@@ -814,6 +910,23 @@ void switchConfig(JsonObject o) {
 #endif
 }
 
+#if HAS_LIGHT
+void cctStatus(JsonObject o) {
+  o["id"] = 0; o["source"] = relaySrc; o["output"] = relayOn;
+  o["brightness"] = lBri; o["ct"] = lCt;
+  if (timerActive) { o["timer_started_at"] = (long)timerStartedAt; o["timer_duration"] = timerDurMs / 1000.0; }
+}
+void cctConfig(JsonObject o) {
+  o["id"] = 0;
+  if (cfg.swName.length()) o["name"] = cfg.swName; else o["name"] = nullptr;
+  o["initial_state"] = cfg.initialState;
+  o["auto_on"] = cfg.autoOn; o["auto_on_delay"] = cfg.autoOnDelay;
+  o["auto_off"] = cfg.autoOff; o["auto_off_delay"] = cfg.autoOffDelay;
+  o["transition_duration"] = cfg.transition;
+  JsonObject r = o["ct_range"].to<JsonObject>(); r["min"] = 2700; r["max"] = 6500;
+  o["ct_invert"] = cfg.ctInvert;
+}
+#endif
 void inputStatus(JsonObject o) { o["id"] = 0; o["state"] = inState; }
 #if HAS_ADDON
 void addonStatus(JsonObject o) { o["id"] = 100; o["state"] = exState; }
@@ -932,7 +1045,14 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "shelly.getstatus") {
     JsonObject o = out.to<JsonObject>();
     sysStatus(o["sys"].to<JsonObject>()); wifiStatus(o["wifi"].to<JsonObject>());
-    switchStatus(o["switch:0"].to<JsonObject>()); inputStatus(o["input:0"].to<JsonObject>());
+#if HAS_LIGHT
+    cctStatus(o["cct:0"].to<JsonObject>());
+#else
+    switchStatus(o["switch:0"].to<JsonObject>());
+#endif
+#if HAS_INPUT
+    inputStatus(o["input:0"].to<JsonObject>());
+#endif
 #if HAS_ADDON
     addonStatus(o["input:100"].to<JsonObject>());
 #endif
@@ -941,7 +1061,14 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "shelly.getconfig") {
     JsonObject o = out.to<JsonObject>();
     sysConfig(o["sys"].to<JsonObject>()); wifiConfig(o["wifi"].to<JsonObject>());
-    switchConfig(o["switch:0"].to<JsonObject>()); inputConfig(o["input:0"].to<JsonObject>());
+#if HAS_LIGHT
+    cctConfig(o["cct:0"].to<JsonObject>());
+#else
+    switchConfig(o["switch:0"].to<JsonObject>());
+#endif
+#if HAS_INPUT
+    inputConfig(o["input:0"].to<JsonObject>());
+#endif
 #if HAS_ADDON
     addonConfig(o["input:100"].to<JsonObject>());
 #endif
@@ -978,6 +1105,8 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
   if (m == "shelly.factoryreset") {
     LittleFS.remove("/config.json"); LittleFS.remove("/energy"); LittleFS.remove("/relay");
+    LittleFS.remove("/light");
+    { File nf = LittleFS.open("/noimport", "w"); if (nf) nf.close(); }   // kein WLAN-Import nach Werksreset
     ESP.eraseConfig();
     rebootAt = millis() + 500;
     out.set(nullptr);
@@ -996,8 +1125,48 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   // ---- Switch / Input: nur id 0 ----
   int pid = p["id"] | 0;
   if (m.startsWith("switch.") && pid != 0) ERR(-103, "Ungültige id – Schalter hat nur id 0");
+  if (!HAS_INPUT && m.startsWith("input.")) ERR(404, "Gerät hat keinen Eingang");
   if (m.startsWith("input.") && pid != 0 && !(HAS_ADDON && pid == 100))
     ERR(-103, HAS_ADDON ? "Ungültige id – Eingänge: 0 (SW), 100 (Add-on)" : "Ungültige id – Eingang hat nur id 0");
+#if HAS_LIGHT
+  if (m.startsWith("switch.")) ERR(404, "Lampe: CCT.* verwenden (wie Shelly Duo Bulb Gen3)");
+  if (m.startsWith("cct.") && pid != 0) ERR(-103, "Ungültige id – Lampe hat nur cct:0");
+  if (m == "cct.set") {
+    // {id, on?, brightness?, ct?, transition_duration?, toggle_after?}
+    if (p["on"].isNull() && p["brightness"].isNull() && p["ct"].isNull()) ERR(-103, "on, brightness oder ct angeben");
+    int b = p["brightness"].is<float>() ? (int)lroundf(p["brightness"].as<float>()) : -1;
+    int c = p["ct"].is<float>() ? (int)lroundf(p["ct"].as<float>()) : -1;
+    if (p["transition_duration"].is<float>()) nextTransition = p["transition_duration"].as<float>();
+    lightSet(b, c);
+    float ta = p["toggle_after"].is<float>() ? p["toggle_after"].as<float>() : -1;
+    if (p["on"].is<bool>()) setRelay(p["on"].as<bool>(), src, ta);
+    else lightUpdate();
+    out.set(nullptr);
+    return 0;
+  }
+  if (m == "cct.toggle") { setRelay(!relayOn, src); out.set(nullptr); return 0; }
+  if (m == "cct.getstatus") { cctStatus(out.to<JsonObject>()); return 0; }
+  if (m == "cct.getconfig") { cctConfig(out.to<JsonObject>()); return 0; }
+  if (m == "cct.setconfig") {
+    JsonVariantConst c = p["config"];
+    if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
+    if (c["name"].is<const char*>()) cfg.swName = c["name"].as<const char*>();
+    if (c["initial_state"].is<const char*>()) {
+      String v = c["initial_state"].as<const char*>();
+      if (v != "off" && v != "on" && v != "restore_last") ERR(-103, "initial_state: off|on|restore_last");
+      cfg.initialState = v;
+    }
+    if (c["auto_on"].is<bool>()) cfg.autoOn = c["auto_on"];
+    if (c["auto_on_delay"].is<float>()) cfg.autoOnDelay = c["auto_on_delay"];
+    if (c["auto_off"].is<bool>()) cfg.autoOff = c["auto_off"];
+    if (c["auto_off_delay"].is<float>()) cfg.autoOffDelay = c["auto_off_delay"];
+    if (c["transition_duration"].is<float>()) cfg.transition = c["transition_duration"];
+    if (c["ct_invert"].is<bool>()) { cfg.ctInvert = c["ct_invert"]; lightWrite(); }
+    saveCfg();
+    out["restart_required"] = false;
+    return 0;
+  }
+#endif
   if (m == "switch.set") {
     if (!p["on"].is<bool>()) ERR(-103, "Parameter on (true/false) fehlt");
     bool on = p["on"];
@@ -1130,6 +1299,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
 #endif
   if (m == "input.getstatus") { inputStatus(out.to<JsonObject>()); return 0; }
   if (m == "input.getconfig") { inputConfig(out.to<JsonObject>()); return 0; }
+#if HAS_INPUT
   if (m == "input.diag") {
     // 200 ms den rohen Pin abtasten (ca. alle 100 µs): Anteil HIGH, Flanken -> Netzfrequenz?
     uint32_t hi = 0, n = 0, edges = 0;
@@ -1146,6 +1316,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     out["state"] = inState; out["filter"] = cfg.inFilter; out["invert"] = cfg.inInvert;
     return 0;
   }
+#endif
   if (m == "input.setconfig") {
     JsonVariantConst c = p["config"];
     if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
@@ -1399,7 +1570,9 @@ void gen1Status() {
   if (!isnan(tempC)) { d["temperature"] = r1(tempC); d["overtemperature"] = overtemp; }
 #endif
   JsonArray ins = d["inputs"].to<JsonArray>();
+#if HAS_INPUT
   ins.add<JsonObject>()["input"] = inState ? 1 : 0;
+#endif
 #if HAS_ADDON
   ins.add<JsonObject>()["input"] = exState ? 1 : 0;
 #endif
@@ -1412,6 +1585,26 @@ void handleNotFound() {
   String uri = server.uri();
   if (uri.startsWith("/rpc/")) { handleRpcGet(uri.substring(5)); return; }
   if (uri == "/relay/0" || uri == "/relay") { gen1Relay(); return; }
+#if HAS_LIGHT
+  if (uri == "/light/0" || uri == "/light") {
+    if (!checkAuth()) return;
+    int b = server.hasArg("brightness") ? server.arg("brightness").toInt() : -1;
+    int c = server.hasArg("temp") ? server.arg("temp").toInt() : -1;
+    if (server.hasArg("transition")) nextTransition = server.arg("transition").toFloat() / 1000.0f;   // Gen1: ms
+    if (b >= 0 || c >= 0) lightSet(b, c);
+    float timer = server.hasArg("timer") ? server.arg("timer").toFloat() : -1;
+    if (server.hasArg("turn")) {
+      String t = server.arg("turn");
+      setRelay(t == "on" ? true : t == "off" ? false : !relayOn, "http", timer);
+    } else if (b >= 0 || c >= 0) lightUpdate();
+    JsonDocument d;
+    d["ison"] = relayOn; d["source"] = relaySrc; d["has_timer"] = timerActive;
+    d["mode"] = "white"; d["brightness"] = lBri; d["white"] = 0; d["temp"] = lCt;
+    d["transition"] = (int)(cfg.transition * 1000);
+    sendJson(200, d);
+    return;
+  }
+#endif
   if (uri == "/meter/0") {
     if (!checkAuth()) return;
     JsonDocument d; d["power"] = r1(apower); d["total"] = (long)(energyWh * 60);
@@ -1449,8 +1642,15 @@ void setupServer() {
 
 // ======================= Setup / Loop =======================
 void setup() {
+#if HAS_RELAY
   pinMode(PIN_RELAY, OUTPUT);
   digitalWrite(PIN_RELAY, LOW);
+#endif
+#if HAS_LIGHT
+  analogWriteRange(1023); analogWriteFreq(1000);
+  pinMode(PIN_PWM_BRI, OUTPUT); pinMode(PIN_PWM_CT, OUTPUT);
+  analogWrite(PIN_PWM_BRI, 0);
+#endif
 #if HAS_LED
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);
@@ -1487,8 +1687,9 @@ void setup() {
   devId = String(DEV_PREFIX) + "-" + lower;
 
   loadCal();
+  bool firstBoot = !LittleFS.exists("/config.json") && !LittleFS.exists("/noimport");
   loadCfg();
-  if (!cfg.ssid.length()) {          // WLAN-Daten vom Hermit Loader bzw. Tasmota uebernehmen
+  if (firstBoot && !cfg.ssid.length()) {   // nur beim allerersten Start: WLAN-Daten vom Hermit Loader bzw. Tasmota uebernehmen
     struct station_config sc;
     if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {
       char ss[33] = {0}, pw[65] = {0};
@@ -1511,6 +1712,7 @@ void setup() {
   exState = exCand = readAddon();
 #endif
 
+#if HAS_INPUT
   // Eingang
   inActiveLevel = (cfg.inInvert != (bool)INPUT_ACTIVE_LOW) ? LOW : HIGH;
   pinMode(PIN_INPUT, INPUT_ACTIVE_LOW ? INPUT_PULLUP : INPUT);
@@ -1519,6 +1721,12 @@ void setup() {
   uint32_t t0 = millis();
   while (millis() - t0 < 80) { inState = inCand = sampleInput(millis()); delay(1); }
   inCandMs = millis();
+#endif
+#if HAS_LIGHT
+  loadLight();
+  powerCycleCheck();
+  if (resetWifiPending) { resetWifiPending = false; cfg.ssid = ""; cfg.pass = ""; cfg.staticIp = false; ESP.eraseConfig(); saveCfg(); }
+#endif
 
   // Startzustand Relais
   bool start = false;
@@ -1555,6 +1763,10 @@ void loop() {
   if (mdnsUp) MDNS.update();
   handleWifi();
   handleInput();
+  handleLight();
+#if HAS_LIGHT
+  if (pcycleClearAt && millis() > pcycleClearAt) { pcycleClearAt = 0; LittleFS.remove("/pcycle"); }
+#endif
   handleAddon();
   handleTimer();
   handlePm();

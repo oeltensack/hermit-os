@@ -38,6 +38,23 @@
   #define DEF_IN_MODE   "momentary"
   #define DEF_IN_FILTER "dc"
   #define DEF_POWER_LIMIT 2500     // Plug S: max. 10 A
+#elif defined(DEVICE_DUO)
+  // Shelly Duo (E27 / GU10), Gen1 SHBDUO-1: weisses Licht, Helligkeit + Farbtemperatur 2700-6500 K
+  // Tasmota-Template {"NAME":"Shelly DUO","GPIO":[0,0,0,0,38,37,0,0,0,0,0,0,0]} (PWM-CT)
+  #define DEV_PREFIX   "hermit-duo"
+  #define DEV_MODEL    "HERMIT-DUO"
+  #define DEV_APP      "Duo"
+  #define GEN1_TYPE    "SHBDUO-1"
+  #define PIN_PWM_BRI  5      // Helligkeit
+  #define PIN_PWM_CT   4      // Farbtemperatur (hoeher = waermer)
+  #define HAS_LIGHT    1
+  #define HAS_RELAY    0
+  #define HAS_INPUT    0
+  #define HAS_PM       0
+  #define HAS_TEMP     0
+  #define HAS_LED      0
+  #define DEF_INITIAL  "on"   // Lampe am Wandschalter: nach Strom an
+  #define PWR_CAL_DEFAULT 1.0f
 #elif defined(DEVICE_SHELLY1)
   #define DEV_PREFIX   "hermit-1"
   #define DEV_MODEL    "HERMIT-1"
@@ -56,8 +73,8 @@
 // Variante mit Shelly-Temperatur-Add-on (Gen1), genutzt als externer Tastereingang input:100.
 // Das Add-on fuehrt die Datenleitung ueber Optokoppler: GPIO0 = Ausgang (Leitung freigeben),
 // GPIO3 = Eingang. Taster zwischen DATA und GND des Add-ons.
-#if defined(WITH_ADDON) && defined(DEVICE_PLUGS)
-  #error "Plug S hat keinen Add-on-Anschluss"
+#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_DUO))
+  #error "Plug S / Duo haben keinen Add-on-Anschluss"
 #endif
 #if defined(WITH_ADDON)
   #define HAS_ADDON      1
@@ -95,3 +112,24 @@
 #endif
 #define V_CAL_DEFAULT 0.16029f      // Tasmota BL0937: 822 * 1950 / 10 / T_us  -> V pro Hz
 #define I_CAL_DEFAULT 0.01155f      // Tasmota BL0937: 3300 * 3500 / 1000 / T_us -> A pro Hz
+#ifndef HAS_LIGHT
+  #define HAS_LIGHT 0
+#endif
+#ifndef HAS_RELAY
+  #define HAS_RELAY 1
+#endif
+#ifndef HAS_INPUT
+  #define HAS_INPUT 1
+#endif
+#ifndef DEF_INITIAL
+  #define DEF_INITIAL "off"
+#endif
+#if HAS_LIGHT
+  #define COMP     "cct"        // Gen2-Komponente wie Shelly Duo Bulb Gen3
+  #define EV_ON    "cct.on"
+  #define EV_OFF   "cct.off"
+#else
+  #define COMP     "switch"
+  #define EV_ON    "switch.on"
+  #define EV_OFF   "switch.off"
+#endif

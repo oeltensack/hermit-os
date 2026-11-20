@@ -34,6 +34,26 @@ Eigene Variante `hermit-plugs` (`bin/hermit-plugs.bin`):
 - Abschaltleistung ab Werk 2500 W (Plug S: max. 10 A), Übertemperatur über internen NTC
 - Flash-Tool erkennt die Plug S mit Original-Firmware (`SHPLG-S`) und Tasmota-Template „Shelly Plug S“
 
+## Shelly Duo (E27 / GU10)
+
+Eigene Variante `hermit-duo` (`bin/hermit-duo.bin`) für die weiße Duo (SHBDUO-1, nicht Duo RGBW):
+
+- API wie die **Shelly Duo Bulb Gen3**: Komponente `cct:0` mit `CCT.Set` (`on`, `brightness` 1–100,
+  `ct` 2700–6500 K, `transition_duration`, `toggle_after`), `CCT.Toggle`, `CCT.GetStatus`, `CCT.SetConfig`
+- Gen1-kompatibel: `/light/0?turn=on&brightness=50&temp=3000`
+- Weiches Überblenden (Standard 0,5 s), Gamma-Korrektur, Helligkeit/Farbtemperatur bleiben gespeichert
+- Nach Stromzufuhr **an** (Lampe am Wandschalter); umstellbar auf aus / letzter Zustand
+- Aktionen: `cct.on`, `cct.off`, `sys.boot`
+- **WLAN-Reset:** Lampe 5× kurz hintereinander aus- und einschalten (jeweils weniger als 6 s an)
+- PWM: Helligkeit GPIO5, Farbtemperatur GPIO4 (1 kHz). Sind warm/kalt vertauscht:
+  „Farbtemperatur-Kanal umkehren“
+
+Gen2-Script-Beispiel:
+
+```js
+Shelly.call("HTTP.GET", {url: "http://192.168.0.70/rpc/CCT.Set?id=0&on=true&brightness=40&ct=2700"});
+```
+
 ## Pinbelegung
 
 | | Shelly 1 | Shelly 1PM |
