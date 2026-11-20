@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.6.0"
+#define FW_VERSION "1.7.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -45,10 +45,10 @@ struct Cfg {
   String apPass;
   String swName, inName;
   String initialState = "off";     // off | on | restore_last | match_input
-  String inMode = "follow";        // follow | flip | momentary | detached
-  String inType = "switch";        // switch | button
+  String inMode = DEF_IN_MODE;     // follow | flip | momentary | detached
+  String inType = DEF_IN_TYPE;     // switch | button
   bool inInvert = false;
-  String inFilter = "ac";          // ac = 50-Hz-Halbwellen ueberbruecken | dc = reiner Pegel
+  String inFilter = DEF_IN_FILTER;          // ac = 50-Hz-Halbwellen ueberbruecken | dc = reiner Pegel
   String exName;                   // Add-on-Taster (input:100)
   String exType = "button";        // switch | button
   bool exInvert = false;
@@ -56,7 +56,8 @@ struct Cfg {
   String exRelay = "none";         // none | momentary | flip | follow
   bool autoOn = false;  float autoOnDelay = 60;
   bool autoOff = false; float autoOffDelay = 60;
-  float powerLimit = 3500;
+  float powerLimit = DEF_POWER_LIMIT;
+  float vCal = V_CAL_DEFAULT, iCal = I_CAL_DEFAULT;   // Plug S: Spannung/Strom
   float tempLimit = 95;
   float pwrCal = PWR_CAL_DEFAULT;  // Watt pro Hz am CF-Pin (eigene Datei /calib)
   String calSrc = "default";       // default | reference | tasmota | manual
@@ -126,7 +127,10 @@ bool inState = false, inCand = false;
 int bootEdges = 0;
 
 volatile uint32_t cfLastUs = 0, cfSumUs = 0, cfCnt = 0;
-float apower = 0;
+float apower = 0, avolt = NAN, acurr = NAN;
+volatile uint32_t cf1LastUs = 0, cf1SumUs = 0, cf1Cnt = 0;
+volatile bool cf1Arm = false;
+bool selVolt = true; uint32_t selSinceMs = 0;
 double energyWh = 0, energySavedWh = 0, minuteAccWh = 0;
 float byMinute[3] = {0, 0, 0};
 uint32_t minuteStartMs = 0;
@@ -149,14 +153,20 @@ static double r3(double v) { return round(v * 1000) / 1000; }
 // Kalibrierung liegt in eigener Datei und uebersteht Werkseinstellungen
 void saveCal() {
   File f = LittleFS.open("/calib", "w");
-  if (f) { f.print(cfg.pwrCal, 6); f.print('\n'); f.print(cfg.calSrc); f.close(); }
+  if (f) {
+    f.print(cfg.pwrCal, 6); f.print('\n'); f.print(cfg.calSrc); f.print('\n');
+    f.print(cfg.vCal, 6); f.print('\n'); f.print(cfg.iCal, 6); f.close();
+  }
 }
 void loadCal() {
   File f = LittleFS.open("/calib", "r");
   if (!f) return;
   float v = f.readStringUntil('\n').toFloat();
   String src = f.readStringUntil('\n'); src.trim();
+  float vv = f.readStringUntil('\n').toFloat(), ii = f.readStringUntil('\n').toFloat();
   f.close();
+  if (vv > 0.001f && vv < 10) cfg.vCal = vv;
+  if (ii > 0.0001f && ii < 1) cfg.iCal = ii;
   if (v > 0.05f && v < 100.0f) { cfg.pwrCal = v; cfg.calSrc = src.length() ? src : "manual"; }
 }
 
@@ -339,6 +349,11 @@ void handleLed() {
 #if HAS_LED
   if (apActive) digitalWrite(PIN_LED, (millis() / 500) & 1 ? LOW : HIGH);
 #endif
+#ifdef PIN_LED_LINK
+  // WLAN-LED: AP blinkt, getrennt an, verbunden aus
+  bool on = apActive ? ((millis() / 250) & 1) : (WiFi.status() != WL_CONNECTED);
+  digitalWrite(PIN_LED_LINK, on ? LOW : HIGH);
+#endif
 }
 
 // ======================= Eingang (AC-tauglich) =======================
@@ -442,7 +457,35 @@ IRAM_ATTR void cfIsr() {
 }
 #endif
 
+#if HAS_CF1
+IRAM_ATTR void cf1Isr() {
+  uint32_t now = micros();
+  if (cf1Arm && cf1LastUs) { cf1SumUs += now - cf1LastUs; cf1Cnt++; }
+  cf1LastUs = now;
+}
+
+// BL0937 CF1: abwechselnd 2 s Spannung (SEL LOW) und 2 s Strom (SEL HIGH), erste 300 ms verwerfen
+void handleCf1() {
+  uint32_t now = millis();
+  if (!cf1Arm && now - selSinceMs > 300) { noInterrupts(); cf1SumUs = 0; cf1Cnt = 0; cf1LastUs = 0; cf1Arm = true; interrupts(); }
+  if (now - selSinceMs < 2000) return;
+  noInterrupts();
+  uint32_t sum = cf1SumUs, cnt = cf1Cnt;
+  cf1Arm = false;
+  interrupts();
+  float hz = (cnt > 0 && sum > 0) ? cnt * 1e6f / sum : 0;
+  if (selVolt) avolt = r1(cfg.vCal * hz);
+  else acurr = (apower > 0.5f) ? roundf(cfg.iCal * hz * 1000) / 1000 : 0;
+  selVolt = !selVolt;
+  digitalWrite(PIN_SEL, selVolt ? LOW : HIGH);
+  selSinceMs = now;
+}
+#endif
+
 void handlePm() {
+#if HAS_CF1
+  handleCf1();
+#endif
 #if HAS_PM
   uint32_t now = millis();
   if (now - lastPmMs < 1000) return;
@@ -726,6 +769,13 @@ void switchStatus(JsonObject o) {
   }
 #if HAS_PM
   o["apower"] = r1(apower);
+#if HAS_CF1
+  if (!isnan(avolt)) o["voltage"] = avolt;
+  if (!isnan(acurr)) o["current"] = acurr;
+  if (!isnan(avolt) && !isnan(acurr) && avolt * acurr > 1) {
+    float pf = apower / (avolt * acurr); o["pf"] = roundf((pf > 1 ? 1 : pf) * 100) / 100;
+  }
+#endif
   JsonObject e = o["aenergy"].to<JsonObject>();
   e["total"] = r3(energyWh);
   JsonArray bm = e["by_minute"].to<JsonArray>();
@@ -755,6 +805,9 @@ void switchConfig(JsonObject o) {
   o["power_limit"] = cfg.powerLimit;
   JsonObject pc = o["pm_calibration"].to<JsonObject>();
   pc["factor"] = cfg.pwrCal; pc["source"] = cfg.calSrc; pc["default"] = PWR_CAL_DEFAULT;
+#if HAS_CF1
+  pc["voltage_factor"] = cfg.vCal; pc["current_factor"] = cfg.iCal;
+#endif
 #endif
 #if HAS_TEMP
   o["temp_limit"] = cfg.tempLimit;
@@ -1001,8 +1054,27 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     //   {"tasmota_powercal": 12530} Wert von Tasmota "PowerCal" (BL0937) uebernehmen
     //   {"factor": 1.7066}          Faktor in W/Hz direkt setzen
     //   {"reset": true}             zurueck auf Standard
+#if HAS_CF1
+    //   {"voltage": 231.5} / {"current": 4.35}   Spannung bzw. Strom mit Messgeraet (Plug S)
+    if (p["voltage"].is<float>() || p["current"].is<float>()) {
+      if (p["voltage"].is<float>()) {
+        float ref = p["voltage"];
+        if (isnan(avolt) || avolt < 10 || ref < 50) ERR(-114, "Keine Spannung gemessen");
+        cfg.vCal = cfg.vCal * ref / avolt; avolt = ref;
+      }
+      if (p["current"].is<float>()) {
+        float ref = p["current"];
+        if (isnan(acurr) || acurr < 0.02f || ref <= 0) ERR(-114, "Kein Strom gemessen – Last anschließen, Relais an");
+        cfg.iCal = cfg.iCal * ref / acurr; acurr = ref;
+      }
+      saveCal();
+      out["voltage_factor"] = cfg.vCal; out["current_factor"] = cfg.iCal;
+      return 0;
+    }
+#endif
     if (p["reset"].is<bool>() && p["reset"].as<bool>()) {
       cfg.pwrCal = PWR_CAL_DEFAULT; cfg.calSrc = "default";
+      cfg.vCal = V_CAL_DEFAULT; cfg.iCal = I_CAL_DEFAULT;
     } else if (p["tasmota_powercal"].is<float>()) {
       float pc = p["tasmota_powercal"];
       if (pc < 1000 || pc > 100000) ERR(-103, "tasmota_powercal unplausibel (typ. 8000–20000)");
@@ -1083,7 +1155,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
       if (v != "switch" && v != "button") ERR(-103, "type: switch|button");
       cfg.inType = v;
     }
-    if (c["invert"].is<bool>()) { cfg.inInvert = c["invert"]; inActiveLevel = cfg.inInvert ? LOW : HIGH; }
+    if (c["invert"].is<bool>()) { cfg.inInvert = c["invert"]; inActiveLevel = (cfg.inInvert != (bool)INPUT_ACTIVE_LOW) ? LOW : HIGH; }
     if (c["filter"].is<const char*>()) {
       String v = c["filter"].as<const char*>();
       if (v != "ac" && v != "dc") ERR(-103, "filter: ac|dc");
@@ -1383,6 +1455,10 @@ void setup() {
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);
 #endif
+#ifdef PIN_LED_LINK
+  pinMode(PIN_LED_LINK, OUTPUT);
+  digitalWrite(PIN_LED_LINK, HIGH);
+#endif
 #if HAS_ADDON
   Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY);   // RX (GPIO3) gehoert dem Add-on
 #else
@@ -1436,8 +1512,8 @@ void setup() {
 #endif
 
   // Eingang
-  inActiveLevel = cfg.inInvert ? LOW : HIGH;
-  pinMode(PIN_INPUT, INPUT);
+  inActiveLevel = (cfg.inInvert != (bool)INPUT_ACTIVE_LOW) ? LOW : HIGH;
+  pinMode(PIN_INPUT, INPUT_ACTIVE_LOW ? INPUT_PULLUP : INPUT);
   attachInterrupt(digitalPinToInterrupt(PIN_INPUT), inIsr, CHANGE);
   inLastActiveMs = millis() - 1000;
   uint32_t t0 = millis();
@@ -1454,6 +1530,12 @@ void setup() {
 #if HAS_PM
   pinMode(PIN_CF, INPUT);
   attachInterrupt(digitalPinToInterrupt(PIN_CF), cfIsr, RISING);
+#if HAS_CF1
+  pinMode(PIN_SEL, OUTPUT); digitalWrite(PIN_SEL, LOW);   // mit Spannung beginnen
+  pinMode(PIN_CF1, INPUT);
+  attachInterrupt(digitalPinToInterrupt(PIN_CF1), cf1Isr, RISING);
+  selSinceMs = millis();
+#endif
   lastPmMs = minuteStartMs = lastEnergySaveMs = millis();
 #endif
 

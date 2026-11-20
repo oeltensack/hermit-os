@@ -12,6 +12,7 @@ VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in up
     "shelly1pm": "hermit-1pm",
     "shelly1_addon": "hermit-1-addon",
     "shelly1pm_addon": "hermit-1pm-addon",
+    "plugs": "hermit-plugs",
 }
 
 ini = (ROOT / "platformio.ini").read_text()

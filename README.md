@@ -22,6 +22,18 @@ können sie genauso ansprechen wie ein neues Shelly, und die alten Geräte melde
 - Optional Passwort (Benutzer `admin`, Digest- oder Basic-Auth)
 - mDNS: `hermit-1-<mac>.local` bzw. `hermit-1pm-<mac>.local`, Dienst `_shelly._tcp`
 
+## Shelly Plug S
+
+Eigene Variante `hermit-plugs` (`bin/hermit-plugs.bin`):
+
+- Relais GPIO15, Taster am Gerät GPIO13 (Standard: Druck schaltet um), Relais-LED GPIO0, WLAN-LED GPIO2
+- BL0937 mit **Leistung, Spannung und Strom** (CF GPIO5, CF1 GPIO14, SEL GPIO12) – `voltage`, `current`, `pf`
+  im Status wie bei Gen2; Spannung/Strom werden abwechselnd alle 2 s gemessen
+- Standardfaktoren wie Tasmota (BL0937); Kalibrieren unter System → Leistung kalibrieren
+  (`Switch.Calibrate` mit `apower`, `voltage`, `current`)
+- Abschaltleistung ab Werk 2500 W (Plug S: max. 10 A), Übertemperatur über internen NTC
+- Flash-Tool erkennt die Plug S mit Original-Firmware (`SHPLG-S`) und Tasmota-Template „Shelly Plug S“
+
 ## Pinbelegung
 
 | | Shelly 1 | Shelly 1PM |

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM (Gen1) schreiben.
+hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug S (Gen1) schreiben.
 
 Erkennt automatisch, was auf dem Geraet laeuft:
   * Original-Shelly-Firmware (Mongoose OS)  -> mg2hermit: angepasstes mg2tasmota laedt Hermit OS
@@ -27,7 +27,8 @@ BIN_DIR = ROOT / "bin"
 CACHE = pathlib.Path(__file__).resolve().parent / ".cache"
 MG2X_URL = "http://ota.tasmota.com/tasmota/shelly/mg2tasmota-{model}.zip"
 MG2X_OLD = b"https://ota.tasmota.com/tasmota/release/tasmota.bin"   # in mg2tasmota einkompiliert (51 Zeichen)
-GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "hermit-1pm")}
+GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "hermit-1pm"),
+               "SHPLG-S": ("ShellyPlugS", "hermit-plugs")}
 
 
 def log(msg):
@@ -131,11 +132,15 @@ def variant_from(dev, kind, info, addon):
     elif kind == "tasmota":
         t = jget(dev, "/cm?cmnd=Template") or {}
         name = str(t.get("NAME", "")).lower()
-        if "1pm" in name:
+        if "plug s" in name:
+            v = "hermit-plugs"
+        elif "1pm" in name:
             v = "hermit-1pm"
         elif "shelly 1" in name:
             v = "hermit-1"
     if v and addon:
+        if v == "hermit-plugs":
+            die("Plug S hat keinen Add-on-Anschluss")
         v += "-addon"
     return v
 

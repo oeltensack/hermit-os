@@ -25,7 +25,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 5px;bord
 .ck{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--fg);font-size:14px}.ck input{width:auto}
 pre{background:var(--bg);padding:10px;border-radius:6px;overflow:auto;font-size:12px;max-height:340px;white-space:pre-wrap}
 nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 11px;border-radius:6px;background:var(--c);font-size:13px;cursor:pointer}
-nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.tab.a{display:block}
+nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.vi{display:none}.tab.a{display:block}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff}
 code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
@@ -39,6 +39,8 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="pm"><div class="v" id="pw">–</div><div class="l">Leistung</div></div>
 <div class="pm"><div class="v" id="en">–</div><div class="l">Energie</div></div>
 <div class="pm"><div class="v" id="tc">–</div><div class="l">Temperatur</div></div>
+<div class="vi"><div class="v" id="vo">–</div><div class="l">Spannung</div></div>
+<div class="vi"><div class="v" id="cu">–</div><div class="l">Strom · cos φ</div></div>
 <div><div class="v" id="in">–</div><div class="l">Eingang SW</div></div>
 <div class="ao"><div class="v" id="ex">–</div><div class="l" id="exl">Add-on-Taster</div></div>
 <div><div class="v" id="rs">–</div><div class="l">WLAN</div></div>
@@ -110,6 +112,9 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="l">Der Faktor bleibt auch bei Werkseinstellungen und Firmware-Updates erhalten.</div>
 <label>a) Referenzlast: Relais an, gemessene Wirkleistung (W)</label><input id="y_cal" type="number" step="0.1">
 <button class="bt" onclick="calib({apower:+$('y_cal').value})">Mit Referenz kalibrieren</button>
+<div class="vi"><label>Spannung mit Messgerät (V)</label><input id="y_vr" type="number" step="0.1">
+<label>Strom mit Messgerät (A) – Last an, Relais an</label><input id="y_ir" type="number" step="0.001">
+<button class="bt" onclick="calVI()">Spannung/Strom kalibrieren</button></div>
 <label>b) Wert aus Tasmota übernehmen (Konsole: <code>PowerCal</code>)</label><input id="y_tpc" type="number" placeholder="12530">
 <button class="bt" onclick="calib({tasmota_powercal:+$('y_tpc').value})">Tasmota-Wert übernehmen</button>
 <label>c) Faktor direkt (W/Hz)</label><input id="y_fac" type="number" step="0.0001">
@@ -154,7 +159,7 @@ $('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').
 $('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
-document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none')}catch(e){}}
+document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
 $('btn').onclick=()=>run(async()=>{await rpc('Switch.Toggle',{id:0});poll()});
 function pulse(){run(async()=>{await rpc('Switch.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
@@ -183,7 +188,8 @@ function saveSys(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name
 function setAuth(clear){run(async()=>{if(!clear&&!$('y_auth').value)throw new Error('Kein Passwort eingegeben');await rpc('Shelly.SetAuth',{pass:clear?null:$('y_auth').value});$('y_auth').value='';loadCfg()},clear?'Passwort entfernt':'Passwort gesetzt')}
 const CSRC={default:'Standard (wie Tasmota BL0937)',reference:'mit Referenzlast kalibriert',tasmota:'aus Tasmota übernommen',manual:'manuell gesetzt'};
 function showCal(c){if(!c)return;$('y_cf').textContent=c.factor.toFixed(4)+' W/Hz · '+(CSRC[c.source]||c.source)+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
-function calib(p){run(async()=>{p.id=0;const r=await rpc('Switch.Calibrate',p);showCal(r);toast('Faktor: '+r.factor.toFixed(4)+' W/Hz')})}
+function calVI(){const p={};if($('y_vr').value)p.voltage=+$('y_vr').value;if($('y_ir').value)p.current=+$('y_ir').value;calib(p)}
+function calib(p){run(async()=>{p.id=0;const r=await rpc('Switch.Calibrate',p);if(r.factor!=null){showCal(r);toast('Faktor: '+r.factor.toFixed(4)+' W/Hz')}else toast('Spannung/Strom kalibriert')})}
 function showUpd(u,ver){if(!u)return;$('u_mode').value=u.mode;$('u_hour').value=u.hour;$('u_url').value=u.url;$('u_tok').placeholder=u.token_set?'gesetzt – leer lassen = unverändert':'kein Token';
 $('u_st').textContent=u.available?'Neue Version '+u.available+' verfügbar':'Aktuell ('+ver+')';$('u_inst').style.display=u.available?'':'none';
 $('u_info').textContent='Variante '+u.variant+(u.last_check?' · zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE'):'')+(u.last_error?' · '+u.last_error:'')+(u.state!='idle'?' · '+u.state:'')}
