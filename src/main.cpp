@@ -19,9 +19,10 @@
 #include "device.h"
 #include "webui.h"
 #include "tasmota_import.h"
+#include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.5.1"
+#define FW_VERSION "1.6.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -1393,7 +1394,13 @@ void setup() {
   if (ESP.getFlashChipRealSize() < ESP.getFlashChipSize())
     Serial.println(F("WARNUNG: Chip kleiner als Firmware-Layout!"));
 
-  if (!LittleFS.begin()) { LittleFS.format(); LittleFS.begin(); }
+  // Erster Start (Dateisystem noch nicht formatiert): vorher WLAN der Original-Shelly-Firmware sichern
+  String mgSsid, mgPass;
+  bool mgFound = false;
+  if (!LittleFS.begin()) {
+    mgFound = mgosimport::readWifi(mgSsid, mgPass);
+    LittleFS.format(); LittleFS.begin();
+  }
 
   uint8_t mac[6];
   WiFi.macAddress(mac);
@@ -1415,6 +1422,7 @@ void setup() {
     } else {
       String ts, tp;                 // direkt von Tasmota geflasht: WLAN aus dessen Einstellungen
       if (tasimport::readWifi(ts, tp)) { cfg.ssid = ts; cfg.pass = tp; saveCfg(); }
+      else if (mgFound) { cfg.ssid = mgSsid; cfg.pass = mgPass; saveCfg(); }   // Original-Shelly-Firmware
     }
   }
   loadEnergy();

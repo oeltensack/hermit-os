@@ -60,6 +60,32 @@ falls dabei etwas schiefgeht.
 
 Spätere Updates: Weboberfläche → System → Firmware, oder `curl -F firmware=@hermit-1pm.bin http://<ip>/update`.
 
+## Flash-Tool: `tools/hermit_flash.py`
+
+Schreibt Hermit OS über WLAN auf einen Shelly 1 / 1PM und erkennt selbst, was gerade läuft:
+
+| Auf dem Gerät | Ablauf |
+|---|---|
+| **Original-Shelly-Firmware** | angepasstes mg2tasmota („mg2hermit“) → lädt Hermit OS direkt |
+| **Tasmota** | Hermit Loader → Hermit OS |
+| **Hermit Loader** | Hermit OS |
+| **Hermit OS** | Firmware-Update |
+
+```bash
+python3 tools/hermit_flash.py 192.168.5.153            # Modell wird erkannt
+python3 tools/hermit_flash.py 192.168.5.153 --addon    # Add-on-Variante
+python3 tools/hermit_flash.py 192.168.5.153 --password geheim   # bei Login-Schutz
+```
+
+- Nur Python 3 (Standardbibliothek), PC im selben Netz wie der Shelly
+- Für die Original-Firmware startet das Tool auf dem PC einen kleinen Webserver (Port 8266) – die
+  **Windows-Firewall** muss den Zugriff erlauben. Internet braucht es nur einmal für das mg2tasmota-Paket
+  (wird in `tools/.cache` gespeichert; alternativ `--mg2x-zip`).
+- mg2hermit ist mg2tasmota (GPL-3.0, Mark Dornbach) mit geänderter Download-Adresse; das Tool lädt das
+  Original und passt es lokal an.
+- Hermit OS übernimmt das WLAN aus der Original-Firmware bzw. aus Tasmota automatisch.
+- Wie bei mg2tasmota wird per OTA der Bootloader ersetzt: Strom während des Vorgangs nicht trennen.
+
 ## Von Tasmota direkt zu Hermit OS (Hermit Loader)
 
 Ist in Tasmota zu wenig Platz für Hermit OS („Not enough space“), geht es ohne tasmota-minimal über den
