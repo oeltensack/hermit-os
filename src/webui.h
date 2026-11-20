@@ -65,6 +65,8 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <h2 style="margin-top:20px">Eingang SW</h2>
 <div class="row"><div><label>Typ</label><select id="i_type"><option value="switch">Schalter</option><option value="button">Taster</option></select></div>
 <div><label class="ck" style="margin-top:34px"><input type="checkbox" id="i_invert">Eingang invertieren</label></div></div>
+<label>Eingangsfilter</label><select id="i_filter"><option value="ac">Wechselspannung (50-Hz-Halbwellen überbrücken)</option><option value="dc">Nur Pegel (Gleichspannung / feste Pegel)</option></select>
+<button class="bt g" onclick="diag()">Eingang messen (roh)</button><pre id="i_diag" style="display:none"></pre>
 <button class="bt" onclick="saveSw()">Speichern</button></div>
 <div class="card ao"><h2>Add-on-Taster (input:100)</h2>
 <div class="l">Taster zwischen DATA und GND des Add-ons.</div>
@@ -158,7 +160,7 @@ function pulse(){run(async()=>{await rpc('Switch.Set',{id:0,on:true,toggle_after
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
 async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0'],inp=c['input:0'];
 ['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
-showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;
+showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
 const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
@@ -166,8 +168,9 @@ const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver
 showUpd(c.sys.updates,d.ver);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
+function diag(){run(async()=>{const r=await rpc('Input.Diag',{id:0});$('i_diag').style.display='block';$('i_diag').textContent='HIGH-Anteil: '+r.high_pct+' %\nFlanken in 200 ms: '+r.edges+'  (≈ '+r.approx_hz+' Hz)\nErkannter Zustand: '+(r.state?'AN':'AUS')+'  ·  Filter '+r.filter+(r.invert?' · invertiert':'')})}
 function saveSw(){run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
-await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked}})},'Gespeichert')}
+await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}})},'Gespeichert')}
 async function loadHooks(){await run(async()=>{if(!SUP.length){const s=await rpc('Webhook.ListSupported');SUP=Object.keys(s.types);$('h_ev').innerHTML=SUP.map(e=>`<option>${e}</option>`).join('')}
 const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
 $('h_ev').onchange=()=>{const v=$('h_ev').value;$('h_thrw').style.display=v.includes('power_')?'':'none';$('h_cidw').style.display=AO&&v.startsWith('input.')?'':'none'};

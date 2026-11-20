@@ -19,7 +19,7 @@
 #include "webui.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.4.0"
+#define FW_VERSION "1.4.1"
 #endif
 
 // ======================= Konfiguration =======================
@@ -45,6 +45,7 @@ struct Cfg {
   String inMode = "follow";        // follow | flip | momentary | detached
   String inType = "switch";        // switch | button
   bool inInvert = false;
+  String inFilter = "ac";          // ac = 50-Hz-Halbwellen ueberbruecken | dc = reiner Pegel
   String exName;                   // Add-on-Taster (input:100)
   String exType = "button";        // switch | button
   bool exInvert = false;
@@ -90,7 +91,7 @@ static const char* METHODS[] = {
 #if HAS_PM
   "Switch.ResetCounters", "Switch.Calibrate",
 #endif
-  "Input.GetStatus", "Input.GetConfig", "Input.SetConfig",
+  "Input.GetStatus", "Input.GetConfig", "Input.SetConfig", "Input.Diag",
 #if HAS_ADDON
   "SensorAddon.GetPeripherals",
 #endif
@@ -162,7 +163,7 @@ void saveCfg() {
   d["name"] = cfg.name; d["ssid"] = cfg.ssid; d["pass"] = cfg.pass;
   d["static"] = cfg.staticIp; d["ip"] = cfg.ip; d["mask"] = cfg.mask; d["gw"] = cfg.gw; d["dns"] = cfg.dns;
   d["appass"] = cfg.apPass; d["swname"] = cfg.swName; d["inname"] = cfg.inName;
-  d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert;
+  d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert; d["infilt"] = cfg.inFilter;
   d["exname"] = cfg.exName; d["extype"] = cfg.exType; d["exinv"] = cfg.exInvert; d["exout"] = cfg.exOutLow; d["exrel"] = cfg.exRelay;
   d["aon"] = cfg.autoOn; d["aond"] = cfg.autoOnDelay; d["aoff"] = cfg.autoOff; d["aoffd"] = cfg.autoOffDelay;
   d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led;
@@ -193,7 +194,7 @@ void loadCfg() {
   cfg.ip = jstr(d["ip"], ""); cfg.mask = jstr(d["mask"], ""); cfg.gw = jstr(d["gw"], ""); cfg.dns = jstr(d["dns"], "");
   cfg.apPass = jstr(d["appass"], ""); cfg.swName = jstr(d["swname"], ""); cfg.inName = jstr(d["inname"], "");
   cfg.initialState = jstr(d["initial"], cfg.initialState); cfg.inMode = jstr(d["inmode"], cfg.inMode);
-  cfg.inType = jstr(d["intype"], cfg.inType); cfg.inInvert = d["ininv"] | false;
+  cfg.inType = jstr(d["intype"], cfg.inType); cfg.inInvert = d["ininv"] | false; cfg.inFilter = jstr(d["infilt"], cfg.inFilter);
   cfg.exName = jstr(d["exname"], ""); cfg.exType = jstr(d["extype"], cfg.exType);
   cfg.exInvert = d["exinv"] | false; cfg.exOutLow = d["exout"] | false; cfg.exRelay = jstr(d["exrel"], cfg.exRelay);
   cfg.autoOn = d["aon"] | false; cfg.autoOnDelay = d["aond"] | 60.0f;
@@ -388,6 +389,7 @@ void onInputEdge(bool st) {
 }
 
 bool sampleInput(uint32_t now) {
+  if (cfg.inFilter == "dc") { inPulse = false; return ((GPI >> PIN_INPUT) & 1) == inActiveLevel; }
   if (inPulse || (((GPI >> PIN_INPUT) & 1) == inActiveLevel)) { inPulse = false; inLastActiveMs = now; }
   return (now - inLastActiveMs) < 35;   // haelt bei 50-Hz-Halbwellen durch
 }
@@ -768,7 +770,7 @@ void addonConfig(JsonObject o) {
 void inputConfig(JsonObject o) {
   o["id"] = 0;
   if (cfg.inName.length()) o["name"] = cfg.inName; else o["name"] = nullptr;
-  o["type"] = cfg.inType; o["invert"] = cfg.inInvert;
+  o["type"] = cfg.inType; o["invert"] = cfg.inInvert; o["filter"] = cfg.inFilter;
 }
 
 void sysStatus(JsonObject o) {
@@ -1051,6 +1053,22 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
 #endif
   if (m == "input.getstatus") { inputStatus(out.to<JsonObject>()); return 0; }
   if (m == "input.getconfig") { inputConfig(out.to<JsonObject>()); return 0; }
+  if (m == "input.diag") {
+    // 200 ms den rohen Pin abtasten (ca. alle 100 µs): Anteil HIGH, Flanken -> Netzfrequenz?
+    uint32_t hi = 0, n = 0, edges = 0;
+    int last = (GPI >> PIN_INPUT) & 1;
+    uint32_t t0 = micros();
+    while (micros() - t0 < 200000UL) {
+      int v = (GPI >> PIN_INPUT) & 1;
+      if (v != last) { edges++; last = v; }
+      hi += v; n++;
+      delayMicroseconds(100);
+    }
+    out["samples"] = n; out["high_pct"] = r1(100.0f * hi / n);
+    out["edges"] = edges; out["approx_hz"] = r1(edges / 2.0f / 0.2f);
+    out["state"] = inState; out["filter"] = cfg.inFilter; out["invert"] = cfg.inInvert;
+    return 0;
+  }
   if (m == "input.setconfig") {
     JsonVariantConst c = p["config"];
     if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
@@ -1061,6 +1079,11 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
       cfg.inType = v;
     }
     if (c["invert"].is<bool>()) { cfg.inInvert = c["invert"]; inActiveLevel = cfg.inInvert ? LOW : HIGH; }
+    if (c["filter"].is<const char*>()) {
+      String v = c["filter"].as<const char*>();
+      if (v != "ac" && v != "dc") ERR(-103, "filter: ac|dc");
+      cfg.inFilter = v;
+    }
     saveCfg();
     out["restart_required"] = false;
     return 0;
