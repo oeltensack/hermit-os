@@ -1,6 +1,7 @@
 // Hermit Loader – kleine Zwischen-Firmware fuer den Wechsel Tasmota -> Hermit OS.
 // Tasmota akzeptiert sie wegen ihrer Groesse direkt (aehnlich tasmota-minimal). Danach:
-//   - WLAN: zuerst die im ESP gespeicherten Zugangsdaten, sonst Access-Point hermit-loader-xxxxxx (192.168.33.1)
+//   - WLAN: im ESP gespeicherte Daten, dann die aus den Tasmota-Einstellungen, sonst Access-Point
+//     hermit-loader-xxxxxx (192.168.33.1)
 //   - Hermit-OS-.bin im Browser hochladen
 //   - WLAN-Daten bleiben im WLAN-Speicher des ESP; Hermit OS uebernimmt sie beim ersten Start
 // Die Relais-Pins werden nicht angesteuert (bleiben aus).
@@ -11,6 +12,7 @@
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
 #include <Updater.h>
+#include "tasmota_import.h"
 
 ESP8266WebServer server(80);
 DNSServer dns;
@@ -90,13 +92,22 @@ void setup() {
   });
   server.begin();
 
-  // Gespeicherte WLAN-Daten (z. B. von Tasmota) versuchen, sonst Access-Point
+  // 1. im ESP gespeicherte WLAN-Daten, 2. Tasmota-Einstellungen, sonst Access-Point
+  String src;
   struct station_config sc;
   wifi_station_get_config_default(&sc);
   wSsid = String((char*)sc.ssid);
-  if (wSsid.length()) WiFi.begin();
-  if (!(wSsid.length() && waitSta(20000))) startAP();
-  msg = WiFi.status() == WL_CONNECTED ? "Mit gespeichertem WLAN verbunden" :
+  if (wSsid.length()) { WiFi.begin(); if (waitSta(20000)) src = "gespeichertem WLAN"; }
+  if (!src.length()) {
+    String ts, tp;
+    if (tasimport::readWifi(ts, tp)) {
+      wSsid = ts;
+      WiFi.begin(ts, tp);                       // persistent: Hermit OS uebernimmt die Daten spaeter
+      if (waitSta(20000)) src = "WLAN aus Tasmota (" + ts + ")";
+    }
+  }
+  if (!src.length()) startAP();
+  msg = src.length() ? "Verbunden mit " + src :
         "Kein WLAN - mit " + devId + " verbinden und http://192.168.33.1 oeffnen";
   Serial.println(msg);
 }

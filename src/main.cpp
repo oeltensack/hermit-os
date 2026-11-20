@@ -18,9 +18,10 @@
 #include <vector>
 #include "device.h"
 #include "webui.h"
+#include "tasmota_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.5.0"
+#define FW_VERSION "1.5.1"
 #endif
 
 // ======================= Konfiguration =======================
@@ -1411,6 +1412,9 @@ void setup() {
       memcpy(ss, sc.ssid, 32); memcpy(pw, sc.password, 64);
       cfg.ssid = ss; cfg.pass = pw;
       saveCfg();
+    } else {
+      String ts, tp;                 // direkt von Tasmota geflasht: WLAN aus dessen Einstellungen
+      if (tasimport::readWifi(ts, tp)) { cfg.ssid = ts; cfg.pass = tp; saveCfg(); }
     }
   }
   loadEnergy();

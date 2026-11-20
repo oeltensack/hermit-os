@@ -66,7 +66,8 @@ Ist in Tasmota zu wenig Platz für Hermit OS („Not enough space“), geht es o
 **Hermit Loader** (`bin/hermit-loader.bin.gz`, ca. 230 KB):
 
 1. Tasmota → Firmware-Update → `hermit-loader.bin.gz` hochladen
-2. Der Loader verbindet sich mit dem im ESP gespeicherten WLAN; klappt das nicht, öffnet er den AP
+2. Der Loader übernimmt das WLAN aus den zurückgelassenen Tasmota-Einstellungen (bzw. dem WLAN-Speicher des ESP);
+   klappt das nicht, öffnet er den AP
    `hermit-loader-xxxxxx` → `http://192.168.33.1` → WLAN eintragen
 3. Im Loader die passende Hermit-`.bin` hochladen (`hermit-1.bin`, `hermit-1pm.bin`, `…-addon.bin`)
 4. Hermit OS startet und übernimmt das WLAN aus dem Loader automatisch
