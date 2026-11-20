@@ -68,14 +68,21 @@ Spätere Updates: Weboberfläche → System → Firmware, oder `curl -F firmware
 
 ## Leistung kalibrieren (1PM)
 
-Der Standardfaktor 12,53 W/Hz ist nur ein Startwert. Ohmsche Last (z. B. Heizlüfter) anschließen, Relais an,
-Wirkleistung messen und unter System → Leistung kalibrieren eintragen bzw.
+Der Shelly 1PM misst mit einem **BL0937** (nur Wirkleistung über CF). Ab Werk rechnet die Firmware mit demselben
+Standardfaktor wie Tasmota für den BL0937: **1,7066 W/Hz** (1362 × 12530 / 10 / Pulsdauer in µs).
+Die Werkskalibrierung der Original-Shelly-Firmware ist nach dem Flashen nicht mehr vorhanden.
 
-```
-http://<ip>/rpc/Switch.Calibrate?id=0&apower=1985.4
-```
+Möglichkeiten (Weboberfläche → System → Leistung kalibrieren, oder per RPC):
 
-Der 1PM misst nur die Wirkleistung (CF). Spannung, Strom und cos φ liefert der HLW8012 in dieser Beschaltung nicht.
+| Weg | RPC |
+|---|---|
+| Referenzlast messen (genaueste Methode) | `/rpc/Switch.Calibrate?id=0&apower=1985.4` |
+| Tasmota-Wert übernehmen (Konsole `PowerCal`, vor dem Flashen auslesen) | `/rpc/Switch.Calibrate?id=0&tasmota_powercal=12530` |
+| Faktor direkt setzen | `/rpc/Switch.Calibrate?id=0&factor=1.7066` |
+| Zurück auf Standard | `/rpc/Switch.Calibrate?id=0&reset=true` |
+
+Der Faktor liegt in einer eigenen Datei und bleibt bei Firmware-Updates **und** Werkseinstellungen erhalten.
+`Switch.GetConfig` zeigt ihn unter `pm_calibration`.
 
 ## Zusammenspiel mit Gen2/Gen3-Scripten
 

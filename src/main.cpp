@@ -18,7 +18,7 @@
 #include "webui.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"
 #endif
 
 // ======================= Konfiguration =======================
@@ -47,7 +47,8 @@ struct Cfg {
   bool autoOff = false; float autoOffDelay = 60;
   float powerLimit = 3500;
   float tempLimit = 95;
-  float pwrCal = 12.53f;           // Watt pro Hz am CF-Pin
+  float pwrCal = PWR_CAL_DEFAULT;  // Watt pro Hz am CF-Pin (eigene Datei /calib)
+  String calSrc = "default";       // default | reference | tasmota | manual
   bool led = true;
   String authPass;
   String tz = "CET-1CEST,M3.5.0,M10.5.0/3";
@@ -126,6 +127,20 @@ static float r1(float v) { return roundf(v * 10) / 10; }
 static double r3(double v) { return round(v * 1000) / 1000; }
 
 // ======================= Speichern / Laden =======================
+// Kalibrierung liegt in eigener Datei und uebersteht Werkseinstellungen
+void saveCal() {
+  File f = LittleFS.open("/calib", "w");
+  if (f) { f.print(cfg.pwrCal, 6); f.print('\n'); f.print(cfg.calSrc); f.close(); }
+}
+void loadCal() {
+  File f = LittleFS.open("/calib", "r");
+  if (!f) return;
+  float v = f.readStringUntil('\n').toFloat();
+  String src = f.readStringUntil('\n'); src.trim();
+  f.close();
+  if (v > 0.05f && v < 100.0f) { cfg.pwrCal = v; cfg.calSrc = src.length() ? src : "manual"; }
+}
+
 void saveCfg() {
   cfg.cfgRev++;
   JsonDocument d;
@@ -134,7 +149,7 @@ void saveCfg() {
   d["appass"] = cfg.apPass; d["swname"] = cfg.swName; d["inname"] = cfg.inName;
   d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert;
   d["aon"] = cfg.autoOn; d["aond"] = cfg.autoOnDelay; d["aoff"] = cfg.autoOff; d["aoffd"] = cfg.autoOffDelay;
-  d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["pcal"] = cfg.pwrCal; d["led"] = cfg.led;
+  d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led;
   d["auth"] = cfg.authPass; d["tz"] = cfg.tz; d["sntp"] = cfg.sntp;
   d["hnext"] = cfg.nextHookId; d["hrev"] = cfg.hookRev; d["rev"] = cfg.cfgRev;
   JsonArray ha = d["hooks"].to<JsonArray>();
@@ -165,7 +180,10 @@ void loadCfg() {
   cfg.autoOn = d["aon"] | false; cfg.autoOnDelay = d["aond"] | 60.0f;
   cfg.autoOff = d["aoff"] | false; cfg.autoOffDelay = d["aoffd"] | 60.0f;
   cfg.powerLimit = d["plim"] | cfg.powerLimit; cfg.tempLimit = d["tlim"] | cfg.tempLimit;
-  cfg.pwrCal = d["pcal"] | cfg.pwrCal; cfg.led = d["led"] | true;
+  cfg.led = d["led"] | true;
+  // Uebernahme aus Version 1.0.0 (Faktor stand in config.json, Standard war falsch 12.53)
+  float old = d["pcal"] | 0.0f;
+  if (old > 0 && fabsf(old - 12.53f) > 0.001f && !LittleFS.exists("/calib")) { cfg.pwrCal = old; cfg.calSrc = "reference"; saveCal(); }
   cfg.authPass = jstr(d["auth"], ""); cfg.tz = jstr(d["tz"], cfg.tz); cfg.sntp = jstr(d["sntp"], cfg.sntp);
   cfg.nextHookId = d["hnext"] | 1; cfg.hookRev = d["hrev"] | 0; cfg.cfgRev = d["rev"] | 0;
   cfg.hooks.clear();
@@ -526,6 +544,8 @@ void switchConfig(JsonObject o) {
   o["auto_off"] = cfg.autoOff; o["auto_off_delay"] = cfg.autoOffDelay;
 #if HAS_PM
   o["power_limit"] = cfg.powerLimit;
+  JsonObject pc = o["pm_calibration"].to<JsonObject>();
+  pc["factor"] = cfg.pwrCal; pc["source"] = cfg.calSrc; pc["default"] = PWR_CAL_DEFAULT;
 #endif
 #if HAS_TEMP
   o["temp_limit"] = cfg.tempLimit;
@@ -722,13 +742,32 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     return 0;
   }
   if (m == "switch.calibrate") {
-    // Referenzlast anschliessen, mit Messgeraet gemessene Wirkleistung uebergeben
-    if (!p["apower"].is<float>()) ERR(-103, "apower (Referenz in W) fehlt");
-    float ref = p["apower"];
-    if (ref <= 0 || apower < 1) ERR(-114, "Keine Leistung gemessen – Relais an und Last angeschlossen?");
-    cfg.pwrCal = cfg.pwrCal * ref / apower;
-    saveCfg();
+    // Moeglichkeiten:
+    //   {"apower": 1985.4}          Referenzlast laeuft, gemessene Wirkleistung in W
+    //   {"tasmota_powercal": 12530} Wert von Tasmota "PowerCal" (BL0937) uebernehmen
+    //   {"factor": 1.7066}          Faktor in W/Hz direkt setzen
+    //   {"reset": true}             zurueck auf Standard
+    if (p["reset"].is<bool>() && p["reset"].as<bool>()) {
+      cfg.pwrCal = PWR_CAL_DEFAULT; cfg.calSrc = "default";
+    } else if (p["tasmota_powercal"].is<float>()) {
+      float pc = p["tasmota_powercal"];
+      if (pc < 1000 || pc > 100000) ERR(-103, "tasmota_powercal unplausibel (typ. 8000–20000)");
+      cfg.pwrCal = 1362.0f * pc / 1e7f; cfg.calSrc = "tasmota";
+    } else if (p["factor"].is<float>()) {
+      float f = p["factor"];
+      if (f < 0.05f || f > 100) ERR(-103, "factor unplausibel");
+      cfg.pwrCal = f; cfg.calSrc = "manual";
+    } else if (p["apower"].is<float>()) {
+      float ref = p["apower"];
+      if (ref <= 0 || apower < 1) ERR(-114, "Keine Leistung gemessen – Relais an und Last angeschlossen?");
+      float nf = cfg.pwrCal * ref / apower;
+      if (nf < 0.05f || nf > 100) ERR(-103, "Ergebnis unplausibel – Referenzwert prüfen");
+      cfg.pwrCal = nf; cfg.calSrc = "reference";
+    } else ERR(-103, "apower, tasmota_powercal, factor oder reset angeben");
+    saveCal();
     out["factor"] = cfg.pwrCal;
+    out["source"] = cfg.calSrc;
+    out["default"] = PWR_CAL_DEFAULT;
     return 0;
   }
 #endif
@@ -1042,6 +1081,7 @@ void setup() {
   String lower = macStr; lower.toLowerCase();
   devId = String(DEV_PREFIX) + "-" + lower;
 
+  loadCal();
   loadCfg();
   loadEnergy();
 

@@ -94,9 +94,16 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label>Passwort für Benutzer <code>admin</code></label><input id="y_auth" type="password">
 <div class="row"><button class="bt" onclick="setAuth(0)">Passwort setzen</button><button class="bt g" onclick="setAuth(1)">Passwort entfernen</button></div></div>
 <div class="card pm"><h2>Leistung kalibrieren</h2>
-<div class="l">Ohmsche Referenzlast anschließen, Relais an, Wirkleistung mit Messgerät messen und eintragen.</div>
-<label>Referenz (W)</label><input id="y_cal" type="number" step="0.1">
-<div class="row"><button class="bt" onclick="calib()">Kalibrieren</button><button class="bt g" onclick="rstc()">Energiezähler nullen</button></div></div>
+<div class="v" id="y_cf" style="font-size:16px">–</div>
+<div class="l">Der Faktor bleibt auch bei Werkseinstellungen und Firmware-Updates erhalten.</div>
+<label>a) Referenzlast: Relais an, gemessene Wirkleistung (W)</label><input id="y_cal" type="number" step="0.1">
+<button class="bt" onclick="calib({apower:+$('y_cal').value})">Mit Referenz kalibrieren</button>
+<label>b) Wert aus Tasmota übernehmen (Konsole: <code>PowerCal</code>)</label><input id="y_tpc" type="number" placeholder="12530">
+<button class="bt" onclick="calib({tasmota_powercal:+$('y_tpc').value})">Tasmota-Wert übernehmen</button>
+<label>c) Faktor direkt (W/Hz)</label><input id="y_fac" type="number" step="0.0001">
+<div class="row"><button class="bt" onclick="calib({factor:+$('y_fac').value})">Faktor setzen</button>
+<button class="bt g" onclick="calib({reset:true})">Standard wiederherstellen</button>
+<button class="bt g" onclick="rstc()">Energiezähler nullen</button></div></div>
 <div class="card"><h2>Firmware</h2>
 <form method="POST" action="/update" enctype="multipart/form-data"><input type="file" name="firmware" accept=".bin">
 <button class="bt">Hochladen &amp; flashen</button></form></div>
@@ -133,7 +140,7 @@ function pulse(){run(async()=>{await rpc('Switch.Set',{id:0,on:true,toggle_after
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
 async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0'],inp=c['input:0'];
 ['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
-$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;
+showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
 const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent=d.model+' · '+d.ver+' · '+d.id;document.title=d.name||d.id;
@@ -151,7 +158,9 @@ function scan(){run(async()=>{$('scan').textContent='Suche …';try{const r=awai
 function saveWifi(){run(async()=>{const s={ssid:$('w_ssid').value,ipv4mode:$('w_mode').value,ip:$('w_ip').value,netmask:$('w_nm').value,gw:$('w_gw').value,nameserver:$('w_dns').value};if($('w_pass').value)s.pass=$('w_pass').value;const c={sta:s};if($('w_ap').value)c.ap={pass:$('w_ap').value};await rpc('WiFi.SetConfig',{config:c})},'Gespeichert – verbinde neu')}
 function saveSys(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('y_name').value},location:{tz:$('y_tz').value},sntp:{server:$('y_sntp').value},ui:{led:$('y_led').checked}}});loadCfg()},'Gespeichert')}
 function setAuth(clear){run(async()=>{if(!clear&&!$('y_auth').value)throw new Error('Kein Passwort eingegeben');await rpc('Shelly.SetAuth',{pass:clear?null:$('y_auth').value});$('y_auth').value='';loadCfg()},clear?'Passwort entfernt':'Passwort gesetzt')}
-function calib(){run(async()=>{const r=await rpc('Switch.Calibrate',{id:0,apower:+$('y_cal').value});toast('Faktor: '+r.factor.toFixed(4)+' W/Hz')})}
+const CSRC={default:'Standard (wie Tasmota BL0937)',reference:'mit Referenzlast kalibriert',tasmota:'aus Tasmota übernommen',manual:'manuell gesetzt'};
+function showCal(c){if(!c)return;$('y_cf').textContent=c.factor.toFixed(4)+' W/Hz · '+(CSRC[c.source]||c.source)+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
+function calib(p){run(async()=>{p.id=0;const r=await rpc('Switch.Calibrate',p);showCal(r);toast('Faktor: '+r.factor.toFixed(4)+' W/Hz')})}
 function rstc(){if(confirm('Energiezähler nullen?'))run(()=>rpc('Switch.ResetCounters',{id:0}),'Zähler genullt')}
 function sendRpc(){run(async()=>{const t=$('r_p').value.trim();const p=t?JSON.parse(t):{};try{$('r_o').textContent=JSON.stringify(await rpc($('r_m').value,p),null,2)}catch(e){$('r_o').textContent='Fehler: '+e.message}})}
 function init(){loadCfg().catch(()=>setTimeout(init,3000))}

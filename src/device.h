@@ -9,7 +9,9 @@
   #define PIN_RELAY    15
   #define PIN_INPUT    4
   #define PIN_LED      0      // invertiert
-  #define PIN_CF       5      // HLW8012 CF (Wirkleistung)
+  #define PIN_CF       5      // BL0937 CF (Wirkleistung)
+  // Standardfaktor wie Tasmota fuer BL0937 (GPIO_HJL_CF): 1362 * 12530 / 10 / T_us
+  #define PWR_CAL_DEFAULT 1.706586f   // W pro Hz
   #define HAS_PM       1
   #define HAS_TEMP     1      // NTC am ADC
   #define HAS_LED      1
@@ -21,6 +23,7 @@
   #define PIN_RELAY    4
   #define PIN_INPUT    5
   #define HAS_PM       0
+  #define PWR_CAL_DEFAULT 1.0f
   #define HAS_TEMP     0
   #define HAS_LED      0
 #else
