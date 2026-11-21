@@ -33,7 +33,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
 <header><h1 id="t">Hermit OS</h1><span class="l" id="ver"></span></header>
 <main>
-<nav><a data-t="st" class="a">Status</a><a data-t="sw">Schalter</a><a data-t="wh">Aktionen</a><a data-t="wf">WLAN</a><a data-t="sy">System</a><a data-t="rp">RPC</a></nav>
+<nav><a data-t="st" class="a">Status</a><a data-t="sw" id="swtab">Schalter</a><a data-t="wh">Aktionen</a><a data-t="wf">WLAN</a><a data-t="sy">System</a><a data-t="rp">RPC</a></nav>
 
 <section class="tab a" id="st"><div class="card"><div class="big">
 <button id="btn">–</button>
@@ -64,8 +64,8 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="row"><div class="so"><label>Eingangsmodus</label><select id="s_in_mode">
 <option value="follow">Folgen (Schalter = Relais)</option><option value="flip">Umschalten bei jeder Flanke</option>
 <option value="momentary">Taster (toggle bei Druck)</option><option value="detached">Getrennt (nur Ereignis)</option></select></div>
-<div><label>Zustand nach Stromausfall</label><select id="s_initial_state">
-<option value="off">Aus</option><option value="on">An</option><option value="restore_last">Letzter Zustand</option><option value="match_input">Wie Eingang</option></select></div></div>
+<div><label id="s_isl">Zustand nach Stromausfall</label><select id="s_initial_state">
+<option value="off">Aus</option><option value="on">An</option><option value="restore_last">Letzter Zustand</option><option value="match_input" class="so">Wie Eingang</option></select></div></div>
 <div class="row"><div><label class="ck"><input type="checkbox" id="s_auto_off">Auto-Aus nach (s)</label><input id="s_auto_off_delay" type="number" step="0.1"></div>
 <div><label class="ck"><input type="checkbox" id="s_auto_on">Auto-An nach (s)</label><input id="s_auto_on_delay" type="number" step="0.1"></div></div>
 <div class="row"><div class="pm"><label>Abschaltleistung (W, 0 = aus)</label><input id="s_power_limit" type="number"></div>
@@ -162,8 +162,8 @@ function fmt(v,d,u){return v==null||isNaN(v)?'–':(+v).toFixed(d)+' '+u}
 function upt(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+h+'h '+m+'m'}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');if(a.dataset.t=='wh')loadHooks()});
 let LT=false,LS=null;
-function showLT(){document.querySelectorAll('.lt').forEach(e=>e.style.display=LT?'block':'none');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');$('swh').textContent=LT?'Licht':'Schalter'}
-function setL(p){run(async()=>{p.id=0;if(LS&&!LS.output&&p.on==null)p.on=true;await rpc('CCT.Set',p);poll()})}
+function showLT(){document.querySelectorAll('.lt').forEach(e=>e.style.display=LT?'block':'none');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');$('swh').textContent=LT?'Licht':'Schalter';$('swtab').textContent=LT?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=LT?'z. B. Deckenlampe Bad':''}
+function setL(p){run(async()=>{p.id=0;await rpc('CCT.Set',p);poll()})}
 async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0'];LT=!!s['cct:0'];LS=s['cct:0']||null;showLT();
 if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}if(document.activeElement!==$('ctr')){$('ctr').value=sw.ct;$('ctv').textContent=sw.ct+' K'}}
 $('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':'AUS';PM='apower' in sw;

@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.5"
+#define FW_VERSION "1.8.6"
 #endif
 
 // ======================= Konfiguration =======================
