@@ -235,7 +235,8 @@ def build_mg2hermit(src_zip, fw_url):
     fw_part["cs_sha256"] = hashlib.sha256(fw).hexdigest()
     fw_part["size"] = len(fw)
     out = io.BytesIO()
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zo:
+    # Mongoose-OS-OTA liest das Zip im Datenstrom und kann nicht entpacken: unkomprimiert (STORED) wie das Original
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as zo:
         for n in names:
             if n == fw_name:
                 zo.writestr(n, fw)
