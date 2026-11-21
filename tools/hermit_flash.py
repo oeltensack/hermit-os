@@ -22,9 +22,13 @@ die Windows-Firewall muss eingehende Verbindungen auf dem Port (Standard 8266) e
 import argparse, base64, hashlib, http.server, io, json, os, pathlib, socket, sys, threading, time
 import urllib.error, urllib.request, uuid, zipfile
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):            # als EXE (PyInstaller): bin/ liegt neben der EXE
+    ROOT = pathlib.Path(sys.executable).resolve().parent
+    CACHE = ROOT / ".cache"
+else:
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    CACHE = pathlib.Path(__file__).resolve().parent / ".cache"
 BIN_DIR = ROOT / "bin"
-CACHE = pathlib.Path(__file__).resolve().parent / ".cache"
 MG2X_URL = "http://ota.tasmota.com/tasmota/shelly/mg2tasmota-{model}.zip"
 MG2X_OLD = b"https://ota.tasmota.com/tasmota/release/tasmota.bin"   # in mg2tasmota einkompiliert (51 Zeichen)
 GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "hermit-1pm"),

@@ -103,6 +103,10 @@ Doppelklick auf **`Hermit-Flasher.pyw`** (Windows, Python 3 installiert) öffnet
 
 Alternativ: `python tools/hermit_flash_gui.py`. Unter Linux ggf. `python3-tk` installieren.
 
+**Als EXE:** Einmal `tools\build_exe.bat` doppelklicken (installiert PyInstaller und baut). Danach liegen
+`Hermit-Flasher.exe` (Oberfläche) und `hermit-flash.exe` (Konsole) neben dem Ordner `bin\` und laufen
+ohne Python – zusammen mit `bin\` auch auf anderen PCs.
+
 ## Flash-Tool: `tools/hermit_flash.py`
 
 Schreibt Hermit OS über WLAN auf einen Shelly 1 / 1PM und erkennt selbst, was gerade läuft:
