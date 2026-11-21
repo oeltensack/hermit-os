@@ -12,6 +12,7 @@ Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
 | **Shelly 1** | `hermit-1` | Shelly Plus 1 (`switch:0`) | SW-Eingang für AC/DC, optional Add-on-Taster |
 | **Shelly 1PM** | `hermit-1pm` | Shelly Plus 1PM | Wirkleistung, Energie, Temperatur, Schutzabschaltung, optional Add-on-Taster |
 | **Shelly Plug S** | `hermit-plugs` | Shelly Plus Plug S | Leistung, **Spannung, Strom, cos φ**, Gerätetaster, zwei LEDs |
+| **Shelly Plug** (16 A, `SHPLG-1`/`SHPLG2-1`) | `hermit-plug` | Shelly Plus Plug S | Wirkleistung, Energie, Gerätetaster, LEDs |
 | **Shelly Duo** (E27/GU10, weiß) | `hermit-duo` | Shelly Duo Bulb Gen3 (`cct:0`) | Helligkeit, Farbtemperatur 2700–6500 K, Überblenden |
 
 > Shelly ist eine Marke der Shelly Group. Hermit OS ist ein unabhängiges Projekt ohne Verbindung zum
@@ -94,7 +95,7 @@ pio run                          # alle Varianten und den Loader bauen
 python3 tools/make_release.py    # bauen, bin/ füllen, update.json schreiben, dist/*.zip packen
 ```
 
-PlatformIO-Umgebungen: `shelly1`, `shelly1pm`, `shelly1_addon`, `shelly1pm_addon`, `plugs`, `duo`, `loader`.
+PlatformIO-Umgebungen: `shelly1`, `shelly1pm`, `shelly1_addon`, `shelly1pm_addon`, `plugs`, `plug`, `duo`, `loader`.
 Flash-Layout 2 MB (`eagle.flash.2m256`): ca. 1,7 MB für Firmware und OTA, 236 KB LittleFS.
 
 **Neue Version veröffentlichen:** Version in `platformio.ini` erhöhen → `python3 tools/make_release.py` →

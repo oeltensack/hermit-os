@@ -33,7 +33,7 @@ POST http://<ip>/rpc                         Body: {"id":1,"src":"script","metho
 | `Shelly.CheckForUpdate` | – | `{"stable":{"version":"x.y.z"}}` oder `{}` |
 | `Shelly.Update` | `stage:"stable"` oder `url` | installiert im Hintergrund – nur bei ausgeschaltetem Relais |
 
-## Switch (Shelly 1 / 1PM / Plug S)
+## Switch (Shelly 1 / 1PM / Plug S / Plug)
 
 | Methode | Parameter |
 |---|---|
@@ -53,7 +53,7 @@ POST http://<ip>/rpc                         Body: {"id":1,"src":"script","metho
  "temperature":{"tC":41.2, "tF":106.2}, "errors":["overpower"]}
 ```
 
-`apower`/`aenergy` beim 1PM und Plug S, `voltage`/`current`/`pf` nur bei der Plug S, `temperature` beim 1PM
+`apower`/`aenergy` beim 1PM, Plug S und Plug, `voltage`/`current`/`pf` nur bei der Plug S, `temperature` beim 1PM
 und Plug S. `aenergy.total` in Wh, `by_minute` in mWh der letzten drei vollen Minuten.
 
 **Konfiguration `switch:0`**
@@ -64,7 +64,7 @@ und Plug S. `aenergy.total` in Wh, `by_minute` in mWh der letzten drei vollen Mi
 | `in_mode` | `follow`, `flip`, `momentary`, `detached` |
 | `initial_state` | `off`, `on`, `restore_last`, `match_input` |
 | `auto_on`, `auto_on_delay`, `auto_off`, `auto_off_delay` | bool, Sekunden |
-| `power_limit` | W, 0 = aus (1PM, Plug S) |
+| `power_limit` | W, 0 = aus (1PM, Plug S, Plug) |
 | `temp_limit` | °C (1PM, Plug S) |
 | `pm_calibration` | nur lesen: `factor`, `source`, `default`, bei Plug S `voltage_factor`, `current_factor` |
 
@@ -125,10 +125,11 @@ Höchstens 20 Aktionen. Ausgeführt wird per HTTP(S)-GET, nacheinander, Zeitlimi
 
 | Ereignis | Geräte | Hinweis |
 |---|---|---|
-| `switch.on`, `switch.off` | 1, 1PM, Plug S | |
+| `switch.on`, `switch.off` | 1, 1PM, Plug S, Plug | |
 | `cct.on`, `cct.off` | Duo | |
-| `switch.overpower`, `switch.overtemperature` | 1PM, Plug S | |
-| `switch.power_above`, `switch.power_below` | 1PM, Plug S | `threshold` in W, Hysterese 5 % |
+| `switch.overpower` | 1PM, Plug S, Plug | |
+| `switch.overtemperature` | 1PM, Plug S | |
+| `switch.power_above`, `switch.power_below` | 1PM, Plug S, Plug | `threshold` in W, Hysterese 5 % |
 | `input.toggle_on`, `input.toggle_off` | Geräte mit Eingang | Typ Schalter |
 | `input.button_down`, `input.button_up`, `input.button_push`, `input.button_doublepush`, `input.button_longpush` | Geräte mit Eingang | Typ Taster; lang = ab 1 s |
 | `sys.boot` | alle | nach dem ersten WLAN-Verbindungsaufbau |
@@ -149,7 +150,7 @@ Höchstens 20 Aktionen. Ausgeführt wird per HTTP(S)-GET, nacheinander, Zeitlimi
 |---|---|
 | `/shelly` | Geräteinfo (ohne Passwort), Gen2-Format plus `type` |
 | `/status` | Gen1-Status mit `relays`, `meters`, `inputs`, `wifi_sta`, `temperature` |
-| `/relay/0?turn=on|off|toggle&timer=10` | schalten (Shelly 1/1PM/Plug S; bei der Duo Licht an/aus) |
+| `/relay/0?turn=on|off|toggle&timer=10` | schalten (Shelly 1/1PM/Plug S/Plug; bei der Duo Licht an/aus) |
 | `/meter/0` | `power`, `total` (Watt-Minuten wie Gen1) |
 | `/light/0?turn=on&brightness=50&temp=3000&transition=500` | Duo (`transition` in ms) |
 | `/update` | Firmware hochladen (Formularfeld beliebig) |

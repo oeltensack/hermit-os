@@ -2,27 +2,27 @@
 
 ## Übersicht
 
-| | Shelly 1 | Shelly 1PM | Plug S | Duo (E27/GU10) |
-|---|---|---|---|---|
-| Firmware | `hermit-1` | `hermit-1pm` | `hermit-plugs` | `hermit-duo` |
-| Add-on-Variante | `hermit-1-addon` | `hermit-1pm-addon` | – | – |
-| Gen1-Typ | `SHSW-1` | `SHSW-PM` | `SHPLG-S` | `SHBDUO-1` |
-| Hermit-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-DUO` |
-| Gen2-Komponente | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `cct:0` |
-| Relais | GPIO4 | GPIO15 | GPIO15 | – |
-| Eingang | SW, GPIO5 | SW, GPIO4 | Taster, GPIO13 (Pull-up) | – |
-| LED | – | GPIO0 (invertiert) | GPIO0 Relais, GPIO2 WLAN | – |
-| Messchip | – | BL0937 (CF GPIO5) | BL0937 (CF GPIO5, CF1 GPIO14, SEL GPIO12) | – |
-| Temperatur | – | NTC am ADC | NTC am ADC | – |
-| Licht | – | – | – | PWM kalt GPIO5, warm GPIO4 |
-| Abschaltleistung ab Werk | – | 3500 W | 2500 W | – |
-| Nach Stromausfall ab Werk | aus | aus | aus | **an** |
+| | Shelly 1 | Shelly 1PM | Plug S | Plug (16 A) | Duo (E27/GU10) |
+|---|---|---|---|---|---|
+| Firmware | `hermit-1` | `hermit-1pm` | `hermit-plugs` | `hermit-plug` | `hermit-duo` |
+| Add-on-Variante | `hermit-1-addon` | `hermit-1pm-addon` | – | – | – |
+| Gen1-Typ | `SHSW-1` | `SHSW-PM` | `SHPLG-S` | `SHPLG-1` / `SHPLG2-1` | `SHBDUO-1` |
+| Hermit-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-PLUG` | `HERMIT-DUO` |
+| Gen2-Komponente | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `cct:0` |
+| Relais | GPIO4 | GPIO15 | GPIO15 | GPIO4 | – |
+| Eingang | SW, GPIO5 | SW, GPIO4 | Taster, GPIO13 (Pull-up) | Taster, GPIO12 (gedrückt = HIGH) | – |
+| LED | – | GPIO0 (invertiert) | GPIO0 Relais, GPIO2 WLAN | GPIO14 rot Relais, GPIO16 blau WLAN, GPIO13 grün aus | – |
+| Messchip | – | BL0937 (CF GPIO5) | BL0937 (CF GPIO5, CF1 GPIO14, SEL GPIO12) | HLW8012 (nur CF GPIO5) | – |
+| Temperatur | – | NTC am ADC | NTC am ADC | – | – |
+| Licht | – | – | – | – | PWM kalt GPIO5, warm GPIO4 |
+| Abschaltleistung ab Werk | – | 3500 W | 2500 W | 3500 W | – |
+| Nach Stromausfall ab Werk | aus | aus | aus | aus | **an** |
 
 Alle Geräte: ESP8266, 2 MB Flash. Die Oberfläche zeigt unter Status → Flash die echte Chipgröße.
 
 ---
 
-## Eingang (Shelly 1 / 1PM / Plug S)
+## Eingang (Shelly 1 / 1PM / Plug S / Plug)
 
 **Eingangsmodus** (Reiter Schalter):
 
@@ -67,6 +67,14 @@ beim Flashen verloren – deshalb jedes Gerät einmal kalibrieren.
 BL0937 mit Leistung (CF) und – abwechselnd alle 2 s – **Spannung und Strom** (CF1, umgeschaltet über SEL).
 Bei der Plug S misst der Chip bei **SEL HIGH die Spannung**. Daraus ergeben sich `voltage`, `current` und `pf`.
 Standardfaktoren: 0,16029 V/Hz und 0,01155 A/Hz (wie Tasmota). Strom wird nur angezeigt, solange Leistung fließt.
+
+### Shelly Plug (16 A)
+
+HLW8012, nur Wirkleistung (CF) – keine Spannung, kein Strom, keine Temperatur. Standardfaktor wie Tasmota
+für HLW8012: **12,53 W/Hz** (10000 × 12530 / 10 / Pulsdauer in µs). Der Wert ist nicht am Gerät
+nachgemessen – einmal mit Referenzlast kalibrieren. Ein `PowerCal` aus Tasmota wird mit der
+HLW8012-Konstante umgerechnet. Die LED-Belegung (rot/blau/grün) stammt aus Tasmota/ESPHome; falls die
+Farben vertauscht sind, mit `Hermit.Gpio` prüfen.
 
 ### Kalibrieren
 

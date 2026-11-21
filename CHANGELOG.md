@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.9.0
+- Neues Gerät: Shelly Plug (16 A, `SHPLG-1`/`SHPLG2-1`) als `hermit-plug` – Relais GPIO4, Taster GPIO12,
+  HLW8012-Leistungsmessung (12,53 W/Hz), LEDs rot/blau
+- LED-Polarität je Gerät einstellbar (`LED_ON_LEVEL`)
+- Tasmota-`PowerCal` wird je nach Messchip (BL0937/HLW8012) richtig umgerechnet
+- Flasher: Plug von Original-Firmware (mg2tasmota-ShellyPlug2) und von Tasmota
+
 ## 1.8.7
 - Geräte ohne Eingang (Duo) bieten keine Eingangs-Ereignisse mehr für Aktionen an
 - Dokumentation neu gegliedert: README, `docs/FLASHEN.md`, `docs/GERAETE.md`, `docs/API.md`

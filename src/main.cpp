@@ -436,18 +436,18 @@ void handleTimer() {
 void updateLed() {
 #if HAS_LED
   if (apActive) return;
-  digitalWrite(PIN_LED, (cfg.led && relayOn) ? LOW : HIGH);
+  digitalWrite(PIN_LED, (cfg.led && relayOn) ? LED_ON_LEVEL : LED_OFF_LEVEL);
 #endif
 }
 
 void handleLed() {
 #if HAS_LED
-  if (apActive) digitalWrite(PIN_LED, (millis() / 500) & 1 ? LOW : HIGH);
+  if (apActive) digitalWrite(PIN_LED, (millis() / 500) & 1 ? LED_ON_LEVEL : LED_OFF_LEVEL);
 #endif
 #ifdef PIN_LED_LINK
   // WLAN-LED: AP blinkt, getrennt an, verbunden aus
   bool on = apActive ? ((millis() / 250) & 1) : (WiFi.status() != WL_CONNECTED);
-  digitalWrite(PIN_LED_LINK, on ? LOW : HIGH);
+  digitalWrite(PIN_LED_LINK, on ? LED_ON_LEVEL : LED_OFF_LEVEL);
 #endif
 }
 
@@ -1290,7 +1290,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "switch.calibrate") {
     // Moeglichkeiten:
     //   {"apower": 1985.4}          Referenzlast laeuft, gemessene Wirkleistung in W
-    //   {"tasmota_powercal": 12530} Wert von Tasmota "PowerCal" (BL0937) uebernehmen
+    //   {"tasmota_powercal": 12530} Wert von Tasmota "PowerCal" (BL0937 bzw. HLW8012 beim Plug) uebernehmen
     //   {"factor": 1.7066}          Faktor in W/Hz direkt setzen
     //   {"reset": true}             zurueck auf Standard
 #if HAS_CF1
@@ -1317,7 +1317,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     } else if (p["tasmota_powercal"].is<float>()) {
       float pc = p["tasmota_powercal"];
       if (pc < 1000 || pc > 100000) ERR(-103, "tasmota_powercal unplausibel (typ. 8000–20000)");
-      cfg.pwrCal = 1362.0f * pc / 1e7f; cfg.calSrc = "tasmota";
+      cfg.pwrCal = PWR_TASMOTA_PREF * pc / 1e7f; cfg.calSrc = "tasmota";
     } else if (p["factor"].is<float>()) {
       float f = p["factor"];
       if (f < 0.05f || f > 100) ERR(-103, "factor unplausibel");
@@ -1723,11 +1723,15 @@ void setup() {
 #endif
 #if HAS_LED
   pinMode(PIN_LED, OUTPUT);
-  digitalWrite(PIN_LED, HIGH);
+  digitalWrite(PIN_LED, LED_OFF_LEVEL);
 #endif
 #ifdef PIN_LED_LINK
   pinMode(PIN_LED_LINK, OUTPUT);
-  digitalWrite(PIN_LED_LINK, HIGH);
+  digitalWrite(PIN_LED_LINK, LED_OFF_LEVEL);
+#endif
+#ifdef PIN_LED_AUX
+  pinMode(PIN_LED_AUX, OUTPUT);
+  digitalWrite(PIN_LED_AUX, LED_OFF_LEVEL);
 #endif
 #if HAS_ADDON
   Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY);   // RX (GPIO3) gehoert dem Add-on

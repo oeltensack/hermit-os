@@ -19,7 +19,7 @@ Im Modellpaket `Hermit-OS-<version>-Shelly-<Modell>.zip` liegen Firmware, Loader
 
 **Start:** Doppelklick auf `Hermit-Flasher.pyw` (Python 3 für Windows von python.org, Haken „Add to PATH“).
 
-1. **Netz durchsuchen** – findet im eigenen /24-Netz alle Shelly 1, 1PM, Plug S und Duo und zeigt, was
+1. **Netz durchsuchen** – findet im eigenen /24-Netz alle Shelly 1, 1PM, Plug S, Plug und Duo und zeigt, was
    darauf läuft (Original, Tasmota, Loader, Hermit OS). Gen2-Geräte werden ausgeblendet.
 2. **Gerät prüfen** – zeigt Firmware und welche Hermit-Variante installiert wird.
 3. **Optionen** – Firmware automatisch oder von Hand, Add-on-Variante, Passwort (falls am Gerät gesetzt),
@@ -71,7 +71,8 @@ So läuft es im Hintergrund:
 - Während des Vorgangs den Strom nicht trennen – mg2hermit ersetzt per WLAN den Bootloader.
 - Internet nur für den einmaligen Download des mg2tasmota-Pakets.
 
-Unterstützte Modelle: Shelly 1 (`SHSW-1`), 1PM (`SHSW-PM`), Plug S (`SHPLG-S`), Duo (`SHBDUO-1`).
+Unterstützte Modelle: Shelly 1 (`SHSW-1`), 1PM (`SHSW-PM`), Plug S (`SHPLG-S`), Plug (`SHPLG-1`, `SHPLG2-1`, über das Paket
+`mg2tasmota-ShellyPlug2`), Duo (`SHBDUO-1`).
 
 ## 3. Von Tasmota (Hermit Loader)
 
@@ -79,7 +80,7 @@ Tasmota lässt für Updates nur begrenzt Platz. Der **Hermit Loader** (`bin/herm
 ist klein genug, um direkt von Tasmota aus installiert zu werden – ohne tasmota-minimal.
 
 **Mit dem Flasher:** Gerät wählen, installieren – Loader und Hermit OS werden nacheinander aufgespielt.
-Erkannt wird das Modell über die Tasmota-Vorlage („Shelly 1“, „Shelly 1PM“, „Shelly Plug S“, „Shelly DUO“).
+Erkannt wird das Modell über die Tasmota-Vorlage („Shelly 1“, „Shelly 1PM“, „Shelly Plug S“, „Shelly Plug“, „Shelly DUO“).
 
 **Von Hand:**
 1. Tasmota → Firmware-Update → `hermit-loader.bin.gz` hochladen

@@ -15,6 +15,7 @@ VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in up
     "shelly1_addon": "hermit-1-addon",
     "shelly1pm_addon": "hermit-1pm-addon",
     "plugs": "hermit-plugs",
+    "plug": "hermit-plug",
     "duo": "hermit-duo",
 }
 
@@ -51,6 +52,7 @@ MODELS = {
     "Shelly-1":      ["hermit-1", "hermit-1-addon"],
     "Shelly-1PM":    ["hermit-1pm", "hermit-1pm-addon"],
     "Shelly-Plug-S": ["hermit-plugs"],
+    "Shelly-Plug":   ["hermit-plug"],
     "Shelly-Duo":    ["hermit-duo"],
 }
 dist = ROOT / "dist"

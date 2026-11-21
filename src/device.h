@@ -41,6 +41,29 @@
   #define DEF_IN_MODE   "momentary"
   #define DEF_IN_FILTER "dc"
   #define DEF_POWER_LIMIT 2500     // Plug S: max. 10 A
+#elif defined(DEVICE_PLUG)
+  // Shelly Plug (Gen1, EU, 16 A, SHPLG-1 / SHPLG2-1), Tasmota-Template
+  // {"NAME":"Shelly Plug EU","GPIO":[0,0,0,0,224,2688,0,0,96,288,289,0,290,0],"FLAG":0,"BASE":18}
+  #define DEV_PREFIX   "hermit-plug"
+  #define DEV_MODEL    "HERMIT-PLUG"
+  #define DEV_APP      "Plug"
+  #define GEN1_TYPE    "SHPLG-1"
+  #define PIN_RELAY    4
+  #define PIN_INPUT    12     // Taster am Geraet, gedrueckt = HIGH
+  #define PIN_LED      14     // rote LED = Relais (nicht invertiert)
+  #define PIN_LED_LINK 16     // blaue LED = WLAN (nicht invertiert)
+  #define PIN_LED_AUX  13     // gruene LED, bleibt aus
+  #define LED_ON_LEVEL HIGH
+  #define PIN_CF       5      // HLW8012 CF (nur Wirkleistung, kein CF1/SEL)
+  #define PWR_TASMOTA_PREF 10000.0f   // HLW8012 (BL0937: 1362)
+  #define PWR_CAL_DEFAULT 12.53f      // Tasmota HLW8012: 10000 * 12530 / 10 / T_us -> W pro Hz
+  #define HAS_PM       1
+  #define HAS_TEMP     0
+  #define HAS_LED      1
+  #define DEF_IN_TYPE   "button"
+  #define DEF_IN_MODE   "momentary"
+  #define DEF_IN_FILTER "dc"
+  #define DEF_POWER_LIMIT 3500     // 16 A
 #elif defined(DEVICE_DUO)
   // Shelly Duo (E27 / GU10), Gen1 SHBDUO-1: weisses Licht, Helligkeit + Farbtemperatur 2700-6500 K
   // Zwei Weisskanaele (wie ESPHome "cwww"): GPIO5 kalt, GPIO4 warm
@@ -76,8 +99,8 @@
 // Variante mit Shelly-Temperatur-Add-on (Gen1), genutzt als externer Tastereingang input:100.
 // Das Add-on fuehrt die Datenleitung ueber Optokoppler: GPIO0 = Ausgang (Leitung freigeben),
 // GPIO3 = Eingang. Taster zwischen DATA und GND des Add-ons.
-#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_DUO))
-  #error "Plug S / Duo haben keinen Add-on-Anschluss"
+#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_PLUG) || defined(DEVICE_DUO))
+  #error "Plug / Plug S / Duo haben keinen Add-on-Anschluss"
 #endif
 #if defined(WITH_ADDON)
   #define HAS_ADDON      1
@@ -95,6 +118,13 @@
 // DEV_VARIANT = Schluessel in update.json und Name der .bin (z. B. hermit-1pm-addon)
 
 // Standardwerte fuer Geraete ohne eigene Vorgabe
+#ifndef LED_ON_LEVEL
+  #define LED_ON_LEVEL LOW       // Shelly-LEDs meist invertiert
+#endif
+#define LED_OFF_LEVEL (LED_ON_LEVEL == LOW ? HIGH : LOW)
+#ifndef PWR_TASMOTA_PREF
+  #define PWR_TASMOTA_PREF 1362.0f    // Tasmota-Konstante BL0937
+#endif
 #ifndef HAS_CF1
   #define HAS_CF1 0
 #endif

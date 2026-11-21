@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 D.Koch – Hermit OS
 """
-hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug S / Duo (Gen1) schreiben.
+hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug / Plug S / Duo (Gen1) schreiben.
 
 Erkennt automatisch, was auf dem Geraet laeuft:
   * Original-Shelly-Firmware (Mongoose OS)  -> mg2hermit: angepasstes mg2tasmota laedt Hermit OS
@@ -34,7 +34,9 @@ BIN_DIR = ROOT / "bin"
 MG2X_URL = "http://ota.tasmota.com/tasmota/shelly/mg2tasmota-{model}.zip"
 MG2X_OLD = b"https://ota.tasmota.com/tasmota/release/tasmota.bin"   # in mg2tasmota einkompiliert (51 Zeichen)
 GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "hermit-1pm"),
-               "SHPLG-S": ("ShellyPlugS", "hermit-plugs"), "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo")}
+               "SHPLG-S": ("ShellyPlugS", "hermit-plugs"),
+               "SHPLG-1": ("ShellyPlug2", "hermit-plug"), "SHPLG2-1": ("ShellyPlug2", "hermit-plug"),
+               "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo")}
 
 
 def log(msg):
@@ -140,6 +142,8 @@ def variant_from(dev, kind, info, addon):
         name = str(t.get("NAME", "")).lower()
         if "plug s" in name:
             v = "hermit-plugs"
+        elif "plug" in name and "us" not in name.split():
+            v = "hermit-plug"
         elif "duo" in name and "rgbw" not in name:
             v = "hermit-duo"
         elif "1pm" in name:
@@ -147,8 +151,8 @@ def variant_from(dev, kind, info, addon):
         elif "shelly 1" in name:
             v = "hermit-1"
     if v and addon:
-        if v in ("hermit-plugs", "hermit-duo"):
-            die("Plug S / Duo haben keinen Add-on-Anschluss")
+        if v in ("hermit-plugs", "hermit-plug", "hermit-duo"):
+            die("Plug / Plug S / Duo haben keinen Add-on-Anschluss")
         v += "-addon"
     return v
 
