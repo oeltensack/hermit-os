@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 D.Koch – Hermit OS
 #pragma once
 // WLAN-Zugangsdaten aus der Original-Shelly-Firmware (Mongoose OS) lesen, nachdem Hermit OS ueber
 // tools/hermit_flash.py (mg2hermit) aufgespielt wurde. Die Konfiguration (conf9.json) liegt im

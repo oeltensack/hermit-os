@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 D.Koch – Hermit OS
 #pragma once
 // Pinbelegung der Shelly-Gen1-Geraete (entspricht den Tasmota-Templates)
 

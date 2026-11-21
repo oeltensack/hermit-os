@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 D.Koch – Hermit OS
 """
 hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug S / Duo (Gen1) schreiben.
 

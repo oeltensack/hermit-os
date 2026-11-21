@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 D.Koch – Hermit OS
 // Script fuer Shelly Gen2/Gen3: fragt alle 10 s die Leistung eines alten Shelly 1PM ab
 // und schaltet das eigene Relais, wenn eine Schwelle ueberschritten wird
 // (z. B. Absaugung an, sobald die Saege laeuft).

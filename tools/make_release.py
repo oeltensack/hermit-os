@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 D.Koch – Hermit OS
 """Baut alle Varianten, kopiert sie nach bin/ und schreibt update.json fuer das Auto-Update.
 
 Aufruf im Projektverzeichnis:  python3 tools/make_release.py
@@ -69,6 +71,7 @@ for model, names in MODELS.items():
         z.write(ROOT / "tools" / "build_exe.bat", f"{top}/tools/build_exe.bat")
         z.write(ROOT / "README.md", f"{top}/README.md")
         z.write(ROOT / "CHANGELOG.md", f"{top}/CHANGELOG.md")
+        z.write(ROOT / "LICENSE", f"{top}/LICENSE")
         for d in sorted((ROOT / "docs").glob("*.md")):
             z.write(d, f"{top}/docs/{d.name}")
     print("  ", out.name)

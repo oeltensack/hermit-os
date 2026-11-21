@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 D.Koch – Hermit OS
 #pragma once
 // WLAN-Zugangsdaten aus den zurueckgelassenen Tasmota-Einstellungen lesen (ESP8266, 2 MB Flash).
 // Tasmota speichert TSettings (4 KB, CRC32 am Ende) im "Core EEPROM"-Sektor (0x1FB, vor OTA immer

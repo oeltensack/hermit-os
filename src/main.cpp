@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 D.Koch – Hermit OS
 #ifndef HERMIT_LOADER   // Hermit Loader wird separat gebaut (src/loader.cpp)
 // Hermit OS – Shelly-Gen2-kompatible Firmware fuer Shelly 1 / 1PM (ESP8266)
 // RPC-API wie Gen2 (/rpc/Switch.Set, POST /rpc JSON-RPC), Webhooks, Gen1-Kompat-API,

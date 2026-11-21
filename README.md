@@ -107,6 +107,20 @@ committen und pushen. Die Geräte finden die neue Version über `update.json`.
 - Keine Scripte auf dem Gerät selbst (der ESP8266 hat dafür zu wenig RAM). Die Logik liegt auf dem Gen2/Gen3.
 - Shelly Duo RGBW und andere Gen1-Modelle werden noch nicht unterstützt.
 
+## Lizenz
+
+Copyright (C) 2026 D.Koch
+
+Hermit OS ist freie Software: Du kannst es unter den Bedingungen der **GNU General Public License**, wie von
+der Free Software Foundation veröffentlicht, weitergeben und/oder verändern – entweder gemäß **Version 3**
+der Lizenz oder (nach deiner Wahl) jeder späteren Version (`GPL-3.0-or-later`).
+
+Hermit OS wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede Gewährleistung** – sogar
+ohne die implizite Gewährleistung der Marktfähigkeit oder der Eignung für einen bestimmten Zweck.
+Den vollständigen Lizenztext enthält [LICENSE](LICENSE).
+
+Verwendete Bibliotheken: ESP8266-Arduino-Core (LGPL-2.1), ArduinoJson (MIT).
+
 ## Danke
 
 - **Tasmota** – Pinbelegungen, BL0937-Formeln und das Einstellungsformat, auf dem der WLAN-Import beruht

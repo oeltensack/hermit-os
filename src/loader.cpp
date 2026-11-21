@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 D.Koch – Hermit OS
 // Hermit Loader – kleine Zwischen-Firmware fuer den Wechsel Tasmota -> Hermit OS.
 // Tasmota akzeptiert sie wegen ihrer Groesse direkt (aehnlich tasmota-minimal). Danach:
 //   - WLAN: im ESP gespeicherte Daten, dann die aus den Tasmota-Einstellungen, sonst Access-Point
