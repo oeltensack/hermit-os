@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.4"
+#define FW_VERSION "1.8.5"
 #endif
 
 // ======================= Konfiguration =======================
@@ -318,14 +318,16 @@ float nextTransition = -1;                   // einmalige Ueberblendzeit (CCT.Se
 extern bool relayOn;
 
 void lightWrite() {
+  // Helligkeit (Gamma) auf Kalt- und Warmkanal verteilen; Summe = Gesamthelligkeit
   float b = curBri / 100.0f;
-  int db = b <= 0 ? 0 : (int)(1023 * powf(b, 2.2f) + 0.5f);       // Gamma
-  if (curBri > 0 && db < 3) db = 3;
+  float d = b <= 0 ? 0 : 1023.0f * powf(b, 2.2f);
+  if (curBri > 0 && d < 3) d = 3;
   float warm = (6500.0f - curCt) / 3800.0f;
-  if (warm < 0) warm = 0; if (warm > 1) warm = 1;
+  if (warm < 0) warm = 0;
+  if (warm > 1) warm = 1;
   if (cfg.ctInvert) warm = 1 - warm;
-  analogWrite(PIN_PWM_BRI, db);
-  analogWrite(PIN_PWM_CT, (int)(1023 * warm + 0.5f));
+  analogWrite(PIN_PWM_WARM, (int)(d * warm + 0.5f));
+  analogWrite(PIN_PWM_COLD, (int)(d * (1 - warm) + 0.5f));
 }
 
 void lightUpdate() {                          // neues Ziel aus relayOn/lBri/lCt, sanft ueberblenden
@@ -371,6 +373,8 @@ void lightSet(int bri, int ct) {
 
 // Bei Lampen ohne Taster: WLAN-Reset durch 5x schnelles Aus/Ein am Wandschalter
 void powerCycleCheck() {
+  // Nur echte Stromunterbrechungen zaehlen (nicht Neustart nach Update, Absturz, Watchdog)
+  if (ESP.getResetInfoPtr()->reason != REASON_DEFAULT_RST) { LittleFS.remove("/pcycle"); return; }
   int n = 0;
   File f = LittleFS.open("/pcycle", "r");
   if (f) { n = f.parseInt(); f.close(); }
@@ -951,6 +955,7 @@ void sysStatus(JsonObject o) {
     o["time"] = b; o["unixtime"] = (long)t;
   } else { o["time"] = nullptr; o["unixtime"] = nullptr; }
   o["uptime"] = millis() / 1000;
+  o["reset_reason"] = ESP.getResetReason();
   o["ram_size"] = 81920; o["ram_free"] = ESP.getFreeHeap();
   FSInfo fi; LittleFS.info(fi);
   o["fs_size"] = fi.totalBytes; o["fs_free"] = fi.totalBytes - fi.usedBytes;
@@ -1709,8 +1714,8 @@ void setup() {
 #endif
 #if HAS_LIGHT
   analogWriteRange(1023); analogWriteFreq(1000);
-  pinMode(PIN_PWM_BRI, OUTPUT); pinMode(PIN_PWM_CT, OUTPUT);
-  analogWrite(PIN_PWM_BRI, 0);
+  pinMode(PIN_PWM_COLD, OUTPUT); pinMode(PIN_PWM_WARM, OUTPUT);
+  analogWrite(PIN_PWM_COLD, 0); analogWrite(PIN_PWM_WARM, 0);
 #endif
 #if HAS_LED
   pinMode(PIN_LED, OUTPUT);

@@ -41,13 +41,13 @@
   #define DEF_POWER_LIMIT 2500     // Plug S: max. 10 A
 #elif defined(DEVICE_DUO)
   // Shelly Duo (E27 / GU10), Gen1 SHBDUO-1: weisses Licht, Helligkeit + Farbtemperatur 2700-6500 K
-  // Tasmota-Template {"NAME":"Shelly DUO","GPIO":[0,0,0,0,38,37,0,0,0,0,0,0,0]} (PWM-CT)
+  // Zwei Weisskanaele (wie ESPHome "cwww"): GPIO5 kalt, GPIO4 warm
   #define DEV_PREFIX   "hermit-duo"
   #define DEV_MODEL    "HERMIT-DUO"
   #define DEV_APP      "Duo"
   #define GEN1_TYPE    "SHBDUO-1"
-  #define PIN_PWM_BRI  5      // Helligkeit
-  #define PIN_PWM_CT   4      // Farbtemperatur (hoeher = waermer)
+  #define PIN_PWM_COLD 5      // Kaltweiss-Kanal (am Geraet gemessen)
+  #define PIN_PWM_WARM 4      // Warmweiss-Kanal
   #define HAS_LIGHT    1
   #define HAS_RELAY    0
   #define HAS_INPUT    0

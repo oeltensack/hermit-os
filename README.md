@@ -45,8 +45,9 @@ Eigene Variante `hermit-duo` (`bin/hermit-duo.bin`) für die weiße Duo (SHBDUO-
 - Nach Stromzufuhr **an** (Lampe am Wandschalter); umstellbar auf aus / letzter Zustand
 - Aktionen: `cct.on`, `cct.off`, `sys.boot`
 - **WLAN-Reset:** Lampe 5× kurz hintereinander aus- und einschalten (jeweils weniger als 6 s an)
-- PWM: Helligkeit GPIO5, Farbtemperatur GPIO4 (1 kHz). Sind warm/kalt vertauscht:
-  „Farbtemperatur-Kanal umkehren“
+- Zwei Weißkanäle (PWM 1 kHz): Kaltweiß GPIO5, Warmweiß GPIO4 – Helligkeit und Farbtemperatur werden
+  darauf verteilt. Sind warm/kalt vertauscht: „Warm-/Kaltkanal tauschen“
+- WLAN-Reset zählt nur echte Stromunterbrechungen (kein Neustart nach Update/Absturz)
 
 Gen2-Script-Beispiel:
 

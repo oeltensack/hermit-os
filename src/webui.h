@@ -71,7 +71,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="row"><div class="pm"><label>Abschaltleistung (W, 0 = aus)</label><input id="s_power_limit" type="number"></div>
 <div class="pm"><label>Abschalttemperatur (°C)</label><input id="s_temp_limit" type="number"></div></div>
 <div class="lt"><div class="row"><div><label>Überblendzeit (s)</label><input id="l_tr" type="number" step="0.1" min="0"></div>
-<div><label class="ck" style="margin-top:34px"><input type="checkbox" id="l_ctinv">Farbtemperatur-Kanal umkehren</label></div></div>
+<div><label class="ck" style="margin-top:34px"><input type="checkbox" id="l_ctinv">Warm-/Kaltkanal tauschen</label></div></div>
 <div class="l">WLAN-Reset: Lampe 5× kurz hintereinander aus- und einschalten (jeweils unter 6 s an).</div></div>
 <div class="io"><h2 style="margin-top:20px">Eingang SW</h2>
 <div class="row"><div><label>Typ</label><select id="i_type"><option value="switch">Schalter</option><option value="button">Taster</option></select></div>
