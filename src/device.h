@@ -102,6 +102,19 @@
 #if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_PLUG) || defined(DEVICE_DUO))
   #error "Plug / Plug S / Duo haben keinen Add-on-Anschluss"
 #endif
+// Messfirmware: nur Energiemessung, Relais bleibt an. Abschaltung bei Ueberlast/Uebertemperatur,
+// Wiedereinschalten nur von Hand am Taster bzw. SW-Eingang. Kein Schalten per RPC/HTTP.
+#if defined(METER_ONLY)
+  #if !(defined(DEVICE_SHELLY1PM) || defined(DEVICE_PLUGS))
+    #error "Messfirmware nur fuer Shelly 1PM und Plug S"
+  #endif
+  #if defined(WITH_ADDON)
+    #error "Messfirmware ohne Add-on"
+  #endif
+  #define IS_METER 1
+#else
+  #define IS_METER 0
+#endif
 #if defined(WITH_ADDON)
   #define HAS_ADDON      1
   #define PIN_ADDON_OUT  0
@@ -110,6 +123,14 @@
   #define HAS_LED        0     // GPIO0 wird vom Add-on belegt
   #define DEV_MODEL_STR  DEV_MODEL "-ADDON"
   #define DEV_VARIANT    DEV_PREFIX "-addon"
+#elif IS_METER
+  #define HAS_ADDON      0
+  #define DEV_MODEL_STR  DEV_MODEL "-METER"
+  #define DEV_VARIANT    DEV_PREFIX "-meter"
+  #undef  DEF_IN_MODE
+  #define DEF_IN_MODE    "detached"
+  #undef  DEF_INITIAL
+  #define DEF_INITIAL    "on"
 #else
   #define HAS_ADDON      0
   #define DEV_MODEL_STR  DEV_MODEL

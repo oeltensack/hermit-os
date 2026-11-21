@@ -17,6 +17,8 @@ VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in up
     "plugs": "hermit-plugs",
     "plug": "hermit-plug",
     "duo": "hermit-duo",
+    "shelly1pm_meter": "hermit-1pm-meter",
+    "plugs_meter": "hermit-plugs-meter",
 }
 
 ini = (ROOT / "platformio.ini").read_text()
@@ -50,8 +52,8 @@ print(f"update.json fuer Version {version} geschrieben")
 # Pro Modell eine Zip: Firmware (+Add-on-Variante), Loader, Flash-Tool, Anleitung
 MODELS = {
     "Shelly-1":      ["hermit-1", "hermit-1-addon"],
-    "Shelly-1PM":    ["hermit-1pm", "hermit-1pm-addon"],
-    "Shelly-Plug-S": ["hermit-plugs"],
+    "Shelly-1PM":    ["hermit-1pm", "hermit-1pm-addon", "hermit-1pm-meter"],
+    "Shelly-Plug-S": ["hermit-plugs", "hermit-plugs-meter"],
     "Shelly-Plug":   ["hermit-plug"],
     "Shelly-Duo":    ["hermit-duo"],
 }

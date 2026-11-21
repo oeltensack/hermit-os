@@ -56,19 +56,20 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label>Helligkeit: <b id="brv">–</b></label><input type="range" id="bri" min="1" max="100" onchange="setL({brightness:+this.value})" oninput="$('brv').textContent=this.value+' %'">
 <label>Farbtemperatur: <b id="ctv">–</b></label><input type="range" id="ctr" min="2700" max="6500" step="50" onchange="setL({ct:+this.value})" oninput="$('ctv').textContent=this.value+' K'">
 <div class="row"><button class="bt g" onclick="setL({ct:2700})">Warmweiß</button><button class="bt g" onclick="setL({ct:4000})">Neutral</button><button class="bt g" onclick="setL({ct:6500})">Tageslicht</button></div></div>
-<div class="card"><h2>Zeitschaltung</h2><div class="row">
+<div class="card nm"><h2>Zeitschaltung</h2><div class="row">
 <div><label>Einschalten für (s)</label><input id="ta" type="number" min="1" value="60"></div></div>
 <button class="bt" onclick="pulse()">Für Dauer einschalten</button></div>
 </section>
 
 <section class="tab" id="sw"><div class="card"><h2 id="swh">Schalter</h2>
+<p class="mt" style="display:none">Messfirmware: Das Relais bleibt eingeschaltet und wird nicht ferngeschaltet. Nach einer Abschaltung wegen Überlast oder Übertemperatur schaltet es nur der Taster bzw. der SW-Eingang am Gerät wieder ein.</p>
 <label>Name</label><input id="s_name">
-<div class="row"><div class="so"><label>Eingangsmodus</label><select id="s_in_mode">
+<div class="row"><div class="so nm"><label>Eingangsmodus</label><select id="s_in_mode">
 <option value="follow">Folgen (Schalter = Relais)</option><option value="flip">Umschalten bei jeder Flanke</option>
 <option value="momentary">Taster (toggle bei Druck)</option><option value="detached">Getrennt (nur Ereignis)</option></select></div>
-<div><label id="s_isl">Zustand nach Stromausfall</label><select id="s_initial_state">
+<div class="nm"><label id="s_isl">Zustand nach Stromausfall</label><select id="s_initial_state">
 <option value="off">Aus</option><option value="on">An</option><option value="restore_last">Letzter Zustand</option><option value="match_input" class="so">Wie Eingang</option></select></div></div>
-<div class="row"><div><label class="ck"><input type="checkbox" id="s_auto_off">Auto-Aus nach (s)</label><input id="s_auto_off_delay" type="number" step="0.1"></div>
+<div class="row nm"><div><label class="ck"><input type="checkbox" id="s_auto_off">Auto-Aus nach (s)</label><input id="s_auto_off_delay" type="number" step="0.1"></div>
 <div><label class="ck"><input type="checkbox" id="s_auto_on">Auto-An nach (s)</label><input id="s_auto_on_delay" type="number" step="0.1"></div></div>
 <div class="row"><div class="pm"><label>Abschaltleistung (W, 0 = aus)</label><input id="s_power_limit" type="number"></div>
 <div class="pm"><label>Abschalttemperatur (°C)</label><input id="s_temp_limit" type="number"></div></div>
@@ -163,22 +164,22 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function fmt(v,d,u){return v==null||isNaN(v)?'–':(+v).toFixed(d)+' '+u}
 function upt(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+h+'h '+m+'m'}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');if(a.dataset.t=='wh')loadHooks()});
-let LT=false,LS=null;
-function showLT(){document.querySelectorAll('.lt').forEach(e=>e.style.display=LT?'block':'none');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');$('swh').textContent=LT?'Licht':'Schalter';$('swtab').textContent=LT?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=LT?'z. B. Deckenlampe Bad':''}
+let LT=false,LS=null,MT=false;
+function showLT(){document.querySelectorAll('.lt').forEach(e=>e.style.display=LT?'block':'none');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');$('swh').textContent=LT?'Licht':'Schalter';$('swtab').textContent=LT?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=LT?'z. B. Deckenlampe Bad':'';if(MT)document.querySelectorAll('.nm').forEach(e=>e.style.display='none')}
 function setL(p){run(async()=>{p.id=0;await rpc('CCT.Set',p);poll()})}
 async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0'];LT=!!s['cct:0'];LS=s['cct:0']||null;showLT();
 if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}if(document.activeElement!==$('ctr')){$('ctr').value=sw.ct;$('ctv').textContent=sw.ct+' K'}}
-$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':'AUS';PM='apower' in sw;
+MT=!!sw.meter_only;$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':(MT?'AUSGELÖST':'AUS');$('btn').title=MT?'Reset nur am Taster/SW des Geräts':'';document.querySelectorAll('.nm').forEach(e=>e.style.display=MT?'none':'');document.querySelectorAll('.mt').forEach(e=>e.style.display=MT?'':'none');PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
 $('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';$('inw').style.display=s['input:0']?'':'none';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 $('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
 document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
-$('btn').onclick=()=>run(async()=>{await rpc(LT?'CCT.Toggle':'Switch.Toggle',{id:0});poll()});
+$('btn').onclick=()=>MT||run(async()=>{await rpc(LT?'CCT.Toggle':'Switch.Toggle',{id:0});poll()});
 function pulse(){run(async()=>{await rpc(LT?'CCT.Set':'Switch.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
-async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0'],inp=c['input:0']||{};LT=!!c['cct:0'];showLT();if(LT){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=sw.ct_invert}
+async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0'],inp=c['input:0']||{};LT=!!c['cct:0'];MT=!!sw.meter_only;showLT();if(LT){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=sw.ct_invert}
 ['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
 showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;

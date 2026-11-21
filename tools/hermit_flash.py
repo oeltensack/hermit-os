@@ -128,15 +128,17 @@ def detect(dev):
     return None, None
 
 
-def variant_from(dev, kind, info, addon):
+def variant_from(dev, kind, info, addon, meter=False):
     v = None
     if kind == "stock":
         v = GEN1_MODELS[info["type"]][1]
     elif kind == "hermit":                       # Modell z. B. HERMIT-1PM-ADDON
         m = str(info.get("model", "")).lower()
-        v = m.replace("-addon", "") if m.startswith("hermit-") else None
+        v = m.replace("-addon", "").replace("-meter", "") if m.startswith("hermit-") else None
         if v and "addon" in m:
             addon = True
+        if v and "meter" in m:
+            meter = True
     elif kind == "tasmota":
         t = jget(dev, "/cm?cmnd=Template") or {}
         name = str(t.get("NAME", "")).lower()
@@ -154,6 +156,10 @@ def variant_from(dev, kind, info, addon):
         if v in ("hermit-plugs", "hermit-plug", "hermit-duo"):
             die("Plug / Plug S / Duo haben keinen Add-on-Anschluss")
         v += "-addon"
+    if v and meter:
+        if v not in ("hermit-1pm", "hermit-plugs"):
+            die("Messfirmware gibt es nur für Shelly 1PM und Plug S")
+        v += "-meter"
     return v
 
 
@@ -438,7 +444,8 @@ def main():
     ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM (Gen1) schreiben")
     ap.add_argument("ip", help="IP-Adresse des Shelly")
     ap.add_argument("--addon", action="store_true", help="Variante mit Add-on-Taster installieren")
-    ap.add_argument("--variant", help="hermit-1 | hermit-1pm | hermit-1-addon | hermit-1pm-addon (sonst automatisch)")
+    ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S): nur Energiemessung, Reset nur am Taster/SW")
+    ap.add_argument("--variant", help="z. B. hermit-1pm, hermit-1pm-addon, hermit-1pm-meter, hermit-plugs-meter (sonst automatisch)")
     ap.add_argument("--bin", help="eigene .bin statt bin/<variante>.bin")
     ap.add_argument("--user", default="admin")
     ap.add_argument("--password", default="")
@@ -453,7 +460,7 @@ def main():
     if not kind:
         die(f"Unter {args.ip} kein Shelly 1/1PM (Original, Tasmota, Loader oder Hermit) gefunden")
     names = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
-    variant = args.variant or variant_from(dev, kind, info, args.addon)
+    variant = args.variant or variant_from(dev, kind, info, args.addon, args.meter)
     if not variant:
         die("Modell nicht erkannt – bitte --variant angeben")
     log(f"Gefunden: {names[kind]}  →  installiere {variant}")

@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.10.0
+- Neue Messfirmware für Shelly 1PM (`hermit-1pm-meter`) und Plug S (`hermit-plugs-meter`): nur
+  Energiemessung, Relais dauerhaft an, nicht fernschaltbar; Schutzabschaltung bei Überlast/Übertemperatur
+  bleibt gespeichert und wird nur am Taster bzw. SW-Eingang zurückgesetzt (Ereignis `switch.reset`)
+- Flasher: Option „Messfirmware“ (`--meter`)
+
 ## 1.9.0
 - Neues Gerät: Shelly Plug (16 A, `SHPLG-1`/`SHPLG2-1`) als `hermit-plug` – Relais GPIO4, Taster GPIO12,
   HLW8012-Leistungsmessung (12,53 W/Hz), LEDs rot/blau

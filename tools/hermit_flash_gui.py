@@ -14,7 +14,8 @@ from tkinter import ttk, filedialog, messagebox
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import hermit_flash as hf  # noqa: E402
 
-VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo"]
+VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo",
+            "hermit-1pm-meter", "hermit-plugs-meter"]
 KIND_NAMES = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
 
 
@@ -62,6 +63,8 @@ class App:
         ttk.Combobox(opt, textvariable=self.variant, values=VARIANTS, state="readonly", width=22).grid(row=0, column=1, sticky="w", padx=6)
         self.addon = tk.BooleanVar()
         ttk.Checkbutton(opt, text="mit Add-on-Taster", variable=self.addon).grid(row=0, column=2, sticky="w", padx=10)
+        self.meter = tk.BooleanVar()
+        ttk.Checkbutton(opt, text="Messfirmware (nur 1PM / Plug S)", variable=self.meter).grid(row=0, column=3, sticky="w", padx=10)
 
         ttk.Label(opt, text="Passwort (falls gesetzt)").grid(row=1, column=0, sticky="w", pady=(8, 0))
         self.pw = tk.StringVar()
@@ -157,7 +160,7 @@ class App:
         ip = self.ip.get().split()[0].strip() if self.ip.get().strip() else ""
         if not ip:
             raise ValueError("Bitte IP-Adresse eingeben oder Netz durchsuchen")
-        return argparse.Namespace(ip=ip, addon=self.addon.get(),
+        return argparse.Namespace(ip=ip, addon=self.addon.get(), meter=self.meter.get(),
                                   variant=None if self.variant.get() == "automatisch" else self.variant.get(),
                                   bin=self.binpath.get() or None, user="admin", password=self.pw.get(),
                                   port=int(self.port.get() or 8266), serve_ip=None, mg2x_zip=None, yes=True)
@@ -236,7 +239,7 @@ class App:
                 self.q.put(("info", "Kein Shelly 1/1PM/Plug S/Duo erkannt"))
                 hf.log(f"Unter {a.ip} kein unterstütztes Gerät gefunden")
                 return
-            v = a.variant or hf.variant_from(dev, kind, info, a.addon) or "? (bitte Firmware wählen)"
+            v = a.variant or hf.variant_from(dev, kind, info, a.addon, a.meter) or "? (bitte Firmware wählen)"
             extra = ""
             if kind == "hermit":
                 extra = f" · {info.get('fw_id')}"
@@ -254,7 +257,7 @@ class App:
             kind, info = hf.detect(dev)
             if not kind:
                 hf.die(f"Unter {a.ip} kein unterstütztes Gerät gefunden")
-            variant = a.variant or hf.variant_from(dev, kind, info, a.addon)
+            variant = a.variant or hf.variant_from(dev, kind, info, a.addon, a.meter)
             if not variant:
                 hf.die("Modell nicht erkannt – bitte Firmware im Auswahlfeld wählen")
             warn = ""

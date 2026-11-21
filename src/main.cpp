@@ -85,6 +85,9 @@ static const char* EVENTS[] = {
 #if !HAS_LIGHT
   "switch.overpower", "switch.overtemperature",
 #endif
+#if IS_METER
+  "switch.reset",
+#endif
 #if HAS_PM
   "switch.power_above", "switch.power_below",
 #endif
@@ -394,8 +397,21 @@ void handleLight() {}
 // ======================= Relais =======================
 void updateLed();
 
+// Messfirmware: Abschaltung bleibt gespeichert (/trip), bis am Geraet quittiert wird
+void setTrip(bool t) {
+#if IS_METER
+  if (t) { File f = LittleFS.open("/trip", "w"); if (f) { f.print(overtemp ? "overtemp" : "overpower"); f.close(); } }
+  else LittleFS.remove("/trip");
+#endif
+}
+
 bool setRelay(bool on, const String& src, float toggleAfter = -1) {
   if (on && overtemp) return false;
+#if IS_METER
+  // nur Start, Hand-Reset und Schutzabschaltung duerfen das Relais bewegen
+  if (!(src == "init" || src == "reset" || src == "overpower" || src == "overtemp")) return false;
+  toggleAfter = 0;
+#endif
   bool was = relayOn;
   relayOn = on;
   relaySrc = src;
@@ -418,6 +434,7 @@ bool setRelay(bool on, const String& src, float toggleAfter = -1) {
     timerStartMs = millis(); timerDurMs = (uint32_t)(ta * 1000);
     timerStartedAt = time(nullptr);
   }
+  if (on && src == "reset") setTrip(false);
   if (was != on) {
     if (cfg.initialState == "restore_last") saveRelayState();
     fireEvent(on ? EV_ON : EV_OFF);
@@ -501,7 +518,12 @@ void onInputEdge(bool st) {
   uint32_t now = millis();
   if (now < 60000 && ++bootEdges >= 10) { resetWifiAndReboot(); return; }
   btnEdge(0, cfg.inType, st, bs0);
+#if IS_METER
+  // Taster: Druck, Schalter/SW: jede Flanke – quittiert eine Schutzabschaltung
+  if ((cfg.inType != "button" || st) && !relayOn && setRelay(true, "reset")) fireEvent("switch.reset");
+#else
   inputAction(cfg.inMode, st, cfg.inMode == "momentary" ? "button" : "switch");
+#endif
 }
 
 bool sampleInput(uint32_t now) {
@@ -618,6 +640,7 @@ void handlePm() {
   if (cfg.powerLimit > 0 && relayOn && apower > cfg.powerLimit) {
     setRelay(false, "overpower", 0);
     overpower = true;
+    setTrip(true);
     fireEvent("switch.overpower");
   }
   for (auto& h : cfg.hooks) {
@@ -647,6 +670,7 @@ void handleTemp() {
   if (!overtemp && tempC > cfg.tempLimit) {
     setRelay(false, "overtemp", 0);
     overtemp = true;
+    setTrip(true);
     fireEvent("switch.overtemperature");
   } else if (overtemp && tempC < cfg.tempLimit - 10) overtemp = false;
 #endif
@@ -867,6 +891,10 @@ void deviceInfo(JsonObject o) {
 
 void switchStatus(JsonObject o) {
   o["id"] = 0; o["source"] = relaySrc; o["output"] = relayOn;
+#if IS_METER
+  o["meter_only"] = true;
+  o["tripped"] = !relayOn;
+#endif
   if (timerActive) {
     o["timer_started_at"] = (long)timerStartedAt;
     o["timer_duration"] = timerDurMs / 1000.0;
@@ -903,6 +931,9 @@ void switchConfig(JsonObject o) {
   o["id"] = 0;
   if (cfg.swName.length()) o["name"] = cfg.swName; else o["name"] = nullptr;
   o["in_mode"] = cfg.inMode; o["initial_state"] = cfg.initialState;
+#if IS_METER
+  o["meter_only"] = true;
+#endif
   o["auto_on"] = cfg.autoOn; o["auto_on_delay"] = cfg.autoOnDelay;
   o["auto_off"] = cfg.autoOff; o["auto_off_delay"] = cfg.autoOffDelay;
 #if HAS_PM
@@ -1236,6 +1267,10 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     out["restart_required"] = false;
     return 0;
   }
+#endif
+#if IS_METER
+  if (m == "switch.set" || m == "switch.toggle")
+    ERR(-114, "Messfirmware: Relais wird nicht ferngeschaltet, Reset nach Abschaltung nur am Taster/SW");
 #endif
   if (m == "switch.set") {
     if (!p["on"].is<bool>()) ERR(-103, "Parameter on (true/false) fehlt");
@@ -1613,7 +1648,7 @@ void gen1Relay() {
     String t = server.arg("turn");
     float timer = server.hasArg("timer") ? server.arg("timer").toFloat() : -1;
     bool on = t == "on" ? true : t == "off" ? false : !relayOn;
-    setRelay(on, "http", timer);
+    setRelay(on, "http", timer);   // Messfirmware: wird in setRelay ignoriert
   }
   JsonDocument d;
   d["ison"] = relayOn; d["has_timer"] = timerActive;
@@ -1817,6 +1852,16 @@ void setup() {
   if (cfg.initialState == "on") start = true;
   else if (cfg.initialState == "restore_last") start = loadRelayState();
   else if (cfg.initialState == "match_input") start = inState;
+#if IS_METER
+  start = true;
+  if (LittleFS.exists("/trip")) {           // Abschaltung vor dem Stromausfall noch nicht quittiert
+    File f = LittleFS.open("/trip", "r");
+    String r = f ? f.readString() : "";
+    if (f) f.close();
+    if (r == "overtemp") overtemp = true; else overpower = true;
+    start = false;
+  }
+#endif
   setRelay(start, "init");
 
 #if HAS_PM
