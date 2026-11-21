@@ -7,6 +7,11 @@
 // SPIFFS: Seiten zu 256 Byte, Kopf 5 Byte (obj_id 2, span 2, flags 1), Daten 251 Byte.
 #include <Arduino.h>
 
+#ifndef HERMIT_IPINFO
+#define HERMIT_IPINFO
+struct ImportIp { String ip, gw, mask, dns; };
+#endif
+
 namespace mgosimport {
 
 // Sucht ab 'from' (max. 600 Zeichen) nach "key" : "wert" – Leerzeichen erlaubt, wie Mongoose OS sie schreibt
@@ -36,7 +41,7 @@ static bool jsonValue(const String& t, int from, const char* key, String& out) {
 }
 
 // Findet "sta" : { ... "ssid": "...", "pass": "..." }
-static bool scanText(const String& t, String& ssid, String& pass, int* where = nullptr) {
+static bool scanText(const String& t, String& ssid, String& pass, ImportIp* ipi = nullptr) {
   bool ok = false;
   int p = 0;
   while ((p = t.indexOf("\"sta\"", p)) >= 0) {
@@ -47,10 +52,16 @@ static bool scanText(const String& t, String& ssid, String& pass, int* where = n
       while (i < (int)t.length() && t[i] == ' ') i++;
       if (i < (int)t.length() && t[i] == '{') {
         String s, w;
-        if (jsonValue(t, i, "ssid", s) && s.length()) {
-          jsonValue(t, i, "pass", w);
+        int end = t.indexOf('}', i);              // nur innerhalb des "sta"-Objekts suchen
+        String obj = end > i ? t.substring(i, end + 1) : t.substring(i);
+        if (jsonValue(obj, 0, "ssid", s) && s.length()) {
+          jsonValue(obj, 0, "pass", w);
           ssid = s; pass = w; ok = true;          // letzte gueltige Fundstelle gewinnt
-          if (where) *where = p;
+          if (ipi) {                               // Mongoose OS: wifi.sta.ip/netmask/gw/nameserver
+            *ipi = ImportIp();
+            jsonValue(obj, 0, "ip", ipi->ip); jsonValue(obj, 0, "netmask", ipi->mask);
+            jsonValue(obj, 0, "gw", ipi->gw); jsonValue(obj, 0, "nameserver", ipi->dns);
+          }
         }
       }
     }
@@ -61,7 +72,7 @@ static bool scanText(const String& t, String& ssid, String& pass, int* where = n
 
 uint32_t lastFoundRegion = 0;
 
-inline bool readWifi(String& ssid, String& pass) {
+inline bool readWifi(String& ssid, String& pass, ImportIp* ipi = nullptr) {
   const uint32_t regions[] = {0x1BB000, 0xBB000};
   uint8_t* sec = (uint8_t*)malloc(4096);
   if (!sec) return false;
@@ -81,7 +92,7 @@ inline bool readWifi(String& ssid, String& pass) {
         for (int i = 5; i < 256; i++) txt += (char)(h[i] == 0xFF || h[i] == 0 ? ' ' : h[i]);
       }
       String s, p;
-      if (scanText(txt, s, p)) { ssid = s; pass = p; found = true; lastFoundRegion = base + off; }
+      if (scanText(txt, s, p, ipi)) { ssid = s; pass = p; found = true; lastFoundRegion = base + off; }
       tail = txt.length() > 600 ? txt.substring(txt.length() - 600) : txt;
     }
     if (found) break;

@@ -6,7 +6,17 @@
 //   0 OTAURL, 1-3 MQTTPREFIX, 4 STASSID1, 5 STASSID2, 6 STAPWD1, 7 STAPWD2
 #include <Arduino.h>
 
+// Feste IP-Einstellungen (leer = DHCP), gemeinsam fuer Tasmota- und Original-Import
+#ifndef HERMIT_IPINFO
+#define HERMIT_IPINFO
+struct ImportIp { String ip, gw, mask, dns; };
+#endif
+
 namespace tasimport {
+
+static String ipStr(const uint8_t* b) {
+  char t[16]; snprintf(t, sizeof t, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]); return String(t);
+}
 
 static uint32_t crc32(const uint8_t* b, uint32_t n) {
   uint32_t c = 0;
@@ -23,7 +33,7 @@ static String poolEntry(const uint8_t* pool, uint32_t len, int idx) {
 }
 
 // true, wenn gueltige Tasmota-Einstellungen mit SSID gefunden wurden
-inline bool readWifi(String& ssid, String& pass) {
+inline bool readWifi(String& ssid, String& pass, ImportIp* ip = nullptr) {
   // 2-MB-Layout: EEPROM 0x1FB, Rotation 0xF7..0xFD; 1-MB-Layout: EEPROM 0xFB, Rotation 0xF4..0xFA
   const uint32_t sectors[] = {0x1FB, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8, 0xF7, 0xF6, 0xF5, 0xF4};
   uint32_t* buf = (uint32_t*)malloc(4096);
@@ -45,6 +55,12 @@ inline bool readWifi(String& ssid, String& pass) {
     else if (s2.length()) { ssid = s2; pass = p2; }
     else continue;
     best = saveFlag; found = true;
+    if (ip) {                                        // ipv4_address[5] @ 0x544: IP, Gateway, Maske, DNS1, DNS2
+      const uint8_t* a = b + 0x544;
+      bool any = a[0] | a[1] | a[2] | a[3];
+      *ip = ImportIp();
+      if (any) { ip->ip = ipStr(a); ip->gw = ipStr(a + 4); ip->mask = ipStr(a + 8); ip->dns = ipStr(a + 12); }
+    }
   }
   free(buf);
   return found;

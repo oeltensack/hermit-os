@@ -43,7 +43,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="pm"><div class="v" id="tc">–</div><div class="l">Temperatur</div></div>
 <div class="vi"><div class="v" id="vo">–</div><div class="l">Spannung</div></div>
 <div class="vi"><div class="v" id="cu">–</div><div class="l">Strom · cos φ</div></div>
-<div><div class="v" id="in">–</div><div class="l">Eingang SW</div></div>
+<div id="inw"><div class="v" id="in">–</div><div class="l">Eingang SW</div></div>
 <div class="ao"><div class="v" id="ex">–</div><div class="l" id="exl">Add-on-Taster</div></div>
 <div><div class="v" id="rs">–</div><div class="l">WLAN</div></div>
 <div><div class="v" id="ip">–</div><div class="l">IP</div></div>
@@ -168,7 +168,7 @@ async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']
 if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}if(document.activeElement!==$('ctr')){$('ctr').value=sw.ct;$('ctv').textContent=sw.ct+' K'}}
 $('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':'AUS';PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
-$('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
+$('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';$('inw').style.display=s['input:0']?'':'none';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 $('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');

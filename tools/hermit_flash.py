@@ -19,7 +19,7 @@ Aufruf:
 Nur Python 3.8+ Standardbibliothek. Der PC muss im selben Netz wie der Shelly sein;
 die Windows-Firewall muss eingehende Verbindungen auf dem Port (Standard 8266) erlauben.
 """
-import argparse, base64, hashlib, http.server, io, json, os, pathlib, socket, sys, threading, time
+import argparse, base64, concurrent.futures, hashlib, http.server, io, ipaddress, json, os, pathlib, socket, sys, threading, time
 import urllib.error, urllib.request, uuid, zipfile
 
 if getattr(sys, "frozen", False):            # als EXE (PyInstaller): bin/ liegt neben der EXE
@@ -286,15 +286,56 @@ def build_mg2hermit(src_zip, fw_url):
 
 
 # ---------------------------------------------------------------- Ablaeufe
-def wait_hermit(dev, seconds=240):
+def norm_mac(m):
+    return "".join(c for c in str(m or "").upper() if c in "0123456789ABCDEF")
+
+
+def device_mac(dev, kind, info):
+    if kind in ("stock", "hermit"):
+        return norm_mac(info.get("mac"))
+    if kind == "tasmota":
+        st = jget(dev, "/cm?cmnd=Status%205") or {}
+        return norm_mac(st.get("StatusNET", {}).get("Mac"))
+    return ""
+
+
+def find_by_mac(mac, near_ip):
+    """Sucht im /24-Netz nach Hermit OS mit dieser MAC (falls das Geraet eine neue IP bekommen hat)."""
+    net = ipaddress.ip_network(near_ip + "/24", strict=False)
+    log(f"Suche das Gerät per MAC {mac} in {net} …")
+
+    def probe(ip):
+        try:
+            with urllib.request.urlopen(f"http://{ip}/shelly", timeout=1.5) as r:
+                j = json.loads(r.read())
+            if str(j.get("fw_id", "")).startswith("hermit-os") and norm_mac(j.get("mac")) == mac:
+                return str(ip), j
+        except Exception:
+            pass
+        return None
+    with concurrent.futures.ThreadPoolExecutor(64) as ex:
+        for r in ex.map(probe, net.hosts()):
+            if r:
+                return r
+    return None
+
+
+def wait_hermit(dev, seconds=240, mac=""):
     info = wait_for(lambda: (jget(dev, "/shelly") or {}).get("fw_id", "").startswith("hermit-os") and jget(dev, "/shelly"),
                     seconds, "Hermit OS")
     if info:
         log(f"FERTIG: {info.get('id')} läuft mit {info.get('fw_id')} unter {dev.base}")
-    else:
-        log("Hermit OS meldet sich nicht unter der alten IP. Möglich: neue IP vom Router, oder kein WLAN übernommen –")
-        log("dann im WLAN nach 'hermit-1-…' / 'hermit-1pm-…' suchen und http://192.168.33.1 öffnen.")
-    return info
+        return info
+    if mac:
+        for _ in range(3):
+            r = find_by_mac(mac, dev.base.split("//")[1])
+            if r:
+                log(f"FERTIG: {r[1].get('id')} läuft mit {r[1].get('fw_id')} unter der NEUEN Adresse http://{r[0]}")
+                return r[1]
+            time.sleep(20)
+    log("Hermit OS meldet sich nicht im Netz. Vermutlich wurde kein WLAN übernommen –")
+    log("dann im WLAN nach 'hermit-…' suchen und http://192.168.33.1 öffnen.")
+    return None
 
 
 def flash_stock(dev, args, info, variant, fw):
@@ -337,7 +378,7 @@ def flash_stock(dev, args, info, variant, fw):
         if not wait_for(lambda: srv.served.get("h.bin"), 360, "Download von Hermit OS"):
             die("Hermit OS wurde nicht geladen. Gerät aus-/einschalten – mg2hermit versucht es erneut, solange dieses Tool läuft.")
         time.sleep(10)
-        wait_hermit(dev)
+        wait_hermit(dev, 180, getattr(args, "mac", ""))
     finally:
         srv.stop()
 
@@ -371,7 +412,7 @@ def flash_loader(dev, args, variant, fw):
     except Exception as e:
         log(f"(Antwort nach Upload: {e})")
     time.sleep(5)
-    wait_hermit(dev)
+    wait_hermit(dev, 180, getattr(args, "mac", ""))
 
 
 def flash_hermit(dev, args, variant, fw):
@@ -384,7 +425,7 @@ def flash_hermit(dev, args, variant, fw):
     except Exception as e:
         log(f"(Antwort nach Upload: {e})")
     time.sleep(8)
-    wait_hermit(dev, 120)
+    wait_hermit(dev, 120, getattr(args, "mac", ""))
 
 
 def main():
@@ -416,6 +457,7 @@ def main():
     if not args.yes and input("Fortfahren? [j/N] ").strip().lower() not in ("j", "ja", "y", "yes"):
         sys.exit(0)
     fw = load_bin(args, variant)
+    args.mac = device_mac(dev, kind, info)
     {"stock": lambda: flash_stock(dev, args, info, variant, fw),
      "tasmota": lambda: flash_tasmota(dev, args, variant, fw),
      "loader": lambda: flash_loader(dev, args, variant, fw),

@@ -263,6 +263,7 @@ class App:
                 hf.log("Abgebrochen")
                 return
             fw = hf.load_bin(a, variant)
+            a.mac = hf.device_mac(dev, kind, info)
             {"stock": lambda: hf.flash_stock(dev, a, info, variant, fw),
              "tasmota": lambda: hf.flash_tasmota(dev, a, variant, fw),
              "loader": lambda: hf.flash_loader(dev, a, variant, fw),

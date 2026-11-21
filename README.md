@@ -130,7 +130,8 @@ python3 tools/hermit_flash.py 192.168.5.153 --password geheim   # bei Login-Schu
   (wird in `tools/.cache` gespeichert; alternativ `--mg2x-zip`).
 - mg2hermit ist mg2tasmota (GPL-3.0, Mark Dornbach) mit geänderter Download-Adresse; das Tool lädt das
   Original und passt es lokal an.
-- Hermit OS übernimmt das WLAN aus der Original-Firmware bzw. aus Tasmota automatisch.
+- Hermit OS übernimmt das WLAN **und eine feste IP** aus der Original-Firmware bzw. aus Tasmota automatisch.
+- Taucht das Gerät trotzdem unter einer anderen IP auf, sucht der Flasher es per MAC-Adresse im Netz.
 - Wie bei mg2tasmota wird per OTA der Bootloader ersetzt: Strom während des Vorgangs nicht trennen.
 
 ## Von Tasmota direkt zu Hermit OS (Hermit Loader)

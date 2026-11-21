@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.2"
+#define FW_VERSION "1.8.3"
 #endif
 
 // ======================= Konfiguration =======================
@@ -1083,14 +1083,17 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     // Diagnose: WLAN-Uebernahme erneut ausfuehren (aendert nichts). Passwort wird nie ausgegeben.
     String ss, pw;
     JsonObject mg = out["mgos"].to<JsonObject>();
-    bool f = mgosimport::readWifi(ss, pw);
+    ImportIp di;
+    bool f = mgosimport::readWifi(ss, pw, &di);
     mg["found"] = f;
-    if (f) { mg["ssid"] = ss; mg["pass_len"] = pw.length(); mg["sector"] = String(mgosimport::lastFoundRegion, HEX); }
+    if (f) { mg["ssid"] = ss; mg["pass_len"] = pw.length(); mg["sector"] = String(mgosimport::lastFoundRegion, HEX);
+             mg["ip"] = di.ip; mg["netmask"] = di.mask; mg["gw"] = di.gw; mg["dns"] = di.dns; }
     ss = ""; pw = "";
     JsonObject ta = out["tasmota"].to<JsonObject>();
-    f = tasimport::readWifi(ss, pw);
+    ImportIp ti;
+    f = tasimport::readWifi(ss, pw, &ti);
     ta["found"] = f;
-    if (f) { ta["ssid"] = ss; ta["pass_len"] = pw.length(); }
+    if (f) { ta["ssid"] = ss; ta["pass_len"] = pw.length(); ta["ip"] = ti.ip; ta["netmask"] = ti.mask; ta["gw"] = ti.gw; }
     struct station_config sc;
     JsonObject sd = out["sdk"].to<JsonObject>();
     if (wifi_station_get_config_default(&sc) && sc.ssid[0]) { char b[33] = {0}; memcpy(b, sc.ssid, 32); sd["ssid"] = b; }
@@ -1709,9 +1712,10 @@ void setup() {
 
   // Erster Start (Dateisystem noch nicht formatiert): vorher WLAN der Original-Shelly-Firmware sichern
   String mgSsid, mgPass;
+  ImportIp mgIp;
   bool mgFound = false;
   if (!LittleFS.begin()) {
-    mgFound = mgosimport::readWifi(mgSsid, mgPass);
+    mgFound = mgosimport::readWifi(mgSsid, mgPass, &mgIp);
     LittleFS.format(); LittleFS.begin();
   }
 
@@ -1726,18 +1730,27 @@ void setup() {
   loadCal();
   bool firstBoot = !LittleFS.exists("/config.json") && !LittleFS.exists("/noimport");
   loadCfg();
-  if (firstBoot && !cfg.ssid.length()) {   // nur beim allerersten Start: WLAN-Daten vom Hermit Loader bzw. Tasmota uebernehmen
+  if (firstBoot && !cfg.ssid.length()) {   // nur beim allerersten Start: WLAN (und feste IP) uebernehmen
+    String ts, tp;
+    ImportIp tIp;
+    bool tasFound = tasimport::readWifi(ts, tp, &tIp);
     struct station_config sc;
-    if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {
+    if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {      // vom Hermit Loader
       char ss[33] = {0}, pw[65] = {0};
       memcpy(ss, sc.ssid, 32); memcpy(pw, sc.password, 64);
       cfg.ssid = ss; cfg.pass = pw;
-      saveCfg();
-    } else {
-      String ts, tp;                 // direkt von Tasmota geflasht: WLAN aus dessen Einstellungen
-      if (tasimport::readWifi(ts, tp)) { cfg.ssid = ts; cfg.pass = tp; saveCfg(); }
-      else if (mgFound) { cfg.ssid = mgSsid; cfg.pass = mgPass; saveCfg(); }   // Original-Shelly-Firmware
+    } else if (tasFound) { cfg.ssid = ts; cfg.pass = tp; }           // direkt von Tasmota
+    else if (mgFound) { cfg.ssid = mgSsid; cfg.pass = mgPass; }      // Original-Shelly-Firmware
+    // Feste IP der vorherigen Firmware beibehalten, damit das Geraet unter derselben Adresse bleibt
+    ImportIp* ipSrc = mgFound && mgIp.ip.length() ? &mgIp : (tasFound && tIp.ip.length() ? &tIp : nullptr);
+    if (cfg.ssid.length() && ipSrc) {
+      IPAddress a, m, g;
+      if (a.fromString(ipSrc->ip) && m.fromString(ipSrc->mask) && g.fromString(ipSrc->gw)) {
+        cfg.staticIp = true; cfg.ip = ipSrc->ip; cfg.mask = ipSrc->mask; cfg.gw = ipSrc->gw;
+        cfg.dns = ipSrc->dns.length() ? ipSrc->dns : ipSrc->gw;
+      }
     }
+    if (cfg.ssid.length()) saveCfg();
   }
   loadEnergy();
 
