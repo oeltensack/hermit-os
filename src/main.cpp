@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.6"
+#define FW_VERSION "1.8.7"
 #endif
 
 // ======================= Konfiguration =======================
@@ -86,9 +86,11 @@ static const char* EVENTS[] = {
 #if HAS_PM
   "switch.power_above", "switch.power_below",
 #endif
+#if HAS_INPUT || HAS_ADDON
   "input.toggle_on", "input.toggle_off",
   "input.button_down", "input.button_up", "input.button_push",
   "input.button_longpush", "input.button_doublepush",
+#endif
   "sys.boot"
 };
 

@@ -68,5 +68,8 @@ for model, names in MODELS.items():
         z.write(ROOT / "Hermit-Flasher.pyw", f"{top}/Hermit-Flasher.pyw")
         z.write(ROOT / "tools" / "build_exe.bat", f"{top}/tools/build_exe.bat")
         z.write(ROOT / "README.md", f"{top}/README.md")
+        z.write(ROOT / "CHANGELOG.md", f"{top}/CHANGELOG.md")
+        for d in sorted((ROOT / "docs").glob("*.md")):
+            z.write(d, f"{top}/docs/{d.name}")
     print("  ", out.name)
 
