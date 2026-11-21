@@ -3,3 +3,5 @@
 
 tools/.cache/
 dist/
+__pycache__/
+*.pyc
