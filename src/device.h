@@ -27,7 +27,8 @@
   #define PIN_LED_LINK 2      // WLAN-LED, invertiert
   #define PIN_CF       5      // BL0937 CF  (Wirkleistung)
   #define PIN_CF1      14     // BL0937 CF1 (Spannung/Strom)
-  #define PIN_SEL      12     // BL0937 SEL: LOW = Spannung, HIGH = Strom
+  #define PIN_SEL      12     // BL0937 SEL
+  #define SEL_VOLT_LEVEL HIGH // Plug S: SEL HIGH = Spannung, LOW = Strom (am Geraet gemessen)
   #define PWR_CAL_DEFAULT 1.706586f
   #define HAS_PM       1
   #define HAS_CF1      1

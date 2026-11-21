@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.0"
+#define FW_VERSION "1.8.1"
 #endif
 
 // ======================= Konfiguration =======================
@@ -573,7 +573,7 @@ void handleCf1() {
   if (selVolt) avolt = r1(cfg.vCal * hz);
   else acurr = (apower > 0.5f) ? roundf(cfg.iCal * hz * 1000) / 1000 : 0;
   selVolt = !selVolt;
-  digitalWrite(PIN_SEL, selVolt ? LOW : HIGH);
+  digitalWrite(PIN_SEL, selVolt ? SEL_VOLT_LEVEL : !SEL_VOLT_LEVEL);
   selSinceMs = now;
 }
 #endif
@@ -1739,7 +1739,7 @@ void setup() {
   pinMode(PIN_CF, INPUT);
   attachInterrupt(digitalPinToInterrupt(PIN_CF), cfIsr, RISING);
 #if HAS_CF1
-  pinMode(PIN_SEL, OUTPUT); digitalWrite(PIN_SEL, LOW);   // mit Spannung beginnen
+  pinMode(PIN_SEL, OUTPUT); digitalWrite(PIN_SEL, SEL_VOLT_LEVEL);   // mit Spannung beginnen
   pinMode(PIN_CF1, INPUT);
   attachInterrupt(digitalPinToInterrupt(PIN_CF1), cf1Isr, RISING);
   selSinceMs = millis();
