@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import hermit_flash as hf  # noqa: E402
 
 VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo",
-            "hermit-1pm-meter", "hermit-plugs-meter"]
+            "hermit-1pm-meter", "hermit-plugs-meter", "hermit-plug-meter"]
 KIND_NAMES = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
 
 
@@ -64,7 +64,7 @@ class App:
         self.addon = tk.BooleanVar()
         ttk.Checkbutton(opt, text="mit Add-on-Taster", variable=self.addon).grid(row=0, column=2, sticky="w", padx=10)
         self.meter = tk.BooleanVar()
-        ttk.Checkbutton(opt, text="Messfirmware (nur 1PM / Plug S)", variable=self.meter).grid(row=0, column=3, sticky="w", padx=10)
+        ttk.Checkbutton(opt, text="Messfirmware (1PM / Plug S / Plug)", variable=self.meter).grid(row=0, column=3, sticky="w", padx=10)
 
         ttk.Label(opt, text="Passwort (falls gesetzt)").grid(row=1, column=0, sticky="w", pady=(8, 0))
         self.pw = tk.StringVar()

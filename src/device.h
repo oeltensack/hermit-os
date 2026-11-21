@@ -105,8 +105,8 @@
 // Messfirmware: nur Energiemessung, Relais bleibt an. Abschaltung bei Ueberlast/Uebertemperatur,
 // Wiedereinschalten nur von Hand am Taster bzw. SW-Eingang. Kein Schalten per RPC/HTTP.
 #if defined(METER_ONLY)
-  #if !(defined(DEVICE_SHELLY1PM) || defined(DEVICE_PLUGS))
-    #error "Messfirmware nur fuer Shelly 1PM und Plug S"
+  #if !(defined(DEVICE_SHELLY1PM) || defined(DEVICE_PLUGS) || defined(DEVICE_PLUG))
+    #error "Messfirmware nur fuer Shelly 1PM, Plug S und Plug"
   #endif
   #if defined(WITH_ADDON)
     #error "Messfirmware ohne Add-on"

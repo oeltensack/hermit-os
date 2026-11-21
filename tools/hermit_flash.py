@@ -157,8 +157,8 @@ def variant_from(dev, kind, info, addon, meter=False):
             die("Plug / Plug S / Duo haben keinen Add-on-Anschluss")
         v += "-addon"
     if v and meter:
-        if v not in ("hermit-1pm", "hermit-plugs"):
-            die("Messfirmware gibt es nur für Shelly 1PM und Plug S")
+        if v not in ("hermit-1pm", "hermit-plugs", "hermit-plug"):
+            die("Messfirmware gibt es nur für Shelly 1PM, Plug S und Plug")
         v += "-meter"
     return v
 
@@ -444,7 +444,7 @@ def main():
     ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM (Gen1) schreiben")
     ap.add_argument("ip", help="IP-Adresse des Shelly")
     ap.add_argument("--addon", action="store_true", help="Variante mit Add-on-Taster installieren")
-    ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S): nur Energiemessung, Reset nur am Taster/SW")
+    ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S / Plug): nur Energiemessung, Reset nur am Taster/SW")
     ap.add_argument("--variant", help="z. B. hermit-1pm, hermit-1pm-addon, hermit-1pm-meter, hermit-plugs-meter (sonst automatisch)")
     ap.add_argument("--bin", help="eigene .bin statt bin/<variante>.bin")
     ap.add_argument("--user", default="admin")

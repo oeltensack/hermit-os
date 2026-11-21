@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|
 | Firmware | `hermit-1` | `hermit-1pm` | `hermit-plugs` | `hermit-plug` | `hermit-duo` |
 | Add-on-Variante | `hermit-1-addon` | `hermit-1pm-addon` | – | – | – |
-| Messfirmware | – | `hermit-1pm-meter` | `hermit-plugs-meter` | – | – |
+| Messfirmware | – | `hermit-1pm-meter` | `hermit-plugs-meter` | `hermit-plug-meter` | – |
 | Gen1-Typ | `SHSW-1` | `SHSW-PM` | `SHPLG-S` | `SHPLG-1` / `SHPLG2-1` | `SHBDUO-1` |
 | Hermit-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-PLUG` | `HERMIT-DUO` |
 | Gen2-Komponente | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `cct:0` |
@@ -103,9 +103,9 @@ Die Faktoren liegen in einer eigenen Datei und bleiben bei Updates **und** Werks
 
 ---
 
-## Messfirmware (Shelly 1PM / Plug S)
+## Messfirmware (Shelly 1PM / Plug S / Plug)
 
-`hermit-1pm-meter` und `hermit-plugs-meter` sind reine Messgeräte mit Schutzabschaltung:
+`hermit-1pm-meter`, `hermit-plugs-meter` und `hermit-plug-meter` sind reine Messgeräte mit Schutzabschaltung:
 
 - Das Relais ist nach dem Einschalten **an** und lässt sich **nicht fernschalten**:
   `Switch.Set`/`Switch.Toggle` antworten mit Fehler −114, `/relay/0?turn=…` wird ignoriert.
@@ -113,14 +113,14 @@ Die Faktoren liegen in einer eigenen Datei und bleiben bei Updates **und** Werks
   `switch.power_above`/`power_below`, `switch.overpower`, `switch.overtemperature`).
 - Bei Überschreiten der **Abschaltleistung** bzw. **Abschalttemperatur** fällt das Relais ab.
   Die Abschaltung ist gespeichert und bleibt auch nach einem Stromausfall bestehen.
-- **Zurücksetzen nur von Hand:** beim Plug S mit dem Gerätetaster, beim 1PM über den SW-Eingang
+- **Zurücksetzen nur von Hand:** beim Plug S und Plug mit dem Gerätetaster, beim 1PM über den SW-Eingang
   (Schalter: jede Flanke, Taster: Druck). Bei Übertemperatur erst nach Abkühlen um 10 °C.
   Danach kommt das Ereignis `switch.reset` und `switch.on` mit `source: reset`.
 - `Switch.GetStatus` meldet zusätzlich `meter_only: true` und `tripped: true|false`.
 - Die Eingangsereignisse (`input.*`) werden weiter gemeldet.
 
 Installieren: Flasher → Haken „Messfirmware“ oder Variante wählen, CLI `--meter`. Zurück zur normalen
-Firmware jederzeit über System → Firmware-Datei (`hermit-1pm.bin` bzw. `hermit-plugs.bin`).
+Firmware jederzeit über System → Firmware-Datei (`hermit-1pm.bin`, `hermit-plugs.bin` bzw. `hermit-plug.bin`).
 
 ## Add-on-Variante (Shelly 1 / 1PM)
 

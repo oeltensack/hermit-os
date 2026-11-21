@@ -129,7 +129,7 @@ Höchstens 20 Aktionen. Ausgeführt wird per HTTP(S)-GET, nacheinander, Zeitlimi
 | `cct.on`, `cct.off` | Duo | |
 | `switch.overpower` | 1PM, Plug S, Plug | |
 | `switch.overtemperature` | 1PM, Plug S | |
-| `switch.reset` | Messfirmware 1PM / Plug S | Schutzabschaltung am Gerät zurückgesetzt |
+| `switch.reset` | Messfirmware 1PM / Plug S / Plug | Schutzabschaltung am Gerät zurückgesetzt |
 | `switch.power_above`, `switch.power_below` | 1PM, Plug S, Plug | `threshold` in W, Hysterese 5 % |
 | `input.toggle_on`, `input.toggle_off` | Geräte mit Eingang | Typ Schalter |
 | `input.button_down`, `input.button_up`, `input.button_push`, `input.button_doublepush`, `input.button_longpush` | Geräte mit Eingang | Typ Taster; lang = ab 1 s |

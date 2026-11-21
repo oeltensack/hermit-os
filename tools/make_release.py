@@ -19,6 +19,7 @@ VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in up
     "duo": "hermit-duo",
     "shelly1pm_meter": "hermit-1pm-meter",
     "plugs_meter": "hermit-plugs-meter",
+    "plug_meter": "hermit-plug-meter",
 }
 
 ini = (ROOT / "platformio.ini").read_text()
@@ -54,7 +55,7 @@ MODELS = {
     "Shelly-1":      ["hermit-1", "hermit-1-addon"],
     "Shelly-1PM":    ["hermit-1pm", "hermit-1pm-addon", "hermit-1pm-meter"],
     "Shelly-Plug-S": ["hermit-plugs", "hermit-plugs-meter"],
-    "Shelly-Plug":   ["hermit-plug"],
+    "Shelly-Plug":   ["hermit-plug", "hermit-plug-meter"],
     "Shelly-Duo":    ["hermit-duo"],
 }
 dist = ROOT / "dist"

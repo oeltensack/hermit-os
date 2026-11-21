@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.10.1
+- Messfirmware auch für den Shelly Plug (16 A): `hermit-plug-meter` (Reset am Gerätetaster, ohne Temperaturschutz)
+
 ## 1.10.0
 - Neue Messfirmware für Shelly 1PM (`hermit-1pm-meter`) und Plug S (`hermit-plugs-meter`): nur
   Energiemessung, Relais dauerhaft an, nicht fernschaltbar; Schutzabschaltung bei Überlast/Übertemperatur
