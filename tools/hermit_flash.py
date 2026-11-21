@@ -169,11 +169,24 @@ class Server:
         outer = self
 
         class H(http.server.BaseHTTPRequestHandler):
-            def do_GET(self):
+            protocol_version = "HTTP/1.0"
+
+            def do_HEAD(self):
+                self.do_GET(head=True)
+
+            def do_GET(self, head=False):
                 name = self.path.split("?")[0].lstrip("/")
+                log(f"  Anfrage von {self.client_address[0]}: {self.command} {self.path} "
+                    f"({self.headers.get('User-Agent', '-')}, Range: {self.headers.get('Range', '-')})")
                 if name not in outer.files:
                     self.send_response(404); self.end_headers(); return
                 data = outer.files[name]
+                if head:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    return
                 log(f"  Gerät {self.client_address[0]} lädt /{name} ({len(data) // 1024} KB) …")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
@@ -191,7 +204,12 @@ class Server:
             def log_message(self, *a):
                 pass
 
-        self.httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), H)
+        class S(http.server.ThreadingHTTPServer):
+            def verify_request(self, request, client_address):
+                log(f"  Verbindung von {client_address[0]}")
+                return True
+
+        self.httpd = S(("0.0.0.0", port), H)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
     def stop(self):
@@ -266,6 +284,12 @@ def flash_stock(dev, args, info, variant, fw):
     zipdata = build_mg2hermit(get_mg2x_zip(args, model), f"{base}/h.bin")
     srv = Server(args.port, {"mg2hermit.zip": zipdata, "h.bin": fw})
     log(f"Webserver läuft auf {base}")
+    try:
+        with urllib.request.urlopen(f"{base}/mg2hermit.zip", timeout=5) as r:
+            r.read(16)
+        log("Selbsttest: Webserver über die LAN-IP erreichbar")
+    except Exception as e:
+        log(f"Selbsttest fehlgeschlagen ({e}) – falsche PC-IP? Mit --serve-ip angeben")
     try:
         log(f"Starte Update der Original-Firmware ({model}, {info.get('fw', '?')}) …")
         pre = jget(dev, "/ota") or {}
