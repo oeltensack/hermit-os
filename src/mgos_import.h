@@ -9,33 +9,57 @@
 
 namespace mgosimport {
 
+// Sucht ab 'from' (max. 600 Zeichen) nach "key" : "wert" – Leerzeichen erlaubt, wie Mongoose OS sie schreibt
 static bool jsonValue(const String& t, int from, const char* key, String& out) {
-  int k = t.indexOf(String("\"") + key + "\":\"", from);
-  if (k < 0 || k - from > 400) return false;
-  int a = k + strlen(key) + 4;
-  out = "";
-  for (int i = a; i < (int)t.length() && out.length() < 64; i++) {
-    char c = t[i];
-    if (c == '\\' && i + 1 < (int)t.length()) { out += t[++i]; continue; }
-    if (c == '"') return true;
-    out += c;
+  String k = String("\"") + key + "\"";
+  int p = from;
+  while ((p = t.indexOf(k, p)) >= 0 && p - from < 600) {
+    int i = p + k.length();
+    while (i < (int)t.length() && t[i] == ' ') i++;
+    if (i < (int)t.length() && t[i] == ':') {
+      i++;
+      while (i < (int)t.length() && t[i] == ' ') i++;
+      if (i < (int)t.length() && t[i] == '"') {
+        out = "";
+        for (i++; i < (int)t.length() && out.length() < 64; i++) {
+          char c = t[i];
+          if (c == '\\' && i + 1 < (int)t.length()) { out += t[++i]; continue; }
+          if (c == '"') return true;
+          out += c;
+        }
+        return false;
+      }
+    }
+    p += k.length();
   }
   return false;
 }
 
-static bool scanText(const String& t, String& ssid, String& pass) {
+// Findet "sta" : { ... "ssid": "...", "pass": "..." }
+static bool scanText(const String& t, String& ssid, String& pass, int* where = nullptr) {
   bool ok = false;
   int p = 0;
-  while ((p = t.indexOf("\"sta\":{", p)) >= 0) {
-    String s, w;
-    if (jsonValue(t, p, "ssid", s) && s.length()) {
-      jsonValue(t, p, "pass", w);
-      ssid = s; pass = w; ok = true;          // letzte gueltige Fundstelle gewinnt
+  while ((p = t.indexOf("\"sta\"", p)) >= 0) {
+    int i = p + 5;
+    while (i < (int)t.length() && t[i] == ' ') i++;
+    if (i < (int)t.length() && t[i] == ':') {
+      i++;
+      while (i < (int)t.length() && t[i] == ' ') i++;
+      if (i < (int)t.length() && t[i] == '{') {
+        String s, w;
+        if (jsonValue(t, i, "ssid", s) && s.length()) {
+          jsonValue(t, i, "pass", w);
+          ssid = s; pass = w; ok = true;          // letzte gueltige Fundstelle gewinnt
+          if (where) *where = p;
+        }
+      }
     }
-    p += 7;
+    p += 5;
   }
   return ok;
 }
+
+uint32_t lastFoundRegion = 0;
 
 inline bool readWifi(String& ssid, String& pass) {
   const uint32_t regions[] = {0x1BB000, 0xBB000};
@@ -57,7 +81,7 @@ inline bool readWifi(String& ssid, String& pass) {
         for (int i = 5; i < 256; i++) txt += (char)(h[i] == 0xFF || h[i] == 0 ? ' ' : h[i]);
       }
       String s, p;
-      if (scanText(txt, s, p)) { ssid = s; pass = p; found = true; }
+      if (scanText(txt, s, p)) { ssid = s; pass = p; found = true; lastFoundRegion = base + off; }
       tail = txt.length() > 600 ? txt.substring(txt.length() - 600) : txt;
     }
     if (found) break;

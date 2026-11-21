@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.1"
+#define FW_VERSION "1.8.2"
 #endif
 
 // ======================= Konfiguration =======================
@@ -1077,6 +1077,43 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "shelly.listmethods") {
     JsonArray a = out["methods"].to<JsonArray>();
     for (auto s : METHODS) a.add(s);
+    return 0;
+  }
+  if (m == "hermit.testimport") {
+    // Diagnose: WLAN-Uebernahme erneut ausfuehren (aendert nichts). Passwort wird nie ausgegeben.
+    String ss, pw;
+    JsonObject mg = out["mgos"].to<JsonObject>();
+    bool f = mgosimport::readWifi(ss, pw);
+    mg["found"] = f;
+    if (f) { mg["ssid"] = ss; mg["pass_len"] = pw.length(); mg["sector"] = String(mgosimport::lastFoundRegion, HEX); }
+    ss = ""; pw = "";
+    JsonObject ta = out["tasmota"].to<JsonObject>();
+    f = tasimport::readWifi(ss, pw);
+    ta["found"] = f;
+    if (f) { ta["ssid"] = ss; ta["pass_len"] = pw.length(); }
+    struct station_config sc;
+    JsonObject sd = out["sdk"].to<JsonObject>();
+    if (wifi_station_get_config_default(&sc) && sc.ssid[0]) { char b[33] = {0}; memcpy(b, sc.ssid, 32); sd["ssid"] = b; }
+    // Rohtext-Probe: kommt "ssid" ueberhaupt in fs0/fs1 vor?
+    JsonArray hits = out["raw_ssid_hits"].to<JsonArray>();
+    uint8_t* buf = (uint8_t*)malloc(4096);
+    if (buf) {
+      const uint32_t regs[] = {0xBB000, 0x1BB000};
+      for (uint32_t base : regs)
+        for (uint32_t off = 0; off < 0x40000 && hits.size() < 8; off += 4096) {
+          if (!ESP.flashRead(base + off, (uint32_t*)buf, 4096)) break;
+          for (int i = 0; i + 6 < 4096 && hits.size() < 8; i++)
+            if (!memcmp(buf + i, "\"ssid\"", 6)) {
+              char ctx[40] = {0}; int n = 0;
+              for (int k = i; k < 4096 && n < 38; k++) {     // nur bis Ende des SSID-Werts (kein Passwort)
+                char c = buf[k]; if (c == ',' || c == '}') break;
+                ctx[n++] = (c >= 32 && c < 127) ? c : '.';
+              }
+              JsonObject h = hits.add<JsonObject>(); h["addr"] = String(base + off + i, HEX); h["text"] = ctx;
+            }
+        }
+      free(buf);
+    }
     return 0;
   }
   if (m == "shelly.checkforupdate") {
