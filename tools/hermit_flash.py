@@ -268,11 +268,27 @@ def flash_stock(dev, args, info, variant, fw):
     log(f"Webserver läuft auf {base}")
     try:
         log(f"Starte Update der Original-Firmware ({model}, {info.get('fw', '?')}) …")
+        pre = jget(dev, "/ota") or {}
+        if pre.get("status") not in (None, "idle"):
+            log(f"Hinweis: Update-Status des Geräts ist '{pre.get('status')}' – evtl. hängt ein früherer Versuch."
+                " Dann Gerät kurz vom Strom trennen und erneut starten.")
         st, body = dev.get(f"/ota?url={base}/mg2hermit.zip", timeout=15)
+        log(f"Antwort des Geräts: HTTP {st} {body[:160].decode(errors='replace').strip()}")
         if st != 200:
-            die(f"Gerät lehnt Update ab (HTTP {st}): {body[:200]!r}")
-        if not wait_for(lambda: srv.served.get("mg2hermit.zip"), 120, "Download von mg2hermit"):
-            die("Gerät hat mg2hermit nicht geladen – Firewall/Port prüfen")
+            die(f"Gerät lehnt Update ab (HTTP {st})")
+        last = [None]
+
+        def zip_loaded():
+            if srv.served.get("mg2hermit.zip"):
+                return True
+            o = jget(dev, "/ota") or {}
+            if o.get("status") != last[0]:
+                last[0] = o.get("status")
+                log(f"  Update-Status am Gerät: {last[0]}")
+            return False
+        if not wait_for(zip_loaded, 120, "Download von mg2hermit"):
+            die("Gerät hat mg2hermit nicht geladen. Gerät kurz vom Strom trennen und erneut versuchen; "
+                "sonst Firewall/Port prüfen (eingehend TCP " + str(args.port) + " für Python).")
         log("mg2hermit installiert, Gerät startet 1–2× neu und lädt dann Hermit OS …")
         if not wait_for(lambda: srv.served.get("h.bin"), 360, "Download von Hermit OS"):
             die("Hermit OS wurde nicht geladen. Gerät aus-/einschalten – mg2hermit versucht es erneut, solange dieses Tool läuft.")
