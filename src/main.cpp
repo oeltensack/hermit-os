@@ -22,7 +22,7 @@
 #include "mgos_import.h"
 
 #ifndef FW_VERSION
-#define FW_VERSION "1.8.3"
+#define FW_VERSION "1.8.4"
 #endif
 
 // ======================= Konfiguration =======================
@@ -1077,6 +1077,27 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "shelly.listmethods") {
     JsonArray a = out["methods"].to<JsonArray>();
     for (auto s : METHODS) a.add(s);
+    return 0;
+  }
+  if (m == "hermit.gpio") {
+    // Diagnose: {"pin":5,"value":512} PWM 0..1023 ausgeben | {"pin":5} Pegel als Eingang lesen
+    // | {"scan":true} alle freien Pins als Eingang lesen
+    if (p["scan"] | false) {
+      JsonObject o = out.to<JsonObject>();
+      const int pins[] = {0, 1, 2, 3, 4, 5, 12, 13, 14, 15, 16};
+      for (int pn : pins) { pinMode(pn, INPUT); o[String("gpio") + pn] = digitalRead(pn); }
+      return 0;
+    }
+    int pin = p["pin"] | -1;
+    if (pin < 0 || pin > 16 || (pin >= 6 && pin <= 11)) ERR(-103, "pin: 0-5 oder 12-16");
+    if (p["value"].is<int>()) {
+      int v = p["value"]; v = v < 0 ? 0 : (v > 1023 ? 1023 : v);
+      pinMode(pin, OUTPUT); analogWrite(pin, v);
+      out["pin"] = pin; out["pwm"] = v;
+    } else {
+      pinMode(pin, INPUT);
+      out["pin"] = pin; out["level"] = digitalRead(pin);
+    }
     return 0;
   }
   if (m == "hermit.testimport") {
