@@ -205,15 +205,35 @@ class Server:
                 pass
 
         class S(http.server.ThreadingHTTPServer):
+            # Windows: SO_REUSEADDR erlaubt einen zweiten Server auf demselben Port – dann landen die
+            # Verbindungen beim alten. Deshalb dort exklusiv binden.
+            allow_reuse_address = os.name != "nt"
+            daemon_threads = True
+
+            def server_bind(self):
+                if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                    self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                super().server_bind()
+
             def verify_request(self, request, client_address):
                 log(f"  Verbindung von {client_address[0]}")
                 return True
 
-        self.httpd = S(("0.0.0.0", port), H)
+        self.httpd = None
+        for p in range(port, port + 10):
+            try:
+                self.httpd = S(("0.0.0.0", p), H)
+                break
+            except OSError:
+                log(f"  Port {p} ist belegt – versuche {p + 1}")
+        if not self.httpd:
+            die(f"Kein freier Port zwischen {port} und {port + 9}")
+        self.port = self.httpd.server_address[1]
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
     def stop(self):
         self.httpd.shutdown()
+        self.httpd.server_close()          # Port wirklich freigeben
 
 
 # ---------------------------------------------------------------- mg2hermit bauen
@@ -280,9 +300,9 @@ def wait_hermit(dev, seconds=240):
 def flash_stock(dev, args, info, variant, fw):
     model = GEN1_MODELS[info["type"]][0]
     pc = args.serve_ip or local_ip_for(args.ip)
-    base = f"http://{pc}:{args.port}"
-    zipdata = build_mg2hermit(get_mg2x_zip(args, model), f"{base}/h.bin")
-    srv = Server(args.port, {"mg2hermit.zip": zipdata, "h.bin": fw})
+    srv = Server(args.port, {"h.bin": fw})
+    base = f"http://{pc}:{srv.port}"
+    srv.files["mg2hermit.zip"] = build_mg2hermit(get_mg2x_zip(args, model), f"{base}/h.bin")
     log(f"Webserver läuft auf {base}")
     try:
         with urllib.request.urlopen(f"{base}/mg2hermit.zip", timeout=5) as r:
@@ -312,7 +332,7 @@ def flash_stock(dev, args, info, variant, fw):
             return False
         if not wait_for(zip_loaded, 120, "Download von mg2hermit"):
             die("Gerät hat mg2hermit nicht geladen. Gerät kurz vom Strom trennen und erneut versuchen; "
-                "sonst Firewall/Port prüfen (eingehend TCP " + str(args.port) + " für Python).")
+                "sonst Firewall/Port prüfen (eingehend TCP " + str(srv.port) + " für Python).")
         log("mg2hermit installiert, Gerät startet 1–2× neu und lädt dann Hermit OS …")
         if not wait_for(lambda: srv.served.get("h.bin"), 360, "Download von Hermit OS"):
             die("Hermit OS wurde nicht geladen. Gerät aus-/einschalten – mg2hermit versucht es erneut, solange dieses Tool läuft.")
