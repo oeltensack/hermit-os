@@ -15,6 +15,7 @@ import os
 import sqlite3
 import threading
 import time
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -23,7 +24,9 @@ import paho.mqtt.client as mqtt
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
-VERSION = "1.0.0"
+VERSION = json.loads((Path(__file__).parent / "version.json").read_text())["version"]
+UPDATE_URL = os.environ.get("UPDATE_URL",
+    "https://raw.githubusercontent.com/oeltensack/hermit-os/main/cloud/app/version.json")
 DATA = Path(os.environ.get("DATA_DIR", "/data"))
 DB_PATH = DATA / "cloud.db"
 MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
@@ -74,6 +77,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS alerts(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, dev TEXT,
       kind TEXT, text TEXT, ack INTEGER DEFAULT 0);
     CREATE INDEX IF NOT EXISTS alerts_ts ON alerts(ts);
+    CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT);
     """)
     DB.commit()
 
@@ -301,6 +305,7 @@ def startup():
     init_db()
     BUS.start()
     threading.Thread(target=watchdog, daemon=True).start()
+    threading.Thread(target=updater_loop, daemon=True).start()
 
 
 @app.get("/")
@@ -325,9 +330,110 @@ def logout(response: Response):
     return {"ok": True}
 
 
+# ======================= Update der Cloud =======================
+# Die App prueft version.json auf GitHub. Installiert wird vom Container "updater": die App legt
+# data/update.request ab, der Updater holt den neuen Stand (git pull bzw. Archiv) und baut neu.
+UPD = {"available": None, "last_check": 0, "error": ""}
+
+
+def setting(k, default=None):
+    r = q("SELECT v FROM settings WHERE k=?", (k,), one=True)
+    return r["v"] if r else default
+
+
+def set_setting(k, v):
+    q("INSERT OR REPLACE INTO settings(k, v) VALUES(?,?)", (k, str(v)))
+
+
+def ver_tuple(v):
+    return tuple(int(x) for x in str(v).split(".") if x.isdigit())
+
+
+def upd_check():
+    try:
+        with urllib.request.urlopen(UPDATE_URL + f"?t={int(time.time())}", timeout=15) as r:
+            v = json.loads(r.read())["version"]
+        UPD["available"] = v if ver_tuple(v) > ver_tuple(VERSION) else None
+        UPD["error"] = ""
+    except Exception as e:
+        UPD["error"] = f"Prüfung fehlgeschlagen: {e}"
+    UPD["last_check"] = time.time()
+    return UPD["available"]
+
+
+def updater_present():
+    try:
+        return time.time() - float((DATA / "updater.alive").read_text()) < 120
+    except Exception:
+        return False
+
+
+def upd_request():
+    if not updater_present():
+        raise RuntimeError("Updater-Container läuft nicht (siehe cloud/README.md)")
+    (DATA / "update.request").write_text(UPD["available"] or "manual")
+    alert("cloud", "update", f"Cloud-Update auf {UPD['available'] or 'aktuellen Stand'} gestartet")
+
+
+def updater_loop():
+    time.sleep(60)
+    last_day = None
+    while True:
+        try:
+            mode, hour = setting("upd_mode", "install"), int(setting("upd_hour", "4"))
+            now = datetime.now(TZ)
+            if mode != "off" and (time.time() - UPD["last_check"] > 6 * 3600 or
+                                  (now.hour == hour and last_day != now.date())):
+                if upd_check() and mode == "install" and now.hour == hour and last_day != now.date() \
+                        and updater_present() and not (DATA / "update.request").exists():
+                    upd_request()
+                if now.hour == hour:
+                    last_day = now.date()
+        except Exception as e:
+            print("Update:", e, flush=True)
+        time.sleep(300)
+
+
+@app.get("/api/update")
+def update_info():
+    def rd(n):
+        try:
+            return (DATA / n).read_text()[-3000:]
+        except Exception:
+            return ""
+    return {"current": VERSION, "available": UPD["available"], "last_check": UPD["last_check"],
+            "error": UPD["error"], "mode": setting("upd_mode", "install"), "hour": int(setting("upd_hour", "4")),
+            "updater": updater_present(), "running": (DATA / "update.request").exists(), "log": rd("update.log")}
+
+
+@app.post("/api/update/check")
+def update_check():
+    upd_check()
+    return update_info()
+
+
+@app.post("/api/update/install")
+def update_install():
+    try:
+        upd_request()
+    except Exception as e:
+        raise HTTPException(409, str(e))
+    return update_info()
+
+
+@app.post("/api/update/config")
+async def update_config(request: Request):
+    d = await request.json()
+    if d.get("mode") in ("off", "check", "install"):
+        set_setting("upd_mode", d["mode"])
+    if "hour" in d and 0 <= int(d["hour"]) <= 23:
+        set_setting("upd_hour", int(d["hour"]))
+    return update_info()
+
+
 @app.get("/api/info")
 def info():
-    return {"version": VERSION, "mqtt": BUS.connected, "auth": bool(PASSWORD),
+    return {"version": VERSION, "mqtt": BUS.connected, "auth": bool(PASSWORD), "update": UPD["available"],
             "broker": f"{os.environ.get('PUBLIC_BROKER', '')}"}
 
 

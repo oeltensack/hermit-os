@@ -62,7 +62,13 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 (z. B. <code id="bk">192.168.0.50:1883</code>), dazu Benutzer und Passwort aus der <code>.env</code>. Shelly Plus/Pro (Gen2/Gen3) gehen genauso:
 Einstellungen → MQTT, „RPC status notifications“ und „Generic status update“ einschalten.</p>
 <p class="l">Geräte erscheinen automatisch, sobald sie sich verbinden. Der Energieverlauf wird aus dem Zählerstand der Geräte berechnet.</p>
-<table id="itab"></table></div></section>
+<table id="itab"></table></div>
+<div class="card"><h2>Cloud-Update</h2>
+<div class="row" style="justify-content:space-between"><div><div class="v" id="u_v">–</div><div class="l" id="u_s"></div></div>
+<div class="row"><button class="bt g" onclick="updCheck()">Jetzt prüfen</button><button class="bt" id="u_btn" onclick="updInstall()" style="display:none">Jetzt aktualisieren</button></div></div>
+<div class="row" style="margin-top:12px"><label class="l">Modus</label><select id="u_mode" onchange="updCfg()"><option value="off">Aus</option><option value="check">Nur prüfen</option><option value="install">Automatisch installieren</option></select>
+<label class="l">um</label><select id="u_hour" onchange="updCfg()"></select></div>
+<p class="l" id="u_hint"></p><pre id="u_log" style="display:none;white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre></div></section>
 </main>
 <div id="login"><div class="card"><h2>Anmelden</h2><input id="pw" type="password" placeholder="Passwort" style="width:100%">
 <button class="bt" style="margin-top:12px;width:100%" onclick="login()">Anmelden</button></div></div>
@@ -150,8 +156,8 @@ const m=await api('energy/months?'+qd);$('mtab').innerHTML=m.length?'<tr><th>Mon
 if(!dev)rankChart($('rchart'),await api('energy/by_device?days=30'))}
 
 // ---------- Meldungen ----------
-const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung'};
-async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&x.kind!='online'&&x.kind!='reset').length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
+const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update'};
+async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&x.kind!='online'&&x.kind!='reset'&&x.kind!='update').length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
 if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><th>Meldung</th><th></th></tr>'+a.map(x=>`<tr class="${x.ack?'ack':''}"><td>${new Date(x.ts*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
 <td><span class="kind ${x.kind}">${KIND[x.kind]||x.kind}</span></td><td>${esc(x.text)}</td><td class="n">${x.ack?'':`<a style="color:var(--a);cursor:pointer" onclick="ack(${x.id})">quittieren</a>`}</td></tr>`).join(''):'<tr><td class="empty">Keine Meldungen.</td></tr>'}
 async function ack(id){await api('alerts/ack',{method:'POST',body:{id}});loadAl()}
@@ -159,7 +165,18 @@ async function ackAll(){await api('alerts/ack',{method:'POST',body:{}});loadAl()
 
 async function loadInfo(){const i=await api('info');$('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' · v'+i.version;
 $('bk').textContent=(i.broker||location.hostname)+':1883';
-if(TAB=='in')$('itab').innerHTML='<tr><th>Gerät</th><th>ID / Topic</th><th>Modell</th><th>Firmware</th><th>IP</th></tr>'+DEVS.map(d=>`<tr><td>${esc(d.name)}</td><td><code>${esc(d.id)}</code></td><td>${esc(d.model)}</td><td>${esc(d.ver)}</td><td>${esc(d.ip)}</td></tr>`).join('')}
+if(i.update)$('hs').textContent+=' · Update '+i.update+' verfügbar';if(TAB=='in'){loadUpd().catch(()=>{});}if(TAB=='in')$('itab').innerHTML='<tr><th>Gerät</th><th>ID / Topic</th><th>Modell</th><th>Firmware</th><th>IP</th></tr>'+DEVS.map(d=>`<tr><td>${esc(d.name)}</td><td><code>${esc(d.id)}</code></td><td>${esc(d.model)}</td><td>${esc(d.ver)}</td><td>${esc(d.ip)}</td></tr>`).join('')}
+for(let h=0;h<24;h++)$('u_hour').insertAdjacentHTML('beforeend',`<option value="${h}">${String(h).padStart(2,'0')}:00</option>`);
+function showUpd(u){$('u_v').textContent='Version '+u.current+(u.available?' → '+u.available+' verfügbar':' – aktuell');
+$('u_s').textContent=u.running?'Update läuft … die Seite lädt danach neu.':(u.error||(u.last_check?'zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''));
+$('u_btn').style.display=u.available&&u.updater&&!u.running?'':'none';$('u_mode').value=u.mode;$('u_hour').value=u.hour;
+$('u_hint').textContent=u.updater?'':'Der Updater-Container läuft nicht – installieren geht dann nur von Hand (siehe cloud/README.md).';
+$('u_log').textContent=u.log;$('u_log').style.display=u.log?'':'none';if(u.running&&!window._ur){window._ur=u.current;waitUpd()}}
+async function loadUpd(){showUpd(await api('update'))}
+async function updCheck(){showUpd(await api('update/check',{method:'POST'}))}
+async function updInstall(){if(!confirm('Cloud jetzt aktualisieren? Die Oberfläche ist dabei kurz nicht erreichbar.'))return;try{showUpd(await api('update/install',{method:'POST'}))}catch(e){toast(e.message)}}
+async function updCfg(){showUpd(await api('update/config',{method:'POST',body:{mode:$('u_mode').value,hour:+$('u_hour').value}}))}
+async function waitUpd(){for(let i=0;i<120;i++){await new Promise(r=>setTimeout(r,5000));try{const u=await api('update');if(u.current!=window._ur||(!u.running&&u.log.includes('FERTIG'))){location.reload();return}if(!u.running&&u.log.includes('FEHLER')){window._ur=null;showUpd(u);return}}catch(e){}}}
 async function refresh(){try{await loadDevs();await loadAl();await loadInfo();if(TAB=='en')await loadEn()}catch(e){if(e.message!='login')console.warn(e)}}
 refresh();setInterval(()=>{if(TAB!='en')refresh();else loadInfo().catch(()=>{})},5000);
 </script></body></html>

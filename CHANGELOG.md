@@ -1,5 +1,9 @@
 # Änderungen
 
+## Hermit Cloud 1.1.0
+- Selbst-Update: Prüfung auf GitHub, Knopf „Jetzt aktualisieren“, automatische Installation zur eingestellten
+  Stunde; neuer Container `hermit-cloud-updater` (git pull bzw. Archiv, Neubau, Neustart)
+
 ## 1.12.1
 - Repo ist öffentlich: Auto-Update ohne Token, Hinweise zum Token nur noch für private Forks
 - README überarbeitet (Download, Hermit Cloud mit Bild, Mitmachen, English summary), Issue-Vorlagen

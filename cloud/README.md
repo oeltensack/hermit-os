@@ -4,6 +4,7 @@ Kleine Heim-Cloud für Hermit-OS-Geräte (und Shelly Plus/Pro Gen2/Gen3). Läuft
 Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die Cloud liest nur mit.
 
 **Funktionen**
+- Selbst-Update aus diesem Repo (Knopf oder automatisch nachts)
 - Geräteübersicht: online/offline, Modell, Firmware, Leistung, Energie heute, Temperatur, Fehler
 - Schalten aus der Oberfläche (bei der Messfirmware gesperrt, Reset nur am Gerät)
 - Energieverlauf: Leistung der letzten 24 h, Energie pro Tag (31 Tage), pro Monat, Verbrauch je Gerät
@@ -49,6 +50,25 @@ Die Geräte erscheinen automatisch, sobald sie verbunden sind.
 
 ## Update
 
+Die Cloud aktualisiert sich selbst. Unter **Info → Cloud-Update**:
+
+| Modus | Verhalten |
+|---|---|
+| Aus | keine Prüfung |
+| Nur prüfen | alle 6 h prüfen, Hinweis oben rechts, Installation mit **Jetzt aktualisieren** |
+| Automatisch installieren (Standard) | zusätzlich täglich zur eingestellten Stunde installieren |
+
+Installiert wird vom Container `hermit-cloud-updater`: Er holt den neuen Stand (`git pull`, bei
+entpacktem ZIP das Archiv von GitHub), baut die Container neu und startet sie. Die Oberfläche ist dabei
+etwa eine Minute weg und lädt danach von selbst neu. Das Protokoll steht unter Info.
+
+- `docker compose` immer **im Ordner `cloud/`** starten – der Updater merkt sich diesen Pfad.
+- Der Updater braucht Zugriff auf `/var/run/docker.sock` und den Repo-Ordner. Wer das nicht will, nimmt den
+  Dienst `updater` aus der `docker-compose.yml` und aktualisiert von Hand:
+  `cd hermit-os && git pull && cd cloud && docker compose up -d --build`
+- Wer die Cloud aus dem ZIP installiert hat: in einem eigenen Ordner entpacken (z. B. `/opt/hermit/cloud`).
+
+**Von 1.0.x auf 1.1.0** einmal von Hand (danach geht es automatisch):
 ```bash
 cd hermit-os && git pull && cd cloud && docker compose up -d --build
 ```

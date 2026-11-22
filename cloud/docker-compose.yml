@@ -1,5 +1,5 @@
 # Hermit Cloud – Heim-Cloud fuer Hermit OS und Shelly Gen2+
-# Start:  cp .env.example .env  (Werte anpassen)  &&  docker compose up -d
+# Start (im Ordner cloud/):  cp .env.example .env  (Werte anpassen)  &&  docker compose up -d
 services:
   mosquitto:
     image: eclipse-mosquitto:2
@@ -33,6 +33,22 @@ services:
       - "${WEB_PORT:-8080}:8080"
     volumes:
       - ./data:/data
+
+  # Updater: installiert Cloud-Updates (Knopf in der Oberflaeche oder automatisch).
+  # Braucht Zugriff auf Docker und auf den Repo-Ordner. Wer das nicht will: Dienst auskommentieren
+  # und von Hand aktualisieren (git pull && docker compose up -d --build).
+  updater:
+    build: ./updater
+    image: hermit-cloud-updater:latest
+    container_name: hermit-cloud-updater
+    restart: unless-stopped
+    command: ["sh", "${PWD}/updater/update.sh"]
+    environment:
+      HERMIT_CLOUD_DIR: ${PWD}
+    working_dir: ${PWD}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}/..:${PWD}/..
 
 volumes:
   mosquitto-data:
