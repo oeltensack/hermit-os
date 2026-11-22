@@ -141,6 +141,13 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label>GitHub-Token (nur bei privatem Repo)</label><input id="u_tok" type="password">
 <div class="l">Das Relais bleibt während Update und Neustart in seinem Zustand. Die Firmware wird vor dem Umschalten per SHA-256 geprüft.</div>
 <div class="row"><button class="bt" onclick="saveUpd()">Speichern</button><button class="bt g" onclick="chkUpd()">Jetzt prüfen</button><button class="bt g" id="u_inst" onclick="instUpd()">Jetzt installieren</button></div></div>
+<div class="card"><h2>Cloud / MQTT</h2>
+<div class="v" id="q_st" style="font-size:16px">–</div>
+<label class="ck"><input type="checkbox" id="q_en">MQTT einschalten (Hermit Cloud, Home Assistant, Node-RED)</label>
+<div class="row"><div><label>Server (host:port)</label><input id="q_srv" placeholder="192.168.0.50:1883"></div><div><label>Topic-Präfix</label><input id="q_pre"></div></div>
+<div class="row"><div><label>Benutzer</label><input id="q_user"></div><div><label>Passwort</label><input id="q_pass" type="password"></div></div>
+<div class="l">Topics wie Shelly Gen2: &lt;präfix&gt;/rpc, /events/rpc, /status/…, /online. Aus = keine Verbindung, das Gerät arbeitet wie bisher.</div>
+<button class="bt" onclick="saveMq()">Speichern</button></div>
 <div class="card"><h2>Firmware manuell</h2>
 <form method="POST" action="/update" enctype="multipart/form-data"><input type="file" name="firmware" accept=".bin">
 <button class="bt">Hochladen &amp; flashen</button></form></div>
@@ -172,7 +179,7 @@ if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv
 MT=!!sw.meter_only;$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':(MT?'AUSGELÖST':'AUS');$('btn').title=MT?'Reset nur am Taster/SW des Geräts':'';document.querySelectorAll('.nm').forEach(e=>e.style.display=MT?'none':'');document.querySelectorAll('.mt').forEach(e=>e.style.display=MT?'':'none');PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
 $('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';$('inw').style.display=s['input:0']?'':'none';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
-$('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
+if(s.mqtt)$('q_st').textContent=$('q_en').checked?(s.mqtt.connected?'verbunden':'nicht verbunden'):'aus';$('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
 document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
@@ -186,7 +193,7 @@ $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_s
 const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
 const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Hermit OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
-showUpd(c.sys.updates,d.ver);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
+showUpd(c.sys.updates,d.ver);showMq(c.mqtt);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
 function diag(){run(async()=>{const r=await rpc('Input.Diag',{id:0});$('i_diag').style.display='block';$('i_diag').textContent='HIGH-Anteil: '+r.high_pct+' %\nFlanken in 200 ms: '+r.edges+'  (≈ '+r.approx_hz+' Hz)\nErkannter Zustand: '+(r.state?'AN':'AUS')+'  ·  Filter '+r.filter+(r.invert?' · invertiert':'')})}
@@ -210,6 +217,8 @@ function calib(p){run(async()=>{p.id=0;const r=await rpc('Switch.Calibrate',p);i
 function showUpd(u,ver){if(!u)return;$('u_mode').value=u.mode;$('u_hour').value=u.hour;$('u_url').value=u.url;$('u_tok').placeholder=u.token_set?'gesetzt – leer lassen = unverändert':'kein Token';
 $('u_st').textContent=u.available?'Neue Version '+u.available+' verfügbar':'Aktuell ('+ver+')';$('u_inst').style.display=u.available?'':'none';
 $('u_info').textContent='Variante '+u.variant+(u.last_check?' · zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE'):'')+(u.last_error?' · '+u.last_error:'')+(u.state!='idle'?' · '+u.state:'')}
+function showMq(m){if(!m)return;$('q_en').checked=m.enable;$('q_srv').value=m.server||'';$('q_pre').value=m.topic_prefix||'';$('q_user').value=m.user||'';$('q_pass').value='';$('q_pass').placeholder=m.pass_set?'gesetzt – leer lassen = unverändert':'kein Passwort'}
+function saveMq(){run(async()=>{const c={enable:$('q_en').checked,server:$('q_srv').value,topic_prefix:$('q_pre').value,user:$('q_user').value||null};if($('q_pass').value)c.pass=$('q_pass').value;if(!c.user)c.pass=null;await rpc('MQTT.SetConfig',{config:c});showMq(await rpc('MQTT.GetConfig'))},'Gespeichert')}
 async function loadUpd(){const c=await rpc('Sys.GetConfig');const d=await rpc('Shelly.GetDeviceInfo');showUpd(c.updates,d.ver)}
 function saveUpd(){run(async()=>{const u={mode:$('u_mode').value,hour:+$('u_hour').value,url:$('u_url').value};if($('u_tok').value)u.token=$('u_tok').value;await rpc('Sys.SetConfig',{config:{updates:u}});$('u_tok').value='';await loadUpd()},'Gespeichert')}
 function chkUpd(){run(async()=>{const r=await rpc('Shelly.CheckForUpdate');await loadUpd();toast(r.stable?'Neue Version '+r.stable.version:'Firmware ist aktuell')})}

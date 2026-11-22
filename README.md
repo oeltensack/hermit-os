@@ -28,6 +28,7 @@ Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
 - **Aktionen (Webhooks)** bei Schalten, Tastendruck, Leistungsschwellen, Überlast, Übertemperatur und Start –
   mit Platzhaltern wie `${apower}` in der URL
 - **Weboberfläche auf Deutsch:** Status, Schalter/Licht, Aktionen, WLAN, System, RPC-Konsole
+- **MQTT im Gen2-Format** (optional) – für die **[Hermit Cloud](cloud/)**, Home Assistant oder Node-RED
 - **Auto-Update** aus diesem Repo (`update.json`), SHA-256-geprüft, Relais bleibt beim Neustart im Zustand
 - **WLAN und feste IP werden übernommen** – aus der Original-Firmware, aus Tasmota oder vom Hermit Loader
 - **Gen1-kompatibel:** `/relay/0`, `/light/0`, `/status`, `/meter/0`, `/shelly`
@@ -72,6 +73,7 @@ Shelly.call("HTTP.GET", { url: "http://192.168.0.70/rpc/CCT.Set?id=0&on=true&bri
 | **[docs/FLASHEN.md](docs/FLASHEN.md)** | Flasher (grafisch, Konsole, EXE), Wege von Original-Firmware und Tasmota, Hermit Loader, serielles Flashen, Updates, Fehlersuche |
 | **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo |
 | **[docs/API.md](docs/API.md)** | Alle RPC-Methoden, Statusfelder, Aktionen und Platzhalter, Gen1-Endpunkte, Diagnose, Unterschiede zu Gen2 |
+| **[cloud/](cloud/README.md)** | Hermit Cloud: Heim-Cloud mit Übersicht, Schalten, Energieverlauf und Meldungen (Docker) |
 | **[CHANGELOG.md](CHANGELOG.md)** | Versionsverlauf |
 | **[examples/](examples/)** | Gen2-Scripte, u. a. Heizlüfter-Stufe 2 am 1PM mit Watchdog |
 
@@ -82,6 +84,7 @@ src/                 Firmware: main.cpp, webui.h, device.h, tasmota_import.h, mg
 bin/                 fertige Firmware (.bin, .bin.gz) und Hermit Loader
 tools/               hermit_flash.py (Konsole), hermit_flash_gui.py (Oberfläche), build_exe.bat, make_release.py
 examples/            Gen2/Gen3-Scripte
+cloud/               Hermit Cloud (Docker: Mosquitto + Weboberfläche)
 docs/                Dokumentation
 update.json          Versionsliste für das Auto-Update
 Hermit-Flasher.pyw   Startdatei für den grafischen Flasher

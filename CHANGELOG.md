@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.12.0
+- MQTT im Gen2-Format (optional): `MQTT.GetConfig/SetConfig/GetStatus`, Topics `…/online`, `…/rpc`,
+  `…/events/rpc` (NotifyEvent/NotifyStatus), `…/status/<komponente>`, `…/info`; Karte „Cloud / MQTT“ unter System
+- Neu: **Hermit Cloud** (`cloud/`) – Heim-Cloud als Docker-Paket mit Mosquitto: Geräteübersicht, Schalten,
+  Energieverlauf (24 h, Tage, Monate, je Gerät) und Meldungen (Überlast, Übertemperatur, offline)
+
 ## 1.11.0
 - Relais bleibt bei Software-Neustart (Update, Neustart-Befehl, Absturz) im bisherigen Zustand – wie bei der
   Original-Firmware. Der Arduino-Core setzte vorher alle GPIOs beim Start auf Eingang.

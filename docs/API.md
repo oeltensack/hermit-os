@@ -145,6 +145,28 @@ Höchstens 20 Aktionen. Ausgeführt wird per HTTP(S)-GET, nacheinander, Zeitlimi
 
 ---
 
+## MQTT (optional)
+
+Format wie Shelly Gen2/Gen3. Eingeschaltet über die Oberfläche (*System → Cloud / MQTT*) oder `MQTT.SetConfig`.
+
+| Methode | Parameter | |
+|---|---|---|
+| `MQTT.GetConfig` | – | `enable`, `server`, `client_id`, `user`, `pass_set`, `topic_prefix`, `rpc_ntf`, `status_ntf` |
+| `MQTT.SetConfig` | `config:{enable, server:"host:port", user, pass, client_id, topic_prefix, rpc_ntf, status_ntf}` | sofort wirksam |
+| `MQTT.GetStatus` | – | `connected` |
+
+| Topic | Richtung | Inhalt |
+|---|---|---|
+| `<präfix>/online` | Gerät → | `true` / `false` (retained, Last Will) |
+| `<präfix>/rpc` | → Gerät | JSON-RPC `{"id":1,"src":"client","method":"Switch.Set","params":{"id":0,"on":true}}` |
+| `<src>/rpc` | Gerät → | Antwort mit `id`, `src`, `dst`, `result` / `error` |
+| `<präfix>/events/rpc` | Gerät → | `NotifyEvent` (jedes Ereignis aus der Webhook-Liste) und `NotifyStatus` |
+| `<präfix>/status/<komponente>` | Gerät → | Status je Komponente (retained): `switch:0`/`cct:0`, `input:0`, `input:100`, `sys`, `wifi` |
+| `<präfix>/info` | Gerät → | `Shelly.GetDeviceInfo` + `ip` (retained, Hermit-Erweiterung) |
+
+Präfix und Client-ID sind standardmäßig die Geräte-ID (`hermit-1pm-a1b2c3`). Status wird bei jeder Änderung
+und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für das eigene Netz oder über WireGuard.
+
 ## Gen1-Endpunkte
 
 | Endpunkt | Wirkung |
@@ -169,7 +191,7 @@ Höchstens 20 Aktionen. Ausgeführt wird per HTTP(S)-GET, nacheinander, Zeitlimi
 
 ## Unterschiede zu Gen2
 
-- Kein WebSocket-RPC, kein MQTT, keine Cloud, keine Benachrichtigungen (`NotifyStatus`)
+- Kein WebSocket-RPC und keine Shelly-Cloud; MQTT ohne TLS, eigene Cloud: [Hermit Cloud](../cloud/)
 - `Shelly.SetAuth` mit `pass` statt `ha1`
 - Webhook-Bedingung als Zahl (`threshold`) statt JS-Ausdruck; ein numerisches `condition` wird ebenfalls angenommen
 - Eigene Methoden: `Switch.Calibrate`, `Input.Diag`, `Hermit.TestImport`, `Hermit.Gpio`

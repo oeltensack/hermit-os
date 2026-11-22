@@ -16,6 +16,7 @@
 #include <DNSServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <PubSubClient.h>
 #include <time.h>
 #include <vector>
 #include "device.h"
@@ -74,6 +75,12 @@ struct Cfg {
   String updToken;                 // optional: GitHub-Token fuer privates Repo
   String updMode = "check";        // off | check | install
   int updHour = 3;                 // taegliche Pruefung um diese Stunde
+  // MQTT (Gen2-Format) – optional, fuer Hermit Cloud, Home Assistant, Node-RED …
+  bool mqEnable = false;
+  String mqServer;                 // host:port
+  String mqUser, mqPass;
+  String mqClientId, mqPrefix;     // leer = Geraete-ID
+  bool mqRpcNtf = true, mqStatusNtf = true;
   std::vector<Hook> hooks;
   int nextHookId = 1;
   int hookRev = 0;
@@ -114,7 +121,8 @@ static const char* METHODS[] = {
   "Sys.GetStatus", "Sys.GetConfig", "Sys.SetConfig",
   "WiFi.GetStatus", "WiFi.GetConfig", "WiFi.SetConfig", "WiFi.Scan",
   "Webhook.List", "Webhook.Create", "Webhook.Update", "Webhook.Delete",
-  "Webhook.DeleteAll", "Webhook.ListSupported"
+  "Webhook.DeleteAll", "Webhook.ListSupported",
+  "MQTT.GetStatus", "MQTT.GetConfig", "MQTT.SetConfig"
 };
 
 // ======================= Laufzeit =======================
@@ -196,6 +204,9 @@ void saveCfg() {
   d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led; d["trans"] = cfg.transition; d["ctinv"] = cfg.ctInvert;
   d["auth"] = cfg.authPass; d["tz"] = cfg.tz; d["sntp"] = cfg.sntp;
   d["uurl"] = cfg.updUrl; d["utok"] = cfg.updToken; d["umode"] = cfg.updMode; d["uhour"] = cfg.updHour;
+  { JsonObject q = d["mq"].to<JsonObject>();
+    q["en"] = cfg.mqEnable; q["srv"] = cfg.mqServer; q["u"] = cfg.mqUser; q["p"] = cfg.mqPass;
+    q["cid"] = cfg.mqClientId; q["pre"] = cfg.mqPrefix; q["rn"] = cfg.mqRpcNtf; q["sn"] = cfg.mqStatusNtf; }
   d["hnext"] = cfg.nextHookId; d["hrev"] = cfg.hookRev; d["rev"] = cfg.cfgRev;
   JsonArray ha = d["hooks"].to<JsonArray>();
   for (auto& h : cfg.hooks) {
@@ -235,6 +246,10 @@ void loadCfg() {
   cfg.authPass = jstr(d["auth"], ""); cfg.tz = jstr(d["tz"], cfg.tz); cfg.sntp = jstr(d["sntp"], cfg.sntp);
   cfg.updUrl = jstr(d["uurl"], cfg.updUrl); cfg.updToken = jstr(d["utok"], "");
   cfg.updMode = jstr(d["umode"], cfg.updMode); cfg.updHour = d["uhour"] | cfg.updHour;
+  { JsonObjectConst q = d["mq"];
+    cfg.mqEnable = q["en"] | false; cfg.mqServer = jstr(q["srv"], ""); cfg.mqUser = jstr(q["u"], ""); cfg.mqPass = jstr(q["p"], "");
+    cfg.mqClientId = jstr(q["cid"], ""); cfg.mqPrefix = jstr(q["pre"], "");
+    cfg.mqRpcNtf = q["rn"] | true; cfg.mqStatusNtf = q["sn"] | true; }
   cfg.nextHookId = d["hnext"] | 1; cfg.hookRev = d["hrev"] | 0; cfg.cfgRev = d["rev"] | 0;
   cfg.hooks.clear();
   for (JsonObjectConst o : d["hooks"].as<JsonArrayConst>()) {
@@ -294,7 +309,9 @@ void fireHook(const Hook& h, const String& ev) {
     if (httpQueue.size() < 12) httpQueue.push_back(expandUrl(u, ev));
 }
 
+void mqttEvent(const String& ev, int cid);
 void fireEvent(const String& ev, int cid = 0) {
+  mqttEvent(ev, cid);
   for (auto& h : cfg.hooks)
     if (h.enable && h.event == ev && h.cid == cid) fireHook(h, ev);
 }
@@ -1076,6 +1093,37 @@ String applyHook(Hook& h, JsonVariantConst p) {
   return "";
 }
 
+// ======================= MQTT (Gen2-Format) =======================
+// Topics wie bei Shelly Plus/Pro:
+//   <prefix>/online               "true"/"false" (retained, Last Will)
+//   <prefix>/rpc                  eingehende JSON-RPC-Anfragen, Antwort an <src>/rpc
+//   <prefix>/events/rpc           NotifyStatus / NotifyEvent
+//   <prefix>/status/<komponente>  Status je Komponente (retained)
+//   <prefix>/info                 Shelly.GetDeviceInfo + IP (retained, Hermit-Erweiterung)
+WiFiClient mqNet;
+PubSubClient mq(mqNet);
+uint32_t mqNextTry = 0, mqLastStatus = 0, mqBackoff = 5000;
+bool mqDirty = false;
+
+String mqPre() { return cfg.mqPrefix.length() ? cfg.mqPrefix : devId; }
+void mqttStatus(JsonObject o) { o["connected"] = mq.connected(); }
+void mqttConfig(JsonObject o) {
+  o["enable"] = cfg.mqEnable; o["server"] = cfg.mqServer.length() ? cfg.mqServer : (const char*)nullptr;
+  o["client_id"] = cfg.mqClientId.length() ? cfg.mqClientId : devId;
+  o["user"] = cfg.mqUser.length() ? cfg.mqUser : (const char*)nullptr;
+  o["pass_set"] = cfg.mqPass.length() > 0;
+  o["topic_prefix"] = mqPre();
+  o["rpc_ntf"] = cfg.mqRpcNtf; o["status_ntf"] = cfg.mqStatusNtf;
+  o["ssl_ca"] = nullptr;
+}
+void mqttRestart() { if (mq.connected()) mq.disconnect(); mqNextTry = 0; mqBackoff = 5000; }
+
+bool mqPub(const String& t, JsonDocument& d, bool retain = false) {
+  if (!mq.connected()) return false;
+  String s; serializeJson(d, s);
+  return mq.publish(t.c_str(), (const uint8_t*)s.c_str(), s.length(), retain);
+}
+
 // ======================= RPC =======================
 #define ERR(c, m) do { err = m; return c; } while (0)
 
@@ -1098,6 +1146,28 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
 #if HAS_ADDON
     addonStatus(o["input:100"].to<JsonObject>());
 #endif
+    mqttStatus(o["mqtt"].to<JsonObject>());
+    return 0;
+  }
+  if (m == "mqtt.getstatus") { mqttStatus(out.to<JsonObject>()); return 0; }
+  if (m == "mqtt.getconfig") { mqttConfig(out.to<JsonObject>()); return 0; }
+  if (m == "mqtt.setconfig") {
+    JsonVariantConst c = p["config"];
+    if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
+    if (c["enable"].is<bool>()) cfg.mqEnable = c["enable"];
+    if (c["server"].is<const char*>()) cfg.mqServer = c["server"].as<const char*>();
+    if (c["user"].is<const char*>()) cfg.mqUser = c["user"].as<const char*>();
+    else if (c["user"].isNull() && c.containsKey("user")) cfg.mqUser = "";
+    if (c["pass"].is<const char*>()) cfg.mqPass = c["pass"].as<const char*>();
+    else if (c["pass"].isNull() && c.containsKey("pass")) cfg.mqPass = "";
+    if (c["client_id"].is<const char*>()) cfg.mqClientId = c["client_id"].as<const char*>();
+    if (c["topic_prefix"].is<const char*>()) cfg.mqPrefix = c["topic_prefix"].as<const char*>();
+    if (c["rpc_ntf"].is<bool>()) cfg.mqRpcNtf = c["rpc_ntf"];
+    if (c["status_ntf"].is<bool>()) cfg.mqStatusNtf = c["status_ntf"];
+    if (cfg.mqEnable && !cfg.mqServer.length()) ERR(-103, "server (host:port) fehlt");
+    saveCfg();
+    mqttRestart();
+    out["restart_required"] = false;
     return 0;
   }
   if (m == "shelly.getconfig") {
@@ -1114,6 +1184,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
 #if HAS_ADDON
     addonConfig(o["input:100"].to<JsonObject>());
 #endif
+    mqttConfig(o["mqtt"].to<JsonObject>());
     return 0;
   }
   if (m == "shelly.listmethods") {
@@ -1908,6 +1979,137 @@ void setup() {
   Serial.println("ID: " + devId);
 }
 
+
+// ---- MQTT: Status, Ereignisse, RPC ----
+void mqStatusComp(const String& comp) {
+  if (!cfg.mqStatusNtf) return;
+  JsonDocument d; JsonObject o = d.to<JsonObject>();
+  if (comp == "sys") sysStatus(o);
+  else if (comp == "wifi") wifiStatus(o);
+#if HAS_LIGHT
+  else if (comp == "cct:0") cctStatus(o);
+#else
+  else if (comp == "switch:0") switchStatus(o);
+#endif
+#if HAS_INPUT
+  else if (comp == "input:0") inputStatus(o);
+#endif
+#if HAS_ADDON
+  else if (comp == "input:100") addonStatus(o);
+#endif
+  else return;
+  mqPub(mqPre() + "/status/" + comp, d, true);
+}
+
+void mqStatusAll() {
+  static const char* comps[] = {
+#if HAS_LIGHT
+    "cct:0",
+#else
+    "switch:0",
+#endif
+#if HAS_INPUT
+    "input:0",
+#endif
+#if HAS_ADDON
+    "input:100",
+#endif
+    "sys", "wifi" };
+  for (auto c : comps) mqStatusComp(c);
+  if (cfg.mqRpcNtf) {                       // NotifyStatus mit dem Hauptkomponenten-Status
+    JsonDocument d;
+    d["src"] = devId; d["dst"] = mqPre() + "/events"; d["method"] = "NotifyStatus";
+    JsonObject p = d["params"].to<JsonObject>();
+    p["ts"] = validTime() ? (double)time(nullptr) : (double)(millis() / 1000);
+#if HAS_LIGHT
+    cctStatus(p["cct:0"].to<JsonObject>());
+#else
+    switchStatus(p["switch:0"].to<JsonObject>());
+#endif
+    mqPub(mqPre() + "/events/rpc", d);
+  }
+  mqLastStatus = millis();
+}
+
+void mqInfo() {
+  JsonDocument d; JsonObject o = d.to<JsonObject>();
+  deviceInfo(o);
+  o["ip"] = WiFi.localIP().toString();
+  o["name"] = cfg.name.length() ? cfg.name : (const char*)nullptr;
+  mqPub(mqPre() + "/info", d, true);
+}
+
+void mqttEvent(const String& ev, int cid) {
+  if (!cfg.mqEnable || !mq.connected()) return;
+  if (cfg.mqRpcNtf) {
+    int dot = ev.indexOf('.');
+    String comp = dot > 0 ? ev.substring(0, dot) : ev;
+    String evn = dot > 0 ? ev.substring(dot + 1) : ev;
+    JsonDocument d;
+    d["src"] = devId; d["dst"] = mqPre() + "/events"; d["method"] = "NotifyEvent";
+    double ts = validTime() ? (double)time(nullptr) : (double)(millis() / 1000);
+    d["params"]["ts"] = ts;
+    JsonObject e = d["params"]["events"].to<JsonArray>().add<JsonObject>();
+    e["component"] = comp == "sys" ? comp : comp + ":" + String(cid);
+    e["id"] = cid; e["event"] = evn; e["ts"] = ts;
+    mqPub(mqPre() + "/events/rpc", d);
+  }
+  mqDirty = true;                           // Status zeitnah nachschieben
+}
+
+void mqCallback(char* topic, uint8_t* payload, unsigned int len) {
+  JsonDocument req, out, res;
+  if (deserializeJson(req, payload, len)) return;
+  String method = jstr(req["method"], "");
+  String src = jstr(req["src"], "");
+  if (!method.length()) return;
+  String err;
+  int code = rpcCall(method, req["params"], out, err, "mqtt");
+  if (!src.length()) return;                // ohne src keine Antwort (wie Gen2)
+  res["id"] = req["id"]; res["src"] = devId; res["dst"] = src;
+  if (code == 0) res["result"] = out;
+  else { res["error"]["code"] = code; res["error"]["message"] = err; }
+  mqPub(src + "/rpc", res);
+  mqDirty = true;
+}
+
+void handleMqtt() {
+  if (!cfg.mqEnable) { if (mq.connected()) mq.disconnect(); return; }
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (!mq.connected()) {
+    if ((int32_t)(millis() - mqNextTry) < 0) return;
+    String host = cfg.mqServer; int port = 1883;
+    int c = host.lastIndexOf(':');
+    if (c > 0) { port = host.substring(c + 1).toInt(); host = host.substring(0, c); }
+    if (!host.length()) { mqNextTry = millis() + 30000; return; }
+    mq.setServer(host.c_str(), port);
+    mq.setBufferSize(2048);
+    mq.setKeepAlive(60);
+    mq.setSocketTimeout(5);
+    mq.setCallback(mqCallback);
+    mqNet.setTimeout(2000);
+    String cid = cfg.mqClientId.length() ? cfg.mqClientId : devId;
+    String will = mqPre() + "/online";
+    bool ok = cfg.mqUser.length()
+      ? mq.connect(cid.c_str(), cfg.mqUser.c_str(), cfg.mqPass.c_str(), will.c_str(), 0, true, "false")
+      : mq.connect(cid.c_str(), nullptr, nullptr, will.c_str(), 0, true, "false");
+    if (!ok) { mqNextTry = millis() + mqBackoff; mqBackoff = min<uint32_t>(mqBackoff * 2, 120000); return; }
+    mqBackoff = 5000;
+    mq.publish(will.c_str(), "true", true);
+    mq.subscribe((mqPre() + "/rpc").c_str());
+    mqInfo();
+    mqStatusAll();
+    return;
+  }
+  mq.loop();
+#if HAS_PM
+  const uint32_t iv = 15000;
+#else
+  const uint32_t iv = 60000;
+#endif
+  if (mqDirty || millis() - mqLastStatus > iv) { mqDirty = false; mqStatusAll(); }
+}
+
 void loop() {
   server.handleClient();
   if (apActive) dnsServer.processNextRequest();
@@ -1924,6 +2126,7 @@ void loop() {
   handleTemp();
   handleLed();
   processQueue();
+  handleMqtt();
   handleUpdate();
   if (rebootAt && (int32_t)(millis() - rebootAt) >= 0) {
     saveEnergy();

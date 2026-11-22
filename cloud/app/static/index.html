@@ -1,0 +1,165 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Hermit Cloud</title>
+<style>
+:root{--bg:#0f1419;--c:#1a2129;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--w:#d29922;--b:#2a333c}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:12px 18px;background:var(--c);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-size:18px;margin:0}main{max-width:1100px;margin:auto;padding:12px}
+nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 12px;border-radius:6px;background:var(--bg);font-size:13px;cursor:pointer}
+nav a.a{background:var(--a)}.badge{background:var(--e);border-radius:9px;padding:0 6px;font-size:11px;margin-left:5px}
+.tab{display:none}.tab.a{display:block}
+.card{background:var(--c);border-radius:10px;padding:16px;margin:12px 0}
+h2{font-size:13px;margin:0 0 12px;color:var(--m);text-transform:uppercase;letter-spacing:.06em}
+.devs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.dev{background:var(--c);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;border:1px solid transparent}
+.dev.off{opacity:.55}.dev.err{border-color:var(--e)}
+.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.dn{font-weight:600;font-size:16px;cursor:pointer}.dn:hover{text-decoration:underline}
+.dm{font-size:12px;color:var(--m)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--off)}.dot.on{background:var(--on)}
+.sw{width:64px;height:64px;border-radius:50%;border:0;font-weight:700;color:#fff;background:var(--off);cursor:pointer;flex:none}
+.sw.on{background:var(--on);box-shadow:0 0 16px #3fb95055}.sw:disabled{cursor:default}.sw.trip{background:var(--e);font-size:10px}
+.dv{display:flex;gap:14px;align-items:center}.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;flex:1}
+.v{font-size:17px;font-weight:600}.l{font-size:11px;color:var(--m)}
+.err-l{color:var(--e);font-size:12px}
+.links{display:flex;gap:10px;font-size:12px}.links a{color:var(--a);cursor:pointer;text-decoration:none}
+select,input{padding:7px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--fg);font:inherit}
+.bt{padding:7px 13px;border:0;border-radius:6px;background:var(--a);color:#fff;font:inherit;cursor:pointer}.bt.g{background:#3a444f}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 6px;border-bottom:1px solid var(--b);text-align:left}
+th{color:var(--m);font-weight:500}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.ack{color:var(--m)}
+.chart{position:relative}.chart svg{display:block;width:100%;height:auto}
+.tt{position:absolute;pointer-events:none;background:#0b0f13;border:1px solid var(--b);border-radius:6px;padding:5px 8px;font-size:12px;display:none;white-space:nowrap}
+.kind{font-size:11px;padding:1px 6px;border-radius:4px;background:#3a444f}
+.kind.overpower,.kind.overtemp,.kind.offline{background:#5a1d1d}.kind.online,.kind.reset{background:#1d4a2a}
+#login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center}
+#login .card{width:320px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff;background:var(--e)}
+.empty{color:var(--m);padding:30px;text-align:center}
+code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+</style></head><body>
+<header><h1>Hermit Cloud</h1>
+<nav><a data-t="dv" class="a">Geräte</a><a data-t="en">Energie</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="in">Info</a></nav>
+<span class="l" id="hs"></span></header>
+<main>
+<section class="tab a" id="dv"><div class="devs" id="devs"></div></section>
+
+<section class="tab" id="en">
+<div class="card"><div class="row"><label class="l">Gerät</label><select id="esel"></select></div></div>
+<div class="card" id="pcard"><h2>Leistung – letzte 24 Stunden</h2><div class="chart" id="pchart"></div></div>
+<div class="card"><h2 id="dh">Energie pro Tag – letzte 31 Tage</h2><div class="chart" id="dchart"></div></div>
+<div class="row" style="align-items:stretch">
+<div class="card" style="flex:1;min-width:280px"><h2>Energie pro Monat</h2><table id="mtab"></table></div>
+<div class="card" style="flex:1;min-width:280px" id="rcard"><h2>Verbrauch je Gerät – 30 Tage</h2><div class="chart" id="rchart"></div></div>
+</div></section>
+
+<section class="tab" id="al"><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Meldungen</h2>
+<button class="bt g" onclick="ackAll()">Alle quittieren</button></div><table id="atab" style="margin-top:10px"></table></div></section>
+
+<section class="tab" id="in"><div class="card"><h2>So verbinden sich Geräte</h2>
+<p>Am Gerät unter <b>System → Cloud / MQTT</b> einschalten und als Server die Adresse dieses Rechners mit Port <code>1883</code> eintragen
+(z. B. <code id="bk">192.168.0.50:1883</code>), dazu Benutzer und Passwort aus der <code>.env</code>. Shelly Plus/Pro (Gen2/Gen3) gehen genauso:
+Einstellungen → MQTT, „RPC status notifications“ und „Generic status update“ einschalten.</p>
+<p class="l">Geräte erscheinen automatisch, sobald sie sich verbinden. Der Energieverlauf wird aus dem Zählerstand der Geräte berechnet.</p>
+<table id="itab"></table></div></section>
+</main>
+<div id="login"><div class="card"><h2>Anmelden</h2><input id="pw" type="password" placeholder="Passwort" style="width:100%">
+<button class="bt" style="margin-top:12px;width:100%" onclick="login()">Anmelden</button></div></div>
+<div id="toast"></div>
+<script>
+const $=i=>document.getElementById(i);let DEVS=[],TAB='dv';
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',3500)}
+async function api(p,o={}){const r=await fetch('/api/'+p,{headers:{'Content-Type':'application/json'},...o,body:o.body?JSON.stringify(o.body):undefined});
+if(r.status==401){$('login').style.display='flex';throw new Error('login')}
+const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||('HTTP '+r.status));return d}
+async function login(){try{await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('pw').value})}).then(r=>{if(!r.ok)throw 0});$('login').style.display='none';refresh()}catch(e){toast('Passwort falsch')}}
+$('pw').onkeydown=e=>{if(e.key=='Enter')login()};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=(v,d,u)=>v==null||isNaN(v)?'–':(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+' '+u;
+const kwh=wh=>wh>=1000?fmt(wh/1000,2,'kWh'):fmt(wh,0,'Wh');
+const ago=t=>{if(!t)return'nie';const s=Date.now()/1000-t;return s<90?'gerade eben':s<3600?Math.round(s/60)+' min':s<86400?Math.round(s/3600)+' h':Math.round(s/86400)+' Tage'};
+document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');TAB=a.dataset.t;refresh()});
+
+// ---------- Geräte ----------
+function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output;
+const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
+return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
+<div class="dh"><div><div class="dn" onclick="ren('${esc(d.id)}')" title="Umbenennen">${esc(d.name||d.id)}</div>
+<div class="dm"><span class="dot ${d.online?'on':''}"></span>${d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div></div>
+<div class="dv"><button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>
+<div class="kv">${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
+<div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute</div></div>`:''}
+${s.temperature?`<div><div class="v">${fmt(s.temperature.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`:''}
+${s.voltage!=null?`<div><div class="v">${fmt(s.voltage,0,'V')}</div><div class="l">Spannung</div></div>`:''}
+${s.brightness!=null?`<div><div class="v">${s.brightness} %</div><div class="l">Helligkeit</div></div><div><div class="v">${s.ct} K</div><div class="l">Farbtemperatur</div></div>`:''}
+</div></div>
+${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur'}[e]||e)).join(', ')}</div>`:''}
+<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank">Gerät öffnen</a>`:''}<a onclick="showEn('${esc(d.id)}')">Energie</a><a onclick="del('${esc(d.id)}')">Entfernen</a></div></div>`}
+async function loadDevs(){DEVS=await api('devices');$('devs').innerHTML=DEVS.length?DEVS.map(devCard).join(''):'<div class="empty">Noch keine Geräte. Unter „Info“ steht, wie sie sich verbinden.</div>';fillSel()}
+async function sw(id){try{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{}});loadDevs()}catch(e){toast(e.message)}}
+async function ren(id){const d=DEVS.find(x=>x.id==id);const n=prompt('Name für '+id,d.name||'');if(n==null)return;await api('devices/'+encodeURIComponent(id)+'/name',{method:'POST',body:{name:n}});loadDevs()}
+async function del(id){if(!confirm('Gerät '+id+' mit allen gespeicherten Werten entfernen? Verbindet es sich wieder, erscheint es neu.'))return;await api('devices/'+encodeURIComponent(id),{method:'DELETE'});loadDevs()}
+function showEn(id){$('esel').value=id;document.querySelector('nav a[data-t=en]').click()}
+
+// ---------- Diagramme (eine Reihe je Diagramm, SVG) ----------
+const W=1000,PAD={l:56,r:12,t:12,b:28};
+function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p}
+function divs(max){const m=max/Math.pow(10,Math.floor(Math.log10(max)));return Math.abs(m-2)<1e-9?4:5}
+function axisY(h,max,unit){let g='';const n=divs(max);for(let i=0;i<=n;i++){const y=PAD.t+(h-PAD.t-PAD.b)*(1-i/n),v=max*i/n;
+g+=`<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="#2a333c" stroke-width="1"/><text x="${PAD.l-8}" y="${y+4}" text-anchor="end" font-size="12" fill="#8a96a3">${v.toLocaleString('de-DE',{maximumFractionDigits:max<10?1:0})}${i==n?' '+unit:''}</text>`}return g}
+function tip(box,html,x,y){const t=box.querySelector('.tt');t.innerHTML=html;t.style.display='block';const bw=box.clientWidth;t.style.left=Math.min(Math.max(x-t.offsetWidth/2,0),bw-t.offsetWidth)+'px';t.style.top=(y-t.offsetHeight-10)+'px'}
+function lineChart(box,pts,unit){const h=260;if(!pts.length){box.innerHTML='<div class="empty">Noch keine Messwerte.</div>';return}
+const t0=pts[0][0],t1=Math.max(pts[pts.length-1][0],t0+60),max=niceMax(Math.max(...pts.map(p=>p[1]))*1.05);
+const X=t=>PAD.l+(W-PAD.l-PAD.r)*(t-t0)/(t1-t0),Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max);
+let d='',prev=null;for(const p of pts){d+=(prev&&p[0]-prev>300?'M':(prev==null?'M':'L'))+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1);prev=p[0]}
+let xt='';const step=(t1-t0)>86400*2?86400:(t1-t0)>6*3600?3*3600:3600;for(let t=Math.ceil(t0/step)*step;t<=t1;t+=step){const dt=new Date(t*1000);
+xt+=`<text x="${X(t)}" y="${h-8}" text-anchor="middle" font-size="12" fill="#8a96a3">${step>=86400?dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</text>`}
+box.innerHTML=`<svg viewBox="0 0 ${W} ${h}">${axisY(h,max,unit)}<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="#56606b"/>${xt}
+<path d="${d}" fill="none" stroke="#2f9be0" stroke-width="2" stroke-linejoin="round"/>${pts.length<3?pts.map(p=>`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="#2f9be0"/>`).join(''):''}<line class="ch" y1="${PAD.t}" y2="${Y(0)}" stroke="#8a96a3" stroke-dasharray="3 3" style="display:none"/>
+<circle class="hp" r="5" fill="#2f9be0" stroke="#1a2129" stroke-width="2" style="display:none"/><rect x="${PAD.l}" y="0" width="${W-PAD.l-PAD.r}" height="${h}" fill="transparent"/></svg><div class="tt"></div>`;
+const svg=box.querySelector('svg'),ch=svg.querySelector('.ch'),hp=svg.querySelector('.hp');
+svg.onmousemove=e=>{const r=svg.getBoundingClientRect(),sx=(e.clientX-r.left)*W/r.width,t=t0+(sx-PAD.l)/(W-PAD.l-PAD.r)*(t1-t0);
+let b=pts[0];for(const p of pts)if(Math.abs(p[0]-t)<Math.abs(b[0]-t))b=p;const x=X(b[0]),y=Y(b[1]);
+ch.setAttribute('x1',x);ch.setAttribute('x2',x);ch.style.display='';hp.setAttribute('cx',x);hp.setAttribute('cy',y);hp.style.display='';
+tip(box,`<b>${fmt(b[1],1,unit)}</b><br>${new Date(b[0]*1000).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'})}`,x*r.width/W,y*r.height/h)};
+svg.onmouseleave=()=>{ch.style.display='none';hp.style.display='none';box.querySelector('.tt').style.display='none'}}
+function barChart(box,rows,unit,lab){const h=240;const vals=rows.map(r=>r[1]);if(!rows.length||!vals.some(v=>v>0)){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
+const max=niceMax(Math.max(...vals)*1.05),n=rows.length,slot=(W-PAD.l-PAD.r)/n,bw=Math.max(Math.min(slot-2,28),2);
+const Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max),base=Y(0);let g='',xt='';
+rows.forEach((r,i)=>{const x=PAD.l+i*slot+(slot-bw)/2,y=Y(r[1]),hh=base-y;
+if(r[1]>0){const rr=Math.min(4,bw/2,hh);g+=`<path d="M${x},${base}V${y+rr}Q${x},${y} ${x+rr},${y}H${x+bw-rr}Q${x+bw},${y} ${x+bw},${y+rr}V${base}Z" fill="#2f9be0"/>`}
+g+=`<rect x="${PAD.l+i*slot}" y="0" width="${slot}" height="${h}" fill="transparent" data-i="${i}"/>`;
+if(i%Math.ceil(n/10)==0||i==n-1)xt+=`<text x="${x+bw/2}" y="${h-8}" text-anchor="middle" font-size="12" fill="#8a96a3">${lab(r[0])}</text>`});
+box.innerHTML=`<svg viewBox="0 0 ${W} ${h}">${axisY(h,max,unit)}<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${base}" y2="${base}" stroke="#56606b"/>${xt}${g}</svg><div class="tt"></div>`;
+const svg=box.querySelector('svg');svg.querySelectorAll('rect[data-i]').forEach(el=>{el.onmouseenter=e=>{const r=rows[+el.dataset.i],sr=svg.getBoundingClientRect(),k=sr.width/W;
+tip(box,`<b>${unit=='kWh'?fmt(r[1],2,'kWh'):fmt(r[1],0,unit)}</b><br>${new Date(r[0]).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}`,(+el.getAttribute('x')+slot/2)*k,Y(r[1])*k)};
+el.onmouseleave=()=>box.querySelector('.tt').style.display='none'})}
+function rankChart(box,rows){if(!rows.length){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
+const max=Math.max(...rows.map(r=>r.wh))||1;box.innerHTML='<table>'+rows.map(r=>`<tr><td style="width:40%">${esc(r.name)}</td>
+<td><div style="height:10px;border-radius:0 4px 4px 0;background:#2f9be0;width:${Math.max(r.wh/max*100,1)}%"></div></td><td class="n" style="width:90px">${kwh(r.wh)}</td></tr>`).join('')+'</table>'}
+
+function fillSel(){const s=$('esel'),v=s.value;s.innerHTML='<option value="">Alle Geräte</option>'+DEVS.filter(d=>'apower' in (d.status||{})).map(d=>`<option value="${esc(d.id)}">${esc(d.name||d.id)}</option>`).join('');if([...s.options].some(o=>o.value==v))s.value=v}
+$('esel').onchange=()=>loadEn();
+async function loadEn(){const dev=$('esel').value,qd=dev?'dev='+encodeURIComponent(dev)+'&':'';
+$('pcard').style.display=dev?'':'none';$('rcard').style.display=dev?'none':'';
+if(dev)lineChart($('pchart'),await api('devices/'+encodeURIComponent(dev)+'/power?hours=24'),'W');
+const days=await api('energy?'+qd+'days=31');const big=days.some(r=>r[1]>=1000);
+barChart($('dchart'),days.map(r=>[r[0],big?r[1]/1000:r[1]]),big?'kWh':'Wh',d=>new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}));
+const m=await api('energy/months?'+qd);$('mtab').innerHTML=m.length?'<tr><th>Monat</th><th class="n">Energie</th></tr>'+m.map(r=>`<tr><td>${new Date(r[0]+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</td><td class="n">${kwh(r[1])}</td></tr>`).join(''):'<tr><td class="empty">Noch keine Werte.</td></tr>';
+if(!dev)rankChart($('rchart'),await api('energy/by_device?days=30'))}
+
+// ---------- Meldungen ----------
+const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung'};
+async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&x.kind!='online'&&x.kind!='reset').length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
+if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><th>Meldung</th><th></th></tr>'+a.map(x=>`<tr class="${x.ack?'ack':''}"><td>${new Date(x.ts*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+<td><span class="kind ${x.kind}">${KIND[x.kind]||x.kind}</span></td><td>${esc(x.text)}</td><td class="n">${x.ack?'':`<a style="color:var(--a);cursor:pointer" onclick="ack(${x.id})">quittieren</a>`}</td></tr>`).join(''):'<tr><td class="empty">Keine Meldungen.</td></tr>'}
+async function ack(id){await api('alerts/ack',{method:'POST',body:{id}});loadAl()}
+async function ackAll(){await api('alerts/ack',{method:'POST',body:{}});loadAl()}
+
+async function loadInfo(){const i=await api('info');$('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' · v'+i.version;
+$('bk').textContent=(i.broker||location.hostname)+':1883';
+if(TAB=='in')$('itab').innerHTML='<tr><th>Gerät</th><th>ID / Topic</th><th>Modell</th><th>Firmware</th><th>IP</th></tr>'+DEVS.map(d=>`<tr><td>${esc(d.name)}</td><td><code>${esc(d.id)}</code></td><td>${esc(d.model)}</td><td>${esc(d.ver)}</td><td>${esc(d.ip)}</td></tr>`).join('')}
+async function refresh(){try{await loadDevs();await loadAl();await loadInfo();if(TAB=='en')await loadEn()}catch(e){if(e.message!='login')console.warn(e)}}
+refresh();setInterval(()=>{if(TAB!='en')refresh();else loadInfo().catch(()=>{})},5000);
+</script></body></html>
