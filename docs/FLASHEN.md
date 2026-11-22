@@ -125,9 +125,8 @@ Bei der Duo ist das Gehäuse verklebt – dieser Weg ist dort nur mit Aufwand m�
 
 - Quelle ist `update.json` in diesem Repo; jedes Gerät lädt nur die Datei seiner Variante.
 - Vor dem Umschalten wird die **SHA-256** geprüft; stimmt sie nicht, bleibt die alte Firmware.
-- **Privates Repo:** Auf jedem Gerät einen GitHub-Token eintragen (fine-grained, nur dieses Repo,
-  *Contents: Read-only*). Anlegen unter github.com → Settings → Developer settings → Personal access tokens →
-  Fine-grained tokens. Läuft der Token ab, meldet die Oberfläche `HTTP 404`.
+- Das Repo ist öffentlich, ein Token ist nicht nötig. **Nur für einen eigenen privaten Fork:** GitHub-Token
+  eintragen (fine-grained, nur dieses Repo, *Contents: Read-only*) und die URL auf den Fork ändern.
 - Alternativ `update.json` und `bin/` auf einem eigenen Webserver ablegen und die URL anpassen.
 
 **Von Hand:** System → Firmware manuell → `.bin` hochladen, oder
@@ -146,7 +145,7 @@ Bei der Duo ist das Gehäuse verklebt – dieser Weg ist dort nur mit Aufwand m�
 | „Verbindung abgebrochen“ beim Laden von mg2hermit | Das Gerät hat das Paket verworfen – Protokoll aufheben und melden |
 | Gerät meldet sich nicht unter der alten IP | Der Flasher sucht per MAC. Findet er nichts: Zugangspunkt `hermit-…` suchen |
 | Tasmota: „Not enough space“ | Den Hermit Loader (`.bin.gz`) statt Hermit OS hochladen |
-| Auto-Update: `update.json: HTTP 404` | Token fehlt, ist abgelaufen oder hat keine Leserechte |
+| Auto-Update: `update.json: HTTP 404` | URL falsch; bei privatem Fork Token fehlt oder abgelaufen |
 
 **Diagnose am Gerät** (Reiter RPC): `Hermit.TestImport` zeigt, welche WLAN- und IP-Daten aus Original-Firmware,
 Tasmota und Loader gefunden werden (ohne Passwort). Details in [API.md](API.md#diagnose).

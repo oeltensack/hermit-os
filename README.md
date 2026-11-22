@@ -5,7 +5,7 @@
 Hermit OS ist eine freie Firmware für **Shelly-Geräte der ersten Generation** (ESP8266, 2 MB Flash). Sie gibt
 den alten Geräten die **RPC-API von Shelly Gen2/Gen3**: Scripte auf Plus-, Pro- und Gen3-Geräten sprechen ein
 altes Shelly 1 genauso an wie ein neues – und die alten Geräte melden Ereignisse per Webhook zurück.
-Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
+Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Hermit Cloud](cloud/)** für zu Hause.
 
 | Gerät | Firmware | Verhält sich wie | Besonderheiten |
 |---|---|---|---|
@@ -17,6 +17,9 @@ Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
 
 > Shelly ist eine Marke der Shelly Group. Hermit OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.
+
+Varianten: `-addon` (Shelly-Temperatur-Add-on als externer Taster) und `-meter` (**Messfirmware**: nur
+Energiemessung, Relais bleibt an, Reset nach Überlast nur am Gerät).
 
 ---
 
@@ -36,6 +39,13 @@ Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
 - **mDNS** `hermit-<modell>-<mac>.local`, Dienst `_shelly._tcp`
 - **Passwortschutz** optional (Benutzer `admin`, Digest oder Basic)
 - **Kalibrierung pro Gerät**, bleibt auch bei Werkseinstellungen erhalten
+- **MQTT im Gen2-Format** (optional) – für die Hermit Cloud, Home Assistant oder Node-RED
+
+## Download
+
+- **Fertige Pakete** je Modell (Firmware, Flasher, Anleitung): **[Releases](https://github.com/oeltensack/hermit-os/releases)**
+- **Einzelne Firmware-Dateien:** Ordner **[bin/](bin/)** – immer die aktuelle Version
+- **Hermit Cloud:** Ordner **[cloud/](cloud/)**
 
 ## Schnellstart
 
@@ -46,6 +56,9 @@ Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
 
 Der Flasher erkennt selbst, ob auf dem Gerät die Original-Firmware, Tasmota, der Hermit Loader oder schon
 Hermit OS läuft, und wählt den passenden Weg. Alles Weitere: **[docs/FLASHEN.md](docs/FLASHEN.md)**
+
+Danach ist das Gerät unter `http://<ip>/` erreichbar (deutsche Oberfläche) und aktualisiert sich auf Wunsch
+selbst aus diesem Repo.
 
 ## Zusammenspiel mit Gen2/Gen3
 
@@ -65,6 +78,17 @@ Shelly.call("HTTP.GET", { url: "http://192.168.0.70/rpc/CCT.Set?id=0&on=true&bri
 **Rückweg:** Im alten Gerät eine *Aktion* anlegen – z. B. Ereignis `input.toggle_on` →
 `http://<gen2-ip>/rpc/Switch.Set?id=0&on=true`, oder an einen Script-Endpunkt
 `http://<gen2-ip>/script/1/alt?ev=${event}&p=${apower}`. Fertige Scripte: **[examples/](examples/)**
+
+## Hermit Cloud (optional)
+
+Eine kleine Heim-Cloud als Docker-Paket (Mosquitto + Weboberfläche), z. B. auf Proxmox, einem Raspberry Pi
+oder NAS: Geräteübersicht, Schalten, Energieverlauf (24 h, Tage, Monate, je Gerät) und Meldungen bei
+Überlast, Übertemperatur oder wenn ein Gerät offline geht. Die Geräte verbinden sich per **MQTT im
+Gen2-Format** – damit klappen auch Home Assistant und Node-RED. Shelly Plus/Pro werden ebenfalls angezeigt.
+
+![Hermit Cloud](docs/img/cloud.png)
+
+Einrichtung: **[cloud/README.md](cloud/README.md)**
 
 ## Dokumentation
 
@@ -106,8 +130,9 @@ committen und pushen. Die Geräte finden die neue Version über `update.json`.
 
 ## Grenzen
 
-- Kein WebSocket-RPC, kein MQTT, keine Cloud, keine Shelly-App. Die Shelly-Integration von Home Assistant
-  erwartet bei Gen2 einen WebSocket und funktioniert deshalb nicht – dort REST-Sensoren und -Schalter nutzen.
+- Kein WebSocket-RPC, keine Shelly-Cloud, keine Shelly-App. Die Shelly-Integration von Home Assistant
+  erwartet bei Gen2 einen WebSocket und funktioniert deshalb nicht – dort MQTT oder REST nutzen.
+- MQTT ohne TLS (zu wenig RAM) – im eigenen Netz oder über VPN betreiben.
 - Keine Scripte auf dem Gerät selbst (der ESP8266 hat dafür zu wenig RAM). Die Logik liegt auf dem Gen2/Gen3.
 - Shelly Duo RGBW und andere Gen1-Modelle werden noch nicht unterstützt.
 
@@ -123,7 +148,23 @@ Hermit OS wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne je
 ohne die implizite Gewährleistung der Marktfähigkeit oder der Eignung für einen bestimmten Zweck.
 Den vollständigen Lizenztext enthält [LICENSE](LICENSE).
 
-Verwendete Bibliotheken: ESP8266-Arduino-Core (LGPL-2.1), ArduinoJson (MIT).
+Verwendete Bibliotheken: ESP8266-Arduino-Core (LGPL-2.1), ArduinoJson (MIT), PubSubClient (MIT).
+Hermit Cloud: FastAPI (MIT), Uvicorn (BSD), paho-mqtt (EPL-2.0/EDL-1.0), Eclipse Mosquitto (EPL-2.0/EDL-1.0).
+
+## Mitmachen
+
+Fehler, Wünsche und Erfahrungen mit weiteren Gen1-Modellen gern als
+**[Issue](https://github.com/oeltensack/hermit-os/issues)**. Hilfreich ist dabei die Ausgabe von
+`http://<ip>/rpc/Shelly.GetDeviceInfo` und `http://<ip>/rpc/Shelly.GetStatus`.
+Pull Requests sind willkommen – bitte mit `pio run` bauen und am Gerät testen.
+
+## English summary
+
+Hermit OS is a free replacement firmware for first-generation **Shelly devices** (Shelly 1, 1PM, Plug,
+Plug S, Duo – ESP8266, 2 MB). It exposes the **Shelly Gen2/Gen3 RPC API** (`/rpc/Switch.Set`, `Switch.GetStatus`,
+webhooks, Gen2-style MQTT), so Gen2/Gen3 scripts can control old devices like new ones. It can be flashed
+over the air from the stock firmware or Tasmota with the included flasher, updates itself from this
+repository, and comes with an optional self-hosted **Hermit Cloud** (Docker). UI and docs are in German.
 
 ## Danke
 

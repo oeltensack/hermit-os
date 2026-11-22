@@ -95,7 +95,7 @@ ${s.voltage!=null?`<div><div class="v">${fmt(s.voltage,0,'V')}</div><div class="
 ${s.brightness!=null?`<div><div class="v">${s.brightness} %</div><div class="l">Helligkeit</div></div><div><div class="v">${s.ct} K</div><div class="l">Farbtemperatur</div></div>`:''}
 </div></div>
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur'}[e]||e)).join(', ')}</div>`:''}
-<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank">Gerät öffnen</a>`:''}<a onclick="showEn('${esc(d.id)}')">Energie</a><a onclick="del('${esc(d.id)}')">Entfernen</a></div></div>`}
+<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}<a onclick="del('${esc(d.id)}')">Entfernen</a></div></div>`}
 async function loadDevs(){DEVS=await api('devices');$('devs').innerHTML=DEVS.length?DEVS.map(devCard).join(''):'<div class="empty">Noch keine Geräte. Unter „Info“ steht, wie sie sich verbinden.</div>';fillSel()}
 async function sw(id){try{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{}});loadDevs()}catch(e){toast(e.message)}}
 async function ren(id){const d=DEVS.find(x=>x.id==id);const n=prompt('Name für '+id,d.name||'');if(n==null)return;await api('devices/'+encodeURIComponent(id)+'/name',{method:'POST',body:{name:n}});loadDevs()}

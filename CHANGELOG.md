@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.12.1
+- Repo ist öffentlich: Auto-Update ohne Token, Hinweise zum Token nur noch für private Forks
+- README überarbeitet (Download, Hermit Cloud mit Bild, Mitmachen, English summary), Issue-Vorlagen
+- Hermit Cloud: Link „Energie“ nur bei Geräten mit Messung
+
 ## 1.12.0
 - MQTT im Gen2-Format (optional): `MQTT.GetConfig/SetConfig/GetStatus`, Topics `…/online`, `…/rpc`,
   `…/events/rpc` (NotifyEvent/NotifyStatus), `…/status/<komponente>`, `…/info`; Karte „Cloud / MQTT“ unter System

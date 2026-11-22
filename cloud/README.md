@@ -23,7 +23,7 @@ Am einfachsten ein Debian-12-LXC-Container (1 CPU, 512 MB RAM, 4 GB Disk). Für 
 # im Container
 apt update && apt install -y curl git
 curl -fsSL https://get.docker.com | sh        # Docker inkl. „docker compose“
-git clone https://github.com/oeltensack/hermit-os.git     # bei privatem Repo mit Token
+git clone https://github.com/oeltensack/hermit-os.git
 cd hermit-os/cloud
 cp .env.example .env
 nano .env          # MQTT_USER, MQTT_PASS, CLOUD_PASSWORD, PUBLIC_BROKER (IP des Containers)
