@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.10.2
+- Messfirmware: Auto-Update und Update per RPC trotz dauerhaft angezogenem Relais; automatisch erst bei Last unter 20 W.
+  Beim Neustart fällt das Relais ca. 1 s ab, eine gespeicherte Schutzabschaltung bleibt erhalten.
+
 ## 1.10.1
 - Messfirmware auch für den Shelly Plug (16 A): `hermit-plug-meter` (Reset am Gerätetaster, ohne Temperaturschutz)
 

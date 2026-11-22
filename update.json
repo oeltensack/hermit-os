@@ -1,54 +1,54 @@
 {
-  "version": "1.10.1",
+  "version": "1.10.2",
   "files": {
     "hermit-1": {
       "url": "bin/hermit-1.bin",
-      "sha256": "beadb2f84dc605a0e28568c6b0e6c66b9e23070e4a6d548c6f847584a63a4563",
-      "size": 575808
+      "sha256": "e0eeabebbfd6bcad3ba85c235514b7b507c0205a4d2101ab339f3d75b66160d9",
+      "size": 575904
     },
     "hermit-1pm": {
       "url": "bin/hermit-1pm.bin",
-      "sha256": "790cd77ad4d6491a2a809ce903457b69eb5d1c7841fca94f4d9bcd87a6fcaaac",
-      "size": 581312
+      "sha256": "3d3fdddc47acca779fd7c29384841141001df5ffb552b47c28dac777c5576ec9",
+      "size": 581408
     },
     "hermit-1-addon": {
       "url": "bin/hermit-1-addon.bin",
-      "sha256": "7da4284bd860d8e7767b95c6af2e9a3294cc7d98d5925f7aa80ec593ad20729c",
-      "size": 577248
+      "sha256": "205bcdff248e1b2d52451b062faeeb989b057c59e795e8e3dc96c3e78c3f0e53",
+      "size": 577360
     },
     "hermit-1pm-addon": {
       "url": "bin/hermit-1pm-addon.bin",
-      "sha256": "fc0edd9a70c32523361e1e5a3ce3cd20c3a921d64539a1f3346869a3b1802662",
-      "size": 582624
+      "sha256": "c49f2724e2a1e32102e9cea770760ba3819d57d778a1ee80ebfd26ffb14dc1f4",
+      "size": 582736
     },
     "hermit-plugs": {
       "url": "bin/hermit-plugs.bin",
-      "sha256": "f7d098a56a772cbf307cd049d61535e9350937997ba3e8ea4f413b2b7b77ef7c",
-      "size": 582736
+      "sha256": "828eb710304e53e461843d5bb9c7dc101b1378925b64bf822e4aba9698497ec6",
+      "size": 582816
     },
     "hermit-plug": {
       "url": "bin/hermit-plug.bin",
-      "sha256": "cb52a567a49e7f1d2be3d498e17ae85cdb08fec41e04f23cebdc04083b5ac394",
-      "size": 579280
+      "sha256": "fa06d892e57339c09e3e6de918e5ec8db79ccc8bc1d622c4eb61560356b0eb12",
+      "size": 579392
     },
     "hermit-duo": {
       "url": "bin/hermit-duo.bin",
-      "sha256": "d5cd83657f7bf616152905f28268bd728037e1bd6bf6b57e51a3722a02f29be4",
-      "size": 581600
+      "sha256": "1567b9745decbb542c651e8ef8ddbbd29d5f43863ec87ebbfe6fbba58b91103c",
+      "size": 581696
     },
     "hermit-1pm-meter": {
       "url": "bin/hermit-1pm-meter.bin",
-      "sha256": "dc5b46b4808131c23965dee4c6197ea3facedbd779cbed1f8be697597497c35f",
-      "size": 581648
+      "sha256": "0ebf297481359a9ca7ce9a3b42ad7aa6a8e443c90d8c33f2085d6b0e97c4c33b",
+      "size": 581664
     },
     "hermit-plugs-meter": {
       "url": "bin/hermit-plugs-meter.bin",
-      "sha256": "85898467d9b66cffabafefc0df908d5ed2fdff20758c8ebd375e308059dac432",
+      "sha256": "640d45e63c0f29aa4889e43fb0a413fe818f08ae3c10723b8d2a8227615ef60b",
       "size": 583056
     },
     "hermit-plug-meter": {
       "url": "bin/hermit-plug-meter.bin",
-      "sha256": "56b81cc12f0f756b7e73147ca9fdebd07a9e4851e07f18c9a7cfe8fd0e05a140",
+      "sha256": "ae9370ad4688c4fd20bc00306fab52aeb4e853eda18d916c8ceb69cad0edc159",
       "size": 579648
     }
   }

@@ -118,6 +118,8 @@ Die Faktoren liegen in einer eigenen Datei und bleiben bei Updates **und** Werks
   Danach kommt das Ereignis `switch.reset` und `switch.on` mit `source: reset`.
 - `Switch.GetStatus` meldet zusätzlich `meter_only: true` und `tripped: true|false`.
 - Die Eingangsereignisse (`input.*`) werden weiter gemeldet.
+- **Update:** trotz angezogenem Relais möglich. Das automatische Update wartet, bis die Last unter 20 W liegt;
+  beim Neustart fällt das Relais ca. 1 s ab.
 
 Installieren: Flasher → Haken „Messfirmware“ oder Variante wählen, CLI `--meter`. Zurück zur normalen
 Firmware jederzeit über System → Firmware-Datei (`hermit-1pm.bin`, `hermit-plugs.bin` bzw. `hermit-plug.bin`).

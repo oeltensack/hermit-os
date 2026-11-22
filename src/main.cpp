@@ -814,8 +814,16 @@ bool updCheck() {
 }
 
 // Laedt und flasht; prueft SHA-256 vor dem Aktivieren. Gibt Fehlertext zurueck oder "".
+// Messfirmware: Relais ist dauerhaft an, Update trotzdem erlaubt (Relais faellt nur beim Neustart ~1 s ab)
+#if IS_METER
+  #define UPD_RELAY_BLOCKS 0
+#else
+  #define UPD_RELAY_BLOCKS 1
+#endif
+#define UPD_METER_IDLE_W 20.0f    // automatisches Update der Messfirmware erst unter dieser Last
+
 String updInstall(const String& url, const String& sha) {
-  if (relayOn) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
+  if (UPD_RELAY_BLOCKS && relayOn) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
   updState = "downloading";
   HTTPClient http; std::unique_ptr<WiFiClient> cl;
   if (!updOpen(http, cl, url)) { updState = "idle"; return "URL ungültig"; }
@@ -870,7 +878,11 @@ void handleUpdate() {
     updNextTryMs = now + 600000UL;              // alle 10 min erneut, solange die Stunde laeuft
     if (!updAvailVer.length()) updCheck();
     if (updAvailVer.length() && cfg.updMode == "install") {
+#if IS_METER
+      if (apower > UPD_METER_IDLE_W) { updLastErr = "Update wartet: Last über 20 W"; return; }
+#else
       if (relayOn) { updLastErr = "Update wartet: Relais ist an"; return; }
+#endif
       updLastErr = updInstall(updAvailUrl, updAvailSha);
     }
     if (!updAvailVer.length() || cfg.updMode != "install") updDoneDay = lt.tm_yday;
@@ -1188,7 +1200,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
   if (m == "shelly.update") {
     // {"stage":"stable"} oder {"url":"http(s)://…/hermit-1pm.bin"}
-    if (relayOn) ERR(-114, "Relais ist an – Update nur bei ausgeschaltetem Relais");
+    if (UPD_RELAY_BLOCKS && relayOn) ERR(-114, "Relais ist an – Update nur bei ausgeschaltetem Relais");
     if (p["url"].is<const char*>()) updManualUrl = p["url"].as<const char*>();
     else {
       if (!updAvailVer.length() && !updCheck()) ERR(-114, updLastErr);
