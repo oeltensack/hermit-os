@@ -31,7 +31,7 @@ POST http://<ip>/rpc                         Body: {"id":1,"src":"script","metho
 | `Shelly.FactoryReset` | – | löscht Einstellungen, Aktionen, Energie; Kalibrierung bleibt |
 | `Shelly.SetAuth` | `pass` (Text oder `null`) | Passwort setzen/entfernen *(Gen2: `ha1`)* |
 | `Shelly.CheckForUpdate` | – | `{"stable":{"version":"x.y.z"}}` oder `{}` |
-| `Shelly.Update` | `stage:"stable"` oder `url` | installiert im Hintergrund – nur bei ausgeschaltetem Relais |
+| `Shelly.Update` | `stage:"stable"` oder `url` | installiert im Hintergrund, Relais bleibt im Zustand |
 
 ## Switch (Shelly 1 / 1PM / Plug S / Plug)
 

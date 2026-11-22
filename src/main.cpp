@@ -814,13 +814,8 @@ bool updCheck() {
 }
 
 // Laedt und flasht; prueft SHA-256 vor dem Aktivieren. Gibt Fehlertext zurueck oder "".
-// Messfirmware: Relais ist dauerhaft an, Update trotzdem erlaubt (Relais faellt nur beim Neustart ~1 s ab)
-#if IS_METER
-  #define UPD_RELAY_BLOCKS 0
-#else
-  #define UPD_RELAY_BLOCKS 1
-#endif
-#define UPD_METER_IDLE_W 20.0f    // automatisches Update der Messfirmware erst unter dieser Last
+// Update auch bei eingeschaltetem Relais: der Relais-Pin bleibt ueber den Neustart gehalten (resetPins)
+#define UPD_RELAY_BLOCKS 0
 
 String updInstall(const String& url, const String& sha) {
   if (UPD_RELAY_BLOCKS && relayOn) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
@@ -878,11 +873,6 @@ void handleUpdate() {
     updNextTryMs = now + 600000UL;              // alle 10 min erneut, solange die Stunde laeuft
     if (!updAvailVer.length()) updCheck();
     if (updAvailVer.length() && cfg.updMode == "install") {
-#if IS_METER
-      if (apower > UPD_METER_IDLE_W) { updLastErr = "Update wartet: Last über 20 W"; return; }
-#else
-      if (relayOn) { updLastErr = "Update wartet: Relais ist an"; return; }
-#endif
       updLastErr = updInstall(updAvailUrl, updAvailSha);
     }
     if (!updAvailVer.length() || cfg.updMode != "install") updDoneDay = lt.tm_yday;
@@ -1758,10 +1748,27 @@ void setupServer() {
 }
 
 // ======================= Setup / Loop =======================
+#if HAS_RELAY
+// Bei einem Software-Neustart (Update, Restart, Absturz) behaelt der ESP8266 seine GPIO-Ausgaenge.
+// Der Arduino-Core setzt sie in initPins() aber alle auf INPUT -> Relais faellt ab. Die Original-
+// Firmware macht das nicht; deshalb wird der Relais-Pin hier ausgelassen.
+extern "C" void resetPins() {
+  for (int i = 0; i <= 16; ++i)
+    if (!isFlashInterfacePin(i) && i != PIN_RELAY) pinMode(i, INPUT);
+}
+bool relayLatched = false;   // Relais war vor dem Neustart an
+bool softReset = false;
+#endif
+
 void setup() {
 #if HAS_RELAY
+  {
+    uint32_t r = ESP.getResetInfoPtr()->reason;
+    softReset = r == REASON_SOFT_RESTART || r == REASON_EXCEPTION_RST || r == REASON_SOFT_WDT_RST;
+    relayLatched = softReset && (GPE & (1UL << PIN_RELAY)) && (GPO & (1UL << PIN_RELAY));
+  }
   pinMode(PIN_RELAY, OUTPUT);
-  digitalWrite(PIN_RELAY, LOW);
+  digitalWrite(PIN_RELAY, relayLatched ? HIGH : LOW);
 #endif
 #if HAS_LIGHT
   analogWriteRange(1023); analogWriteFreq(1000);
@@ -1864,6 +1871,9 @@ void setup() {
   if (cfg.initialState == "on") start = true;
   else if (cfg.initialState == "restore_last") start = loadRelayState();
   else if (cfg.initialState == "match_input") start = inState;
+#if HAS_RELAY
+  if (softReset) start = relayLatched;      // Neustart ohne Stromausfall: Zustand unveraendert lassen
+#endif
 #if IS_METER
   start = true;
   if (LittleFS.exists("/trip")) {           // Abschaltung vor dem Stromausfall noch nicht quittiert

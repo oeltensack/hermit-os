@@ -28,7 +28,7 @@ Ohne Cloud, ohne Zentrale, ohne Sonderwege für Tasmota.
 - **Aktionen (Webhooks)** bei Schalten, Tastendruck, Leistungsschwellen, Überlast, Übertemperatur und Start –
   mit Platzhaltern wie `${apower}` in der URL
 - **Weboberfläche auf Deutsch:** Status, Schalter/Licht, Aktionen, WLAN, System, RPC-Konsole
-- **Auto-Update** aus diesem Repo (`update.json`), SHA-256-geprüft, nur bei ausgeschaltetem Relais
+- **Auto-Update** aus diesem Repo (`update.json`), SHA-256-geprüft, Relais bleibt beim Neustart im Zustand
 - **WLAN und feste IP werden übernommen** – aus der Original-Firmware, aus Tasmota oder vom Hermit Loader
 - **Gen1-kompatibel:** `/relay/0`, `/light/0`, `/status`, `/meter/0`, `/shelly`
 - **Zugangspunkt** `hermit-…` auf **192.168.33.1** mit Captive-Portal, falls kein WLAN erreichbar ist

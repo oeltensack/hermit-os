@@ -139,7 +139,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div><label>Uhrzeit (Stunde)</label><input id="u_hour" type="number" min="0" max="23"></div></div>
 <label>Update-Quelle (update.json)</label><input id="u_url">
 <label>GitHub-Token (nur bei privatem Repo)</label><input id="u_tok" type="password">
-<div class="l">Installiert wird nur bei ausgeschaltetem Relais, bei der Messfirmware automatisch erst unter 20 W Last (Relais fällt nur beim Neustart kurz ab). Die Firmware wird vor dem Umschalten per SHA-256 geprüft.</div>
+<div class="l">Das Relais bleibt während Update und Neustart in seinem Zustand. Die Firmware wird vor dem Umschalten per SHA-256 geprüft.</div>
 <div class="row"><button class="bt" onclick="saveUpd()">Speichern</button><button class="bt g" onclick="chkUpd()">Jetzt prüfen</button><button class="bt g" id="u_inst" onclick="instUpd()">Jetzt installieren</button></div></div>
 <div class="card"><h2>Firmware manuell</h2>
 <form method="POST" action="/update" enctype="multipart/form-data"><input type="file" name="firmware" accept=".bin">

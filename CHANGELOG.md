@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.11.0
+- Relais bleibt bei Software-Neustart (Update, Neustart-Befehl, Absturz) im bisherigen Zustand – wie bei der
+  Original-Firmware. Der Arduino-Core setzte vorher alle GPIOs beim Start auf Eingang.
+- Updates deshalb auch bei eingeschaltetem Relais (alle Geräte); die 20-W-Wartegrenze der Messfirmware entfällt
+
 ## 1.10.2
 - Messfirmware: Auto-Update und Update per RPC trotz dauerhaft angezogenem Relais; automatisch erst bei Last unter 20 W.
   Beim Neustart fällt das Relais ca. 1 s ab, eine gespeicherte Schutzabschaltung bleibt erhalten.

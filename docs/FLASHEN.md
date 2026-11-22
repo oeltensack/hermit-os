@@ -121,7 +121,7 @@ Bei der Duo ist das Gehäuse verklebt – dieser Weg ist dort nur mit Aufwand m�
 |---|---|
 | Aus | keine Prüfung |
 | Nur prüfen (Standard) | 2 min nach dem Start und täglich zur eingestellten Stunde prüfen, Hinweis in der Oberfläche |
-| Automatisch installieren | zusätzlich installieren – **nur bei ausgeschaltetem Relais**, sonst in der Stunde alle 10 min erneut |
+| Automatisch installieren | zusätzlich installieren (Relais bleibt im Zustand), bei Fehler in der Stunde alle 10 min erneut |
 
 - Quelle ist `update.json` in diesem Repo; jedes Gerät lädt nur die Datei seiner Variante.
 - Vor dem Umschalten wird die **SHA-256** geprüft; stimmt sie nicht, bleibt die alte Firmware.
