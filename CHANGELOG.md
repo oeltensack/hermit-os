@@ -1,5 +1,10 @@
 # Änderungen
 
+## Hermit Cloud 1.2.2
+- Kurze Verbindungsaussetzer (z. B. bei schwachem WLAN) erzeugen keine Meldungen mehr: „offline“ wird erst
+  gemeldet, wenn ein Gerät länger als 2 Minuten weg ist (`OFFLINE_ALERT_AFTER`), „wieder online“ nur danach.
+  Auch Regeln mit Auslöser offline/online warten diese Zeit ab.
+
 ## 1.12.4
 - WLAN-Übernahme von der Original-Firmware: Mongoose OS hat zwei Dateisystem-Bereiche, ein Werksreset leert
   nur den aktiven. Bisher wurde der erste Treffer aus dem zweiten Bereich genommen – das konnte ein altes

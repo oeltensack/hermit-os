@@ -10,7 +10,7 @@ import time
 import paho.mqtt.client as mqtt
 
 import engine
-from core import alert, dev_name, q, today
+from core import OFFLINE_ALERT_AFTER, alert, dev_name, q, today
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
@@ -147,22 +147,32 @@ def ensure(dev):
 
 
 def seen(dev, online=None):
+    """Lebenszeichen bzw. Online-Meldung. Offline wird sofort angezeigt, aber erst nach
+    OFFLINE_ALERT_AFTER gemeldet (siehe check_offline) – kurze WLAN-Aussetzer erzeugen keine Meldung."""
     ensure(dev)
-    r = q("SELECT online, hidden FROM devices WHERE id=?", (dev,), one=True)
+    r = q("SELECT online, off_alerted FROM devices WHERE id=?", (dev,), one=True)
     if online is False:
         if r["online"]:
-            q("UPDATE devices SET online=0 WHERE id=?", (dev,))
-            if not r["hidden"]:
-                alert(dev, "offline", f"{dev_name(dev)} ist offline")
-            engine.on_online(dev, False)
+            q("UPDATE devices SET online=0, off_since=?, off_alerted=0 WHERE id=?", (time.time(), dev))
         return
     if not r["online"]:
-        if q("SELECT 1 FROM alerts WHERE dev=? AND kind='offline'", (dev,), one=True):
+        q("UPDATE devices SET online=1, last_seen=?, off_since=NULL, off_alerted=0 WHERE id=?", (time.time(), dev))
+        if r["off_alerted"]:                       # nur wenn vorher wirklich „offline“ gemeldet wurde
             alert(dev, "online", f"{dev_name(dev)} ist wieder online")
-        q("UPDATE devices SET online=1, last_seen=? WHERE id=?", (time.time(), dev))
-        engine.on_online(dev, True)
+            engine.on_online(dev, True)
         return
     q("UPDATE devices SET last_seen=? WHERE id=?", (time.time(), dev))
+
+
+def check_offline():
+    """Vom Watchdog aufgerufen: Geraete, die laenger als OFFLINE_ALERT_AFTER weg sind, melden."""
+    lim = time.time() - OFFLINE_ALERT_AFTER
+    for r in q("SELECT id, hidden FROM devices WHERE online=0 AND off_alerted=0 AND off_since IS NOT NULL AND off_since<?",
+               (lim,)):
+        q("UPDATE devices SET off_alerted=1 WHERE id=?", (r["id"],))
+        if not r["hidden"]:
+            alert(r["id"], "offline", f"{dev_name(r['id'])} ist offline")
+        engine.on_online(r["id"], False)
 
 
 def set_info(dev, d, live=True):

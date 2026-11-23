@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 import core
 import engine
-from bus import BUS, seen
+from bus import BUS, check_offline, seen
 from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
                   set_setting, setting, today)
 
@@ -172,11 +172,12 @@ def user_delete(name: str, request: Request):
 # ======================= Start =======================
 def watchdog():
     while True:
-        time.sleep(30)
+        time.sleep(20)
         try:
             lim = time.time() - OFFLINE_AFTER
             for r in q("SELECT id FROM devices WHERE online=1 AND last_seen<?", (lim,)):
                 seen(r["id"], online=False)
+            check_offline()
             q("DELETE FROM power WHERE ts<?", (int(time.time()) - KEEP_POWER_DAYS * 86400,))
             q("DELETE FROM alerts WHERE ts<? AND ack=1", (time.time() - 180 * 86400,))
             q("DELETE FROM sessions WHERE seen<?", (time.time() - 365 * 86400,))

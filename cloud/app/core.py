@@ -18,6 +18,7 @@ DB_PATH = DATA / "cloud.db"
 TZ = ZoneInfo(os.environ.get("TZ", "Europe/Berlin"))
 KEEP_POWER_DAYS = int(os.environ.get("KEEP_POWER_DAYS", "31"))
 OFFLINE_AFTER = int(os.environ.get("OFFLINE_AFTER", "180"))
+OFFLINE_ALERT_AFTER = int(os.environ.get("OFFLINE_ALERT_AFTER", "120"))   # kurze Aussetzer nicht melden
 
 _lock = threading.RLock()
 DB = None
@@ -85,6 +86,8 @@ def init_db():
     """)
     _add_col("devices", "room", "TEXT DEFAULT ''")
     _add_col("power", "wmax", "REAL")
+    _add_col("devices", "off_since", "REAL")
+    _add_col("devices", "off_alerted", "INTEGER DEFAULT 0")
     DB.commit()
 
 

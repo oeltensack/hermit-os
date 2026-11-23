@@ -98,7 +98,8 @@ Sicherung: den Ordner `data/` kopieren.
 | `TZ` | Zeitzone für die Tageswerte |
 
 Weitere Werte im Container: `KEEP_POWER_DAYS` (Leistungsverlauf, Standard 31 Tage),
-`OFFLINE_AFTER` (s ohne Lebenszeichen bis „offline“, Standard 180).
+`OFFLINE_AFTER` (s ohne Lebenszeichen bis „offline“, Standard 180), `OFFLINE_ALERT_AFTER` (s offline bis zur
+Meldung, Standard 120).
 
 Ein abgezogenes Gerät meldet der Broker nach etwa 45 s (Hermit OS ab 1.12.2) als offline; spätestens nach
 `OFFLINE_AFTER` setzt die Cloud es selbst auf offline. Offline-Geräte bleiben mit ihren Werten in der Liste,
