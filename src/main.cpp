@@ -1758,6 +1758,9 @@ void handleUpdate() {
   if (updPendingCheck) { updPendingCheck = false; updCheck(); }
   if (updPendingInstall) {
     updPendingInstall = false;
+    // Vor dem Installieren immer frisch pruefen: alte Treffer zeigen sonst auf eine inzwischen ersetzte
+    // Datei in bin/ (SHA-256 passt nicht mehr -> Update wird jedes Mal verworfen)
+    if (!updManualUrl.length() && updCheck() && !updAvailVer.length()) { updLastErr = "Keine neuere Version"; return; }
     String url = updManualUrl.length() ? updManualUrl : updAvailUrl;
     String sha = updManualUrl.length() ? String("") : updAvailSha;
     updManualUrl = "";
@@ -1770,7 +1773,7 @@ void handleUpdate() {
   time_t t = time(nullptr); struct tm lt; localtime_r(&t, &lt);
   if (lt.tm_hour == cfg.updHour && lt.tm_yday != updDoneDay && (int32_t)(now - updNextTryMs) >= 0) {
     updNextTryMs = now + 600000UL;              // alle 10 min erneut, solange die Stunde laeuft
-    if (!updAvailVer.length()) updCheck();
+    updCheck();                                 // immer neu: update.json kann sich seit dem letzten Mal geaendert haben
     if (updAvailVer.length() && cfg.updMode == "install") {
       updLastErr = updInstall(updAvailUrl, updAvailSha);
     }

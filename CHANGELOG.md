@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.16.1
+- Update-Fehler behoben: Ein einmal gefundenes Update wurde nie neu geprüft. Kam danach eine neuere Version,
+  passte die SHA-256 nicht mehr zur Datei in `bin/` und das Update wurde jedes Mal verworfen (z. B. Duo blieb
+  auf 1.12 mit „1.13.0 verfügbar“). Jetzt wird vor jeder Installation und bei jedem Termin frisch geprüft
+
 ## 1.16.0
 - **Sonoff RF Bridge 433** (`hermit-rfbridge`, R2 mit EFM8BB1, Original- oder Portisch-Firmware im Funkchip):
   - Empfangene Codes anzeigen, übernehmen und speichern als Taste, Kontakt (offen/zu) oder Schalter (Funksteckdose)
