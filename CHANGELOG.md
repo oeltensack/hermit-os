@@ -1,5 +1,10 @@
 # Änderungen
 
+## Hermit Cloud 1.1.1 / Hermit OS 1.12.2
+- Cloud: Nach einem Neustart der Cloud (z. B. Update) wurden abgezogene Geräte durch gespeicherte
+  Broker-Nachrichten wieder als online angezeigt – gespeicherte Nachrichten zählen jetzt nicht mehr als Lebenszeichen
+- Firmware: MQTT-Keepalive 30 s – ein abgezogenes Gerät erscheint nach ca. 45 s als offline
+
 ## Hermit Cloud 1.1.0
 - Selbst-Update: Prüfung auf GitHub, Knopf „Jetzt aktualisieren“, automatische Installation zur eingestellten
   Stunde; neuer Container `hermit-cloud-updater` (git pull bzw. Archiv, Neubau, Neustart)

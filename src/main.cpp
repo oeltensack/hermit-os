@@ -2084,7 +2084,7 @@ void handleMqtt() {
     if (!host.length()) { mqNextTry = millis() + 30000; return; }
     mq.setServer(host.c_str(), port);
     mq.setBufferSize(2048);
-    mq.setKeepAlive(60);
+    mq.setKeepAlive(30);            // Broker meldet ein abgezogenes Geraet nach ca. 45 s offline
     mq.setSocketTimeout(5);
     mq.setCallback(mqCallback);
     mqNet.setTimeout(2000);

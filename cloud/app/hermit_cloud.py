@@ -122,11 +122,13 @@ class Bus:
     # ---- eingehend ----
     def on_message(self, c, userdata, msg):
         try:
-            self.handle(msg.topic, msg.payload)
+            self.handle(msg.topic, msg.payload, msg.retain)
         except Exception as e:                       # nie den MQTT-Thread sterben lassen
             print("Fehler bei", msg.topic, e, flush=True)
 
-    def handle(self, topic, payload):
+    def handle(self, topic, payload, retained=False):
+        # Gespeicherte (retained) Nachrichten liefert der Broker beim Verbinden der Cloud erneut aus –
+        # sie aktualisieren die Daten, zaehlen aber nicht als Lebenszeichen. Massgeblich ist dann /online.
         if topic == f"{SRC}/rpc":
             d = json.loads(payload)
             w = self.wait.get(d.get("id"))
@@ -148,12 +150,12 @@ class Bus:
             return
         d = json.loads(payload)
         if rest == "info":
-            set_info(dev, d)
+            set_info(dev, d, live=not retained)
         elif rest.startswith("status/"):
             comp = rest[7:]
             if comp.startswith(("switch:", "cct:", "light:")):
-                set_status(dev, comp, d)
-            else:
+                set_status(dev, comp, d, live=not retained)
+            elif not retained:
                 seen(dev)
         elif rest == "events/rpc":
             m = d.get("method")
@@ -218,16 +220,17 @@ def seen(dev, online=None):
     q("UPDATE devices SET online=1, last_seen=? WHERE id=?", (now, dev))
 
 
-def set_info(dev, d):
+def set_info(dev, d, live=True):
     ensure(dev)
     q("""UPDATE devices SET info=?, model=?, app=?, ver=?, mac=?, gen=?, ip=COALESCE(?, ip),
          name=COALESCE(?, name) WHERE id=?""",
       (json.dumps(d), d.get("model"), d.get("app"), d.get("ver"), d.get("mac"), d.get("gen"),
        d.get("ip"), d.get("name"), dev))
-    seen(dev)
+    if live:
+        seen(dev)
 
 
-def set_status(dev, comp, st, merge=False):
+def set_status(dev, comp, st, merge=False, live=True):
     ensure(dev)
     r = q("SELECT status, comp, last_total, today_wh FROM devices WHERE id=?", (dev,), one=True)
     old = json.loads(r["status"] or "{}") if r["comp"] in (None, comp) else {}
@@ -235,6 +238,8 @@ def set_status(dev, comp, st, merge=False):
     if merge and "aenergy" in st:
         new["aenergy"] = st["aenergy"]
     q("UPDATE devices SET status=?, comp=? WHERE id=?", (json.dumps(new), comp, dev))
+    if not live:
+        return                            # alter Stand vom Broker: keine Leistung/Energie verbuchen
     seen(dev)
     now = int(time.time())
     if "apower" in st:

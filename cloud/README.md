@@ -89,6 +89,10 @@ Sicherung: den Ordner `data/` kopieren.
 Weitere Werte im Container: `KEEP_POWER_DAYS` (Leistungsverlauf, Standard 31 Tage),
 `OFFLINE_AFTER` (s ohne Lebenszeichen bis „offline“, Standard 180).
 
+Ein abgezogenes Gerät meldet der Broker nach etwa 45 s (Hermit OS ab 1.12.2) als offline; spätestens nach
+`OFFLINE_AFTER` setzt die Cloud es selbst auf offline. Offline-Geräte bleiben mit ihren Werten in der Liste,
+bis du sie mit **Entfernen** löschst.
+
 ## Von unterwegs
 
 Nicht direkt ins Internet stellen. Am besten über den WireGuard-Tunnel ins Heimnetz
