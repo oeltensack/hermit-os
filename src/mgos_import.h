@@ -8,10 +8,21 @@
 // eigenen LittleFS ueberschrieben – deshalb vor LittleFS.begin() aufrufen.
 // SPIFFS: Seiten zu 256 Byte, Kopf 5 Byte (obj_id 2, span 2, flags 1), Daten 251 Byte.
 #include <Arduino.h>
+#include <vector>
 
 #ifndef HERMIT_IPINFO
 #define HERMIT_IPINFO
 struct ImportIp { String ip, gw, mask, dns; };
+#endif
+#ifndef HERMIT_WIFICAND
+#define HERMIT_WIFICAND
+struct WifiCand { String ssid, pass; ImportIp ip; String src; };
+// Kandidat nur aufnehmen, wenn SSID+Passwort noch nicht in der Liste stehen
+inline void addCand(std::vector<WifiCand>& v, const WifiCand& c) {
+  if (!c.ssid.length()) return;
+  for (auto& x : v) if (x.ssid == c.ssid && x.pass == c.pass) return;
+  v.push_back(c);
+}
 #endif
 
 namespace mgosimport {
@@ -73,6 +84,63 @@ static bool scanText(const String& t, String& ssid, String& pass, ImportIp* ipi 
 }
 
 uint32_t lastFoundRegion = 0;
+
+// Alle "sta"-Objekte mit SSID in einem Text sammeln
+static void scanAll(const String& t, std::vector<WifiCand>& out, const String& src) {
+  int p = 0;
+  while ((p = t.indexOf("\"sta\"", p)) >= 0) {
+    int i = p + 5;
+    while (i < (int)t.length() && t[i] == ' ') i++;
+    if (i < (int)t.length() && t[i] == ':') {
+      i++;
+      while (i < (int)t.length() && t[i] == ' ') i++;
+      if (i < (int)t.length() && t[i] == '{') {
+        int end = t.indexOf('}', i);
+        String obj = end > i ? t.substring(i, end + 1) : t.substring(i);
+        WifiCand c;
+        if (jsonValue(obj, 0, "ssid", c.ssid) && c.ssid.length()) {
+          jsonValue(obj, 0, "pass", c.pass);
+          jsonValue(obj, 0, "ip", c.ip.ip); jsonValue(obj, 0, "netmask", c.ip.mask);
+          jsonValue(obj, 0, "gw", c.ip.gw); jsonValue(obj, 0, "nameserver", c.ip.dns);
+          c.src = src;
+          addCand(out, c);
+        }
+      }
+    }
+    p += 5;
+  }
+}
+
+// Saemtliche WLAN-Eintraege aus beiden Dateisystem-Bereichen der Original-Firmware. Mongoose OS hat zwei
+// Bereiche, die sich bei Updates abwechseln; ein Werksreset leert nur den aktiven – im anderen kann ein
+// alter Stand liegen. Deshalb alle Eintraege sammeln und spaeter der Reihe nach ausprobieren.
+inline int readAll(std::vector<WifiCand>& out) {
+  const uint32_t regions[] = {0xBB000, 0x1BB000};
+  uint8_t* sec = (uint8_t*)malloc(4096);
+  if (!sec) return 0;
+  size_t before = out.size();
+  for (uint32_t base : regions) {
+    String tail;
+    for (uint32_t off = 0; off < 0x40000; off += 4096) {
+      if (!ESP.flashRead(base + off, (uint32_t*)sec, 4096)) break;
+      String txt = tail;
+      for (int pg = 0; pg < 16; pg++) {
+        const uint8_t* h = sec + pg * 256;
+        uint16_t obj = h[0] | (h[1] << 8);
+        uint8_t fl = h[4];
+        if (obj == 0xFFFF || obj == 0) continue;
+        if (!(fl & 0x80)) continue;
+        if (!(fl & 0x04)) continue;
+        for (int i = 5; i < 256; i++) txt += (char)(h[i] == 0xFF || h[i] == 0 ? ' ' : h[i]);
+      }
+      scanAll(txt, out, base == 0xBB000 ? "mgos-fs0" : "mgos-fs1");
+      tail = txt.length() > 600 ? txt.substring(txt.length() - 600) : txt;
+      yield();
+    }
+  }
+  free(sec);
+  return out.size() - before;
+}
 
 inline bool readWifi(String& ssid, String& pass, ImportIp* ipi = nullptr) {
   const uint32_t regions[] = {0x1BB000, 0xBB000};

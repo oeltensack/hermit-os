@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.12.4
+- WLAN-Übernahme von der Original-Firmware: Mongoose OS hat zwei Dateisystem-Bereiche, ein Werksreset leert
+  nur den aktiven. Bisher wurde der erste Treffer aus dem zweiten Bereich genommen – das konnte ein altes
+  Passwort sein. Jetzt werden alle gefundenen Zugangsdaten (Chip-Speicher, beide Bereiche, Tasmota)
+  gesammelt und beim ersten Start der Reihe nach je 25 s probiert, sichtbare Netze zuerst
+- `Hermit.TestImport` zeigt alle gefundenen Einträge (`mgos_all`) und die probierten (`tried`)
+
 ## 1.12.3
 - WLAN-Übernahme von der Original-Firmware: deren Konfiguration hat jetzt Vorrang vor dem SDK-Speicher
   (der kann einen alten Stand enthalten); feste IP nur, wenn IP, Maske und Gateway zusammenpassen

@@ -135,6 +135,11 @@ bool apActive = false, wifiWasUp = false, mdnsUp = false, bootEventSent = false,
 uint32_t wifiLostMs = 0, wifiUpMs = 0, rebootAt = 0, staTryMs = 0;
 bool staOn = false;          // STA sucht gerade das Heim-WLAN (bei aktivem AP nur zeitweise)
 bool safeMode = false;       // nach mehreren Abstuerzen in Folge: keine Uebernahme, AP sofort
+// Erster Start: alle gefundenen WLAN-Zugangsdaten werden der Reihe nach probiert (sichtbare Netze zuerst)
+std::vector<WifiCand> wifiCands;
+size_t candIdx = 0;
+bool candActive = false;
+uint32_t candStartMs = 0;
 
 bool relayOn = false;
 String relaySrc = "init";
@@ -742,6 +747,7 @@ void onWifiUp() {
   if (!bootEventSent) { bootEventSent = true; fireEvent("sys.boot"); }
 }
 
+void applyCand(size_t i);
 void handleWifi() {
   uint32_t now = millis();
   if (pendingReconnect) {
@@ -752,12 +758,20 @@ void handleWifi() {
     startSTA();
   }
   bool up = WiFi.status() == WL_CONNECTED;
+  if (candActive) {                          // erster Start: Kandidaten der Reihe nach probieren
+    if (!candStartMs) candStartMs = now;
+    if (up) { candActive = false; saveCfg(); wifiCands.clear(); }
+    else if (now - candStartMs > 25000UL) {
+      if (candIdx + 1 < wifiCands.size()) { applyCand(++candIdx); candStartMs = now; pendingReconnect = true; return; }
+      candActive = false; applyCand(0); saveCfg();   // keiner passte: ersten behalten, Zugangspunkt folgt
+    }
+  }
   if (up) {
     if (!wifiWasUp) { wifiWasUp = true; wifiUpMs = now; onWifiUp(); }
     if (apActive && now - wifiUpMs > 120000UL) stopAP();
   } else {
     if (wifiWasUp) { wifiWasUp = false; wifiLostMs = now; }
-    if (!apActive && (!cfg.ssid.length() || now - wifiLostMs > 60000UL)) startAP();
+    if (!apActive && (!cfg.ssid.length() || (now - wifiLostMs > 60000UL && !candActive))) startAP();
     // Zugangspunkt erreichbar halten: Beim Suchen nach dem Heim-WLAN springt der ESP8266 durch die Kanaele,
     // der AP ist dann kaum zu finden. Deshalb STA nur alle 3 min fuer 30 s versuchen – und nie, solange
     // jemand mit dem AP verbunden ist.
@@ -1242,6 +1256,14 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     struct station_config sc;
     JsonObject sd = out["sdk"].to<JsonObject>();
     if (wifi_station_get_config_default(&sc) && sc.ssid[0]) { char b[33] = {0}; memcpy(b, sc.ssid, 32); sd["ssid"] = b; }
+    {
+      std::vector<WifiCand> all;
+      mgosimport::readAll(all);
+      JsonArray a = out["mgos_all"].to<JsonArray>();
+      for (auto& c : all) { JsonObject o = a.add<JsonObject>(); o["ssid"] = c.ssid; o["pass_len"] = c.pass.length(); o["src"] = c.src; o["ip"] = c.ip.ip; }
+      JsonArray t = out["tried"].to<JsonArray>();
+      for (auto& c : wifiCands) { JsonObject o = t.add<JsonObject>(); o["ssid"] = c.ssid; o["pass_len"] = c.pass.length(); o["src"] = c.src; }
+    }
     // Rohtext-Probe: kommt "ssid" ueberhaupt in fs0/fs1 vor?
     JsonArray hits = out["raw_ssid_hits"].to<JsonArray>();
     uint8_t* buf = (uint8_t*)malloc(4096);
@@ -1829,6 +1851,21 @@ void setupServer() {
   server.begin();
 }
 
+// Kandidat i als WLAN uebernehmen (feste IP nur, wenn IP, Maske und Gateway zusammenpassen)
+void applyCand(size_t i) {
+  const WifiCand& c = wifiCands[i];
+  cfg.ssid = c.ssid; cfg.pass = c.pass; cfg.staticIp = false;
+  IPAddress a, m, g;
+  bool ok = c.ip.ip.length() && a.fromString(c.ip.ip) && m.fromString(c.ip.mask) && g.fromString(c.ip.gw)
+            && (uint32_t)m != 0 && (uint32_t)a != 0 && (uint32_t)a != (uint32_t)g
+            && (((uint32_t)a & (uint32_t)m) == ((uint32_t)g & (uint32_t)m));
+  if (ok) {
+    cfg.staticIp = true; cfg.ip = c.ip.ip; cfg.mask = c.ip.mask; cfg.gw = c.ip.gw;
+    cfg.dns = c.ip.dns.length() ? c.ip.dns : c.ip.gw;
+  }
+  Serial.printf("WLAN-Kandidat %u/%u: %s (%s)\n", (unsigned)i + 1, (unsigned)wifiCands.size(), c.ssid.c_str(), c.src.c_str());
+}
+
 // ======================= Setup / Loop =======================
 #if HAS_RELAY
 // Bei einem Software-Neustart (Update, Restart, Absturz) behaelt der ESP8266 seine GPIO-Ausgaenge.
@@ -1881,9 +1918,7 @@ void setup() {
     Serial.println(F("WARNUNG: Chip kleiner als Firmware-Layout!"));
 
   // Erster Start (Dateisystem noch nicht formatiert): vorher WLAN der Original-Shelly-Firmware sichern
-  String mgSsid, mgPass;
-  ImportIp mgIp;
-  bool mgFound = false;
+  std::vector<WifiCand> mgCands;
   // Absturzschutz: zaehlt Neustarts durch Absturz/Watchdog in Folge (RTC-Speicher ueberlebt Soft-Resets)
   {
     struct { uint32_t magic, n; } rb;
@@ -1897,7 +1932,7 @@ void setup() {
     if (safeMode) Serial.println(F("Abgesicherter Start: mehrere Abstuerze in Folge"));
   }
   if (!LittleFS.begin()) {
-    if (!safeMode) mgFound = mgosimport::readWifi(mgSsid, mgPass, &mgIp);
+    if (!safeMode) mgosimport::readAll(mgCands);
     LittleFS.format(); LittleFS.begin();
   }
 
@@ -1913,33 +1948,35 @@ void setup() {
   bool firstBoot = !LittleFS.exists("/config.json") && !LittleFS.exists("/noimport");
   loadCfg();
   if (firstBoot && !cfg.ssid.length() && !safeMode) {   // nur beim allerersten Start: WLAN (und feste IP) uebernehmen
-    String ts, tp;
-    ImportIp tIp;
-    bool tasFound = tasimport::readWifi(ts, tp, &tIp);
+    // Kandidaten: SDK-Speicher (zuletzt vom Chip benutzt) -> Original-Firmware (beide Bereiche) -> Tasmota
     struct station_config sc;
-    bool sdk = wifi_station_get_config_default(&sc) && sc.ssid[0];
-    // Reihenfolge: Original-Firmware (deren Konfiguration ist massgeblich; der SDK-Speicher kann dort einen
-    // alten Stand enthalten) -> Hermit Loader (SDK-Speicher) -> Tasmota
-    if (mgFound) { cfg.ssid = mgSsid; cfg.pass = mgPass; }
-    else if (sdk) {
+    if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {
       char ss[33] = {0}, pw[65] = {0};
       memcpy(ss, sc.ssid, 32); memcpy(pw, sc.password, 64);
-      cfg.ssid = ss; cfg.pass = pw;
-    } else if (tasFound) { cfg.ssid = ts; cfg.pass = tp; }
-    // Feste IP der vorherigen Firmware beibehalten, damit das Geraet unter derselben Adresse bleibt
-    ImportIp* ipSrc = mgFound ? (mgIp.ip.length() ? &mgIp : nullptr) : (tasFound && tIp.ip.length() ? &tIp : nullptr);
-    if (cfg.ssid.length() && ipSrc) {
-      IPAddress a, m, g;
-      // nur uebernehmen, wenn ip/netmask/gw zusammenpassen (gleiches Netz, gueltige Maske)
-      bool ok = a.fromString(ipSrc->ip) && m.fromString(ipSrc->mask) && g.fromString(ipSrc->gw)
-                && (uint32_t)m != 0 && (uint32_t)a != 0 && (uint32_t)a != (uint32_t)g
-                && (((uint32_t)a & (uint32_t)m) == ((uint32_t)g & (uint32_t)m));
-      if (ok) {
-        cfg.staticIp = true; cfg.ip = ipSrc->ip; cfg.mask = ipSrc->mask; cfg.gw = ipSrc->gw;
-        cfg.dns = ipSrc->dns.length() ? ipSrc->dns : ipSrc->gw;
-      }
+      WifiCand c; c.ssid = ss; c.pass = pw; c.src = "sdk";
+      addCand(wifiCands, c);
     }
-    if (cfg.ssid.length()) saveCfg();
+    for (auto& c : mgCands) addCand(wifiCands, c);
+    { WifiCand c; if (tasimport::readWifi(c.ssid, c.pass, &c.ip)) { c.src = "tasmota"; addCand(wifiCands, c); } }
+    if (wifiCands.size() > 1) {
+      // Netze, die gerade zu sehen sind, nach vorn (Reihenfolge sonst beibehalten)
+      WiFi.mode(WIFI_STA);
+      int n = WiFi.scanNetworks(false, true);
+      std::vector<WifiCand> vis, rest;
+      for (auto& c : wifiCands) {
+        bool seen = false;
+        for (int k = 0; k < n && !seen; k++) seen = WiFi.SSID(k) == c.ssid;
+        (seen ? vis : rest).push_back(c);
+      }
+      WiFi.scanDelete();
+      wifiCands = vis; wifiCands.insert(wifiCands.end(), rest.begin(), rest.end());
+    }
+    if (!wifiCands.empty()) {
+      applyCand(0);
+      saveCfg();
+      if (wifiCands.size() > 1) { candActive = true; candIdx = 0; }
+      else wifiCands.clear();
+    }
   }
   loadEnergy();
 
