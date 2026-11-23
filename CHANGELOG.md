@@ -1,5 +1,10 @@
 # Änderungen
 
+## Hermit Scanner 1.0.0
+- Neues Windows-Programm `Hermit-Scanner` (tools/hermit_scanner.py): findet Shelly Gen1, Shelly Gen2/Gen3, Tasmota und
+  Hermit OS in einem oder mehreren Netzen; Name, Modell, Firmware, MAC, Empfang, Zustand, Leistung, Update, Laufzeit;
+  Filter, Sortierung, Browser öffnen, Neustart, CSV-Export; EXE über tools/build_exe.bat
+
 ## Hermit Cloud 1.4.0
 - **Verbrauch je Zeitraum** (wie in der Shelly-App): Tag (Stunden), Woche, Monat, Jahr – mit Blättern,
   gestrichelter Linie für den Zeitraum davor, Gesamt mit Kosten, Abweichung in %, Durchschnitt, Max, Min

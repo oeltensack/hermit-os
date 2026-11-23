@@ -73,6 +73,8 @@ for model, names in MODELS.items():
         z.write(ROOT / "tools" / "hermit_flash.py", f"{top}/tools/hermit_flash.py")
         z.write(ROOT / "tools" / "hermit_flash_gui.py", f"{top}/tools/hermit_flash_gui.py")
         z.write(ROOT / "Hermit-Flasher.pyw", f"{top}/Hermit-Flasher.pyw")
+        z.write(ROOT / "tools" / "hermit_scanner.py", f"{top}/tools/hermit_scanner.py")
+        z.write(ROOT / "Hermit-Scanner.pyw", f"{top}/Hermit-Scanner.pyw")
         z.write(ROOT / "tools" / "build_exe.bat", f"{top}/tools/build_exe.bat")
         z.write(ROOT / "README.md", f"{top}/README.md")
         z.write(ROOT / "CHANGELOG.md", f"{top}/CHANGELOG.md")

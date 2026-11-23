@@ -100,6 +100,7 @@ Einrichtung: **[cloud/README.md](cloud/README.md)**
 | **[docs/FLASHEN.md](docs/FLASHEN.md)** | Flasher (grafisch, Konsole, EXE), Wege von Original-Firmware und Tasmota, Hermit Loader, serielles Flashen, Updates, Fehlersuche |
 | **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo |
 | **[docs/API.md](docs/API.md)** | Alle RPC-Methoden, Statusfelder, Aktionen und Platzhalter, Gen1-Endpunkte, Diagnose, Unterschiede zu Gen2 |
+| **[docs/SCANNER.md](docs/SCANNER.md)** | Hermit Scanner: findet Shelly Gen1/Gen2+, Tasmota und Hermit OS im Netz (Windows) |
 | **[cloud/](cloud/README.md)** | Hermit Cloud: Heim-Cloud mit Übersicht, Schalten, Energieverlauf und Meldungen (Docker) |
 | **[CHANGELOG.md](CHANGELOG.md)** | Versionsverlauf |
 | **[examples/](examples/)** | Gen2-Scripte, u. a. Heizlüfter-Stufe 2 am 1PM mit Watchdog |
@@ -115,6 +116,7 @@ cloud/               Hermit Cloud (Docker: Mosquitto + Weboberfläche)
 docs/                Dokumentation
 update.json          Versionsliste für das Auto-Update
 Hermit-Flasher.pyw   Startdatei für den grafischen Flasher
+Hermit-Scanner.pyw   Startdatei für den Netz-Scanner
 ```
 
 ## Selbst bauen
