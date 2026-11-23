@@ -1,70 +1,77 @@
 {
-  "version": "1.15.0",
+  "version": "1.16.0",
   "files": {
     "hermit-1": {
       "url": "bin/hermit-1.bin",
-      "sha256": "5bc925938eb4f1a30a8c5be09810c541da0ec8c0448c7d44b90ab9ff2ad3508a",
-      "size": 610000
+      "sha256": "8d913438413e60a9a6254203b8c8db5c1cb846cc61f63bc24e5499ecc02be159",
+      "size": 617072
     },
     "hermit-1pm": {
       "url": "bin/hermit-1pm.bin",
-      "sha256": "cb7b07cf1bf4e2527d3d5141c0e3786997fa0c6e68e1f5b8ae2018544e151a1d",
-      "size": 615600
+      "sha256": "b6ee352baf047fa7155cc026d44d29aff3ada5b0f7cb8e6ebdd83f8bcf055359",
+      "size": 622688
     },
     "hermit-1-addon": {
       "url": "bin/hermit-1-addon.bin",
-      "sha256": "b1b954efe4b0808388df7f8cb8fc061c088ca0dca2497153aeda27f8c01cafbc",
-      "size": 611456
+      "sha256": "3bc818a14d7e0aa60169d75156d5d7424299649b4ccffe2b12c5180793d9cc51",
+      "size": 618528
     },
     "hermit-1pm-addon": {
       "url": "bin/hermit-1pm-addon.bin",
-      "sha256": "55408800b1a62f2f6929e34479b97b3ea4ec4927ddbb7d6cab5f8743d85eb9b7",
-      "size": 616960
+      "sha256": "967ca878b66e0b21b993a6e07edddc951a291912c65560fe32d6f06a2080fe53",
+      "size": 624000
     },
     "hermit-plugs": {
       "url": "bin/hermit-plugs.bin",
-      "sha256": "9c20e2b3f28fb15f3751e23198b4c173673b8fe030307efcd105052f7c44f9fc",
-      "size": 617216
+      "sha256": "3d36bbaa68497bf86ed874e388e6325c266ddf28b2aecb5c0243ce5b95e8c471",
+      "size": 624288
     },
     "hermit-plug": {
       "url": "bin/hermit-plug.bin",
-      "sha256": "e85f0ae45dcff907eee95b0fc6d4743c91c5583e1f8362380ae73fdf8aff293f",
-      "size": 613552
+      "sha256": "62970f6e86018222b629059afa9b12fa670ff319dd2ec47a2ebe0c12bcaf9ec7",
+      "size": 620656
     },
     "hermit-duo": {
       "url": "bin/hermit-duo.bin",
-      "sha256": "3d48347169a82f32ed79734a18b9299675c0221aaa8700f5d338b807113c3cee",
-      "size": 615248
+      "sha256": "b3a058a68a803c1eade343df4236bd6a6f551d142dc5669acec07efcb03584e4",
+      "size": 622224
     },
     "hermit-dimmer2": {
       "url": "bin/hermit-dimmer2.bin",
-      "sha256": "3b54b465d955952e2bbf2b746c231b2a92d5bf79d4b744befcd1636b9b3a7778",
-      "size": 626784
+      "sha256": "bc0d1082ee9eff4d20960ddd25d813a9563ea1bd18da0b2cc3e598551ab31599",
+      "size": 633856
     },
     "hermit-25": {
       "url": "bin/hermit-25.bin",
-      "sha256": "4af3d3a64e37d25e55b42f58adb390002bc6e452320b2b897052e77cf1f6f977",
-      "size": 624432
+      "sha256": "d656ca16d2cddd52a6f13d13b0859e904980b7f278ea6acc73dca6ba8351e11e",
+      "size": 631536
     },
     "hermit-25-cover": {
       "url": "bin/hermit-25-cover.bin",
-      "sha256": "9d4e4c5371040c577a9a1a074f93d0777af959c0cf7675386c162bbcd9caba70",
-      "size": 635664
+      "sha256": "addadab6e656ae70ada50caf758674788e6acda33c5ca00227f786f34c6c703b",
+      "size": 642720
     },
     "hermit-1pm-meter": {
       "url": "bin/hermit-1pm-meter.bin",
-      "sha256": "2895b4d920bc9d887499b4d90f360551fad73a35a20102b7729a6357008c1e67",
-      "size": 615920
+      "sha256": "b884ee938003f836b586a6d09d1c28b0d1ab978215887e6b30e352f469de9b03",
+      "size": 622992
     },
     "hermit-plugs-meter": {
       "url": "bin/hermit-plugs-meter.bin",
-      "sha256": "3dcc2b263975346763b30e03566b6606c679425eaa1e5fb801bb4a1815596355",
-      "size": 617600
+      "sha256": "e27457598777e4b9b27fff17be9d28f3dbb600330bf7774a9acb91977b50c963",
+      "size": 624656
     },
     "hermit-plug-meter": {
       "url": "bin/hermit-plug-meter.bin",
-      "sha256": "a67c9f830c1ebe3461521aa699a11a992b92e046abb38d3d98438fdf7db340bf",
-      "size": 613856
+      "sha256": "7f6329c31f133130359e95eb8e2c3153ad27be1df94663d241bf844fd13cb87b",
+      "size": 620928
+    },
+    "hermit-rfbridge": {
+      "url": "bin/hermit-rfbridge.bin.gz",
+      "sha256": "a17045abbe997b2010bbd13bfdc62041101bf0e92a9a1851daf1b51202e0af45",
+      "size": 426080,
+      "loader": "bin/hermit-loader-1m.bin.gz",
+      "loader_sha256": "0ab0b54aeaa45f426ebb218045411e6973dfbf745fc8328b65f8f41f42acb2e0"
     }
   }
 }

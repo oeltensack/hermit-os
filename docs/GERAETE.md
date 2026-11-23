@@ -19,7 +19,8 @@
 | Abschaltleistung ab Werk | – | 3500 W | 2500 W | 3500 W | – | 250 W |
 | Nach Stromausfall ab Werk | aus | aus | aus | aus | **an** | letzter Zustand |
 
-Alle Geräte: ESP8266, 2 MB Flash. Die Oberfläche zeigt unter Status → Flash die echte Chipgröße.
+Alle Shellys: ESP8266, 2 MB Flash. Die Sonoff RF Bridge hat 1 MB (siehe unten). Die Oberfläche zeigt unter
+Status → Flash die echte Chipgröße.
 
 ---
 
@@ -218,6 +219,47 @@ sonst `hermit-25` (umstellbar mit `--cover` bzw. `--switch` oder in der Auswahl 
 - **Nach Stromausfall:** stehen bleiben (Standard), öffnen oder schließen. Nach einem Neustart des ESP (z. B. Update)
   steht der Motor; die Position bleibt gespeichert
 - Gen1: `/roller/0?go=open|close|stop|to_pos&roller_pos=50`
+
+---
+
+## Sonoff RF Bridge 433
+
+| | |
+|---|---|
+| Firmware / Modell | `hermit-rfbridge` / `HERMIT-RFBRIDGE` (Gen1-Typ `RFBRIDGE`) |
+| Chip | ESP8285, **1 MB Flash** |
+| Funkchip | EFM8BB1 an UART0 (GPIO1/3, 19200 Baud) – Original-Firmware oder [Portisch](https://github.com/Portisch/RF-Bridge-EFM8BB1) |
+| LED | GPIO13 (invertiert, blinkt im Zugangspunkt-Modus) |
+| Taster | GPIO0 (10 s halten = WLAN zurücksetzen) |
+| Gen2-Komponenten | `rf` (Empfang, gespeicherte Codes), `switch:<n>` je gespeicherter Funksteckdose |
+
+Nur die Hardware mit EFM8BB1 (R2 bis v1.0). Die R2 **v2.2** hat keinen EFM8 mehr – dafür ist Hermit OS nicht gedacht.
+Am Funkchip wird nichts geflasht; Hermit OS spricht beide Firmwares.
+
+**Empfangsmodus** (Reiter „Funk“):
+
+| Modus | Firmware im EFM8 | Erkennt |
+|---|---|---|
+| Standard | Original und Portisch | 24-Bit-Codes (EV1527, PT2262 …): die meisten Fernbedienungen, Tür-/Fensterkontakte, Bewegungsmelder, Klingeltaster |
+| Alle Protokolle | nur Portisch | alle Protokolle der Portisch-Liste, längere Codes |
+| Rohdaten | nur Portisch | Zeitstufen + Daten (B1) – für Geräte, die keins der Protokolle sprechen |
+
+**Codes:** Unter Status erscheinen die zuletzt empfangenen Codes (`S:` Standard, `P:` Protokoll, `R:` Rohdaten).
+„Übernehmen“ setzt einen Code in das Formular unter „Funk“; gespeichert wird er als
+
+- **Taste** – ein Code; Ereignis `rf.button` (Klingel, Fernbedienungstaste, Bewegungsmelder)
+- **Kontakt** – Code „offen“ und optional „geschlossen“; Ereignisse `rf.open` / `rf.closed`, Zustand wird gehalten
+- **Schalter** – Code „an“ und „aus“ (Funksteckdose); erscheint als `switch:<n>` wie bei einem Shelly und lässt sich
+  per `Switch.Set`, Zeitplan, Regel und Hermit Cloud schalten. Drückt jemand die Original-Fernbedienung, zieht der
+  Zustand mit
+
+Bis zu 40 Einträge, Nummer `id` 0–63. Wiederholungen derselben Taste innerhalb von 0,7 s zählen einmal.
+Unbekannte Codes lösen `rf.unknown` aus. Gesendet wird mit 8 Wiederholungen (einstellbar 1–40).
+
+**Flash:** In 1 MB passt Hermit OS nicht zweimal. Updates laufen deshalb in zwei Schritten über den
+**Hermit Loader 1 MB** (`hermit-loader-1m.bin.gz`): Hermit OS installiert den Loader, startet neu, der Loader lädt
+die neue Firmware (SHA-256-geprüft) und startet sie. Einstellungen und gespeicherte Codes bleiben erhalten.
+Schlägt es fehl, bleibt der Loader mit seiner Seite zum Hochladen (`hermit-rfbridge.bin.gz`) erreichbar.
 
 ---
 

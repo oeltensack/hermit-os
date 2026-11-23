@@ -22,7 +22,7 @@ Nur Python 3.8+ Standardbibliothek. Der PC muss im selben Netz wie der Shelly se
 die Windows-Firewall muss eingehende Verbindungen auf dem Port (Standard 8266) erlauben.
 """
 import argparse, base64, concurrent.futures, hashlib, http.server, io, ipaddress, json, os, pathlib, socket, sys, threading, time
-import urllib.error, urllib.request, uuid, zipfile
+import urllib.error, urllib.parse, urllib.request, uuid, zipfile
 
 if getattr(sys, "frozen", False):            # als EXE (PyInstaller): bin/ liegt neben der EXE
     ROOT = pathlib.Path(sys.executable).resolve().parent
@@ -39,6 +39,8 @@ GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "herm
                "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo"),
                "SHDM-2": ("ShellyDimmer2", "hermit-dimmer2"),
                "SHSW-25": ("Shelly25", "hermit-25")}
+ONE_MB = {"hermit-rfbridge"}                 # 1 MB Flash: Firmware als .bin.gz, Umweg ueber hermit-loader-1m
+TASMOTA_MINIMAL = "http://ota.tasmota.com/tasmota/release/tasmota-minimal.bin.gz"
 
 
 def log(msg):
@@ -156,13 +158,15 @@ def variant_from(dev, kind, info, addon, meter=False, cover=None):
             v = "hermit-dimmer2"
         elif "duo" in name and "rgbw" not in name:
             v = "hermit-duo"
+        elif "bridge" in name or "rf bridge" in str((jget(dev, "/cm?cmnd=Module") or {}).get("Module", "")).lower():
+            v = "hermit-rfbridge"
         elif "1pm" in name:
             v = "hermit-1pm"
         elif "shelly 1" in name:
             v = "hermit-1"
     if v and addon:
-        if v in ("hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover"):
-            die("Plug / Plug S / Duo / Dimmer 2 / Shelly 2.5 haben keinen Add-on-Anschluss")
+        if v in ("hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover", "hermit-rfbridge"):
+            die("Plug / Plug S / Duo / Dimmer 2 / Shelly 2.5 / RF Bridge haben keinen Add-on-Anschluss")
         v += "-addon"
     if v and cover is not None and v.startswith("hermit-25"):
         v = "hermit-25-cover" if cover else "hermit-25"
@@ -174,11 +178,14 @@ def variant_from(dev, kind, info, addon, meter=False, cover=None):
 
 
 def load_bin(args, variant):
-    p = pathlib.Path(args.bin) if args.bin else BIN_DIR / f"{variant}.bin"
+    gz = variant in ONE_MB                   # 1 MB: nur die gepackte Datei passt neben den Loader
+    p = pathlib.Path(args.bin) if args.bin else BIN_DIR / f"{variant}.bin{'.gz' if gz else ''}"
     if not p.exists():
         die(f"Firmware {p} nicht gefunden (Repo-Ordner bin/ oder --bin angeben)")
     data = p.read_bytes()
-    if data[:1] != b"\xe9":
+    if gz and data[:2] != b"\x1f\x8b":
+        die(f"{p.name}: für 1-MB-Geräte die .bin.gz verwenden")
+    if not gz and data[:1] != b"\xe9":
         die(f"{p.name} ist keine ESP8266-Firmware (.bin, nicht .gz verwenden)")
     log(f"Firmware: {p.name} ({len(data) // 1024} KB)")
     return data
@@ -405,20 +412,42 @@ def flash_stock(dev, args, info, variant, fw):
         srv.stop()
 
 
-def flash_tasmota(dev, args, variant, fw):
-    loader = BIN_DIR / "hermit-loader.bin.gz"
-    if not loader.exists():
-        die(f"{loader} fehlt")
-    data = loader.read_bytes()
-    log("Tasmota erkannt – spiele Hermit Loader auf …")
+def loader_file(variant):
+    name = "hermit-loader-1m.bin.gz" if variant in ONE_MB else "hermit-loader.bin.gz"
+    f = BIN_DIR / name
+    if not f.exists():
+        die(f"{f} fehlt")
+    return name, f.read_bytes()
+
+
+def tasmota_upload(dev, name, data):
     dev.get("/up")                                   # setzt bei Tasmota den Upload-Typ "Firmware"
     try:
-        dev.upload(f"/u2?fsz={len(data)}", "u2", "hermit-loader.bin.gz", data)
+        st, body = dev.upload(f"/u2?fsz={len(data)}", "u2", name, data)
+        return body or b""
     except urllib.error.HTTPError as e:
         if e.code not in (301, 302, 303):
             log(f"(Antwort nach Upload: HTTP {e.code})")
+        return e.read() or b""
     except Exception as e:
         log(f"(Antwort nach Upload: {e})")
+        return b""
+
+
+def flash_tasmota(dev, args, variant, fw):
+    name, data = loader_file(variant)
+    log("Tasmota erkannt – spiele Hermit Loader auf …")
+    body = tasmota_upload(dev, name, data)
+    if variant in ONE_MB and (b"space" in body.lower() or b"failed" in body.lower()):
+        # 1 MB: im vollen Tasmota ist zu wenig Platz – erst tasmota-minimal (Tasmota laedt es selbst)
+        log("Zu wenig Platz in Tasmota – installiere zuerst tasmota-minimal …")
+        dev.get("/cm?cmnd=" + urllib.parse.quote("OtaUrl " + TASMOTA_MINIMAL))
+        dev.get("/cm?cmnd=Upgrade%201")
+        time.sleep(15)
+        if not wait_for(lambda: (jget(dev, "/cm?cmnd=Status%202") or {}).get("StatusFWR", {}).get("Version", "").lower().count("minimal"),
+                        240, "tasmota-minimal"):
+            die("tasmota-minimal meldet sich nicht – Gerät prüfen und erneut starten")
+        body = tasmota_upload(dev, name, data)
     if not wait_for(lambda: b"Hermit Loader" in dev.get("/")[1], 180, "Hermit Loader"):
         die("Loader meldet sich nicht unter der alten IP – evtl. AP 'hermit-loader-…' (kein WLAN gefunden)")
     flash_loader(dev, args, variant, fw)
@@ -427,7 +456,7 @@ def flash_tasmota(dev, args, variant, fw):
 def flash_loader(dev, args, variant, fw):
     log("Hermit Loader erkannt – lade Hermit OS hoch …")
     try:
-        dev.upload("/upload", "f", f"{variant}.bin", fw)
+        dev.upload("/upload", "f", f"{variant}.bin" + (".gz" if variant in ONE_MB else ""), fw)
     except urllib.error.HTTPError as e:
         if e.code not in (301, 302, 303):
             log(f"(Antwort nach Upload: HTTP {e.code})")
@@ -438,6 +467,18 @@ def flash_loader(dev, args, variant, fw):
 
 
 def flash_hermit(dev, args, variant, fw):
+    if variant in ONE_MB:
+        # 1 MB: Hermit OS passt nicht zweimal hinein – erst den Loader, dann die Firmware
+        name, data = loader_file(variant)
+        log("Hermit OS (1 MB) erkannt – spiele zuerst den Hermit Loader auf …")
+        try:
+            dev.upload("/update", "firmware", name, data)
+        except Exception as e:
+            log(f"(Antwort nach Upload: {e})")
+        if not wait_for(lambda: b"Hermit Loader" in dev.get("/")[1], 120, "Hermit Loader"):
+            die("Loader meldet sich nicht")
+        flash_loader(dev, args, variant, fw)
+        return
     log("Hermit OS erkannt – Firmware-Update …")
     try:
         dev.upload("/update", "firmware", f"{variant}.bin", fw)
@@ -451,13 +492,13 @@ def flash_hermit(dev, args, variant, fw):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 (Gen1) schreiben")
+    ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 / 2.5 (Gen1) und Sonoff RF Bridge schreiben")
     ap.add_argument("ip", help="IP-Adresse des Shelly")
     ap.add_argument("--addon", action="store_true", help="Variante mit Add-on-Taster installieren")
     ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S / Plug): nur Energiemessung, Reset nur am Taster/SW")
     ap.add_argument("--cover", action="store_true", default=None, help="Shelly 2.5: Rollladen-Firmware (hermit-25-cover)")
     ap.add_argument("--switch", dest="cover", action="store_false", help="Shelly 2.5: Schalter-Firmware mit zwei Kanälen (hermit-25)")
-    ap.add_argument("--variant", help="z. B. hermit-1pm, hermit-1pm-addon, hermit-1pm-meter, hermit-plugs-meter (sonst automatisch)")
+    ap.add_argument("--variant", help="z. B. hermit-1pm, hermit-1pm-addon, hermit-1pm-meter, hermit-plugs-meter, hermit-rfbridge (sonst automatisch)")
     ap.add_argument("--bin", help="eigene .bin statt bin/<variante>.bin")
     ap.add_argument("--user", default="admin")
     ap.add_argument("--password", default="")

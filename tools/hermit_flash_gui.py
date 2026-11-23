@@ -14,7 +14,7 @@ from tkinter import ttk, filedialog, messagebox
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import hermit_flash as hf  # noqa: E402
 
-VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover",
+VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover", "hermit-rfbridge",
             "hermit-1pm-meter", "hermit-plugs-meter", "hermit-plug-meter"]
 KIND_NAMES = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
 

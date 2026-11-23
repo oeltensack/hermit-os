@@ -91,6 +91,12 @@ Erkannt wird das Modell über die Tasmota-Vorlage („Shelly 1“, „Shelly 1PM
 
 Der Loader steuert die Relais nicht an und kann kein HTTPS (dadurch bleibt er klein).
 
+**Sonoff RF Bridge (1 MB):** Hier gehört der **Hermit Loader 1 MB** (`hermit-loader-1m.bin.gz`, ca. 310 KB) dazu.
+Er kann HTTPS und installiert Hermit OS nach 60 s selbst aus dem Netz (`update.json`), falls bis dahin keine Datei
+hochgeladen wurde; von Hand wird `hermit-rfbridge.bin.gz` hochgeladen (hier die `.gz`). Der Flasher erkennt die
+Tasmota-Vorlage „Sonoff Bridge“. Hat Tasmota zu wenig Platz, spielt der Flasher erst `tasmota-minimal` auf
+(Tasmota lädt es selbst von ota.tasmota.com) und danach den Loader. Der Funkchip (EFM8) bleibt, wie er ist.
+
 ## 4. Per Kabel (Notlösung)
 
 USB-UART-Adapter mit **3,3 V**, Gerät **nur über den Adapter** versorgen – niemals gleichzeitig am Netz.
@@ -125,6 +131,7 @@ Bei der Duo ist das Gehäuse verklebt – dieser Weg ist dort nur mit Aufwand m�
 
 - Quelle ist `update.json` in diesem Repo; jedes Gerät lädt nur die Datei seiner Variante.
 - Vor dem Umschalten wird die **SHA-256** geprüft; stimmt sie nicht, bleibt die alte Firmware.
+- **RF Bridge (1 MB):** Update in zwei Schritten über den Hermit Loader 1 MB, siehe [GERAETE.md](GERAETE.md#sonoff-rf-bridge-433).
 - Das Repo ist öffentlich, ein Token ist nicht nötig. **Nur für einen eigenen privaten Fork:** GitHub-Token
   eintragen (fine-grained, nur dieses Repo, *Contents: Read-only*) und die URL auf den Fork ändern.
 - Alternativ `update.json` und `bin/` auf einem eigenen Webserver ablegen und die URL anpassen.

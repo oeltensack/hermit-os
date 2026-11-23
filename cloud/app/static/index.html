@@ -479,7 +479,7 @@ dlg(`<h2>${id?'Regel bearbeiten':'Neue Regel'}</h2><div class="f"><label>Name</l
 <label class="rt rt-d">Gerät</label><select id="ru_d" class="rt rt-d">${devOpts(t.dev)}</select>
 <label class="rt rt-p">Bedingung</label><div class="row rt rt-p"><select id="ru_op"><option value=">" ${t.op!='<'?'selected':''}>über</option><option value="<" ${t.op=='<'?'selected':''}>unter</option></select><input id="ru_w" style="width:80px" value="${t.w??100}"> W für <input id="ru_f" style="width:60px" value="${(t.for_s||0)/60}"> min</div>
 <label class="rt rt-s">Zustand</label><select id="ru_s" class="rt rt-s"><option value="on">eingeschaltet</option><option value="off" ${t.state=='off'?'selected':''}>ausgeschaltet</option></select>
-<label class="rt rt-e">Ereignis</label><input id="ru_e" class="rt rt-e" value="${esc(t.event||'single_push')}" placeholder="single_push, double_push, toggle_on, overpower …">
+<label class="rt rt-e">Ereignis</label><input id="ru_e" class="rt rt-e" value="${esc(t.event||'single_push')}" placeholder="single_push, double_push, toggle_on, overpower …"><div class="l rt rt-e">RF Bridge: <code>rf:3.button</code> (Taste Nr. 3), <code>rf:2.open</code> / <code>rf:2.closed</code> (Kontakt Nr. 2) – die Nummer steht in der Bridge unter „Funk“.</div>
 <label>Nur zwischen</label><div class="row"><input id="ru_wf" type="time" value="${w.from||''}"> und <input id="ru_wt" type="time" value="${w.to||''}"> <span class="l">leer = immer</span></div>
 <label>Nur an</label>${daysHtml(t.days??127,'ru_dy')}
 <label>Aktiv</label><div><input type="checkbox" id="ru_en" ${r.enabled?'checked':''}></div></div>

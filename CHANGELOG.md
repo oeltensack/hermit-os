@@ -1,5 +1,20 @@
 # Änderungen
 
+## 1.16.0
+- **Sonoff RF Bridge 433** (`hermit-rfbridge`, R2 mit EFM8BB1, Original- oder Portisch-Firmware im Funkchip):
+  - Empfangene Codes anzeigen, übernehmen und speichern als Taste, Kontakt (offen/zu) oder Schalter (Funksteckdose)
+  - Funksteckdosen erscheinen als `switch:<n>` – schaltbar per RPC, Zeitplan, Regel, Hermit Cloud; Fernbedienung
+    aktualisiert den Zustand
+  - Ereignisse `rf.button`, `rf.open`, `rf.closed`, `rf.unknown`, `switch.on/off` je gespeichertem Code (Aktionen, MQTT)
+  - Empfangsmodi Standard (24 Bit), alle Protokolle und Rohdaten (Portisch); Senden beliebiger Codes; Summer
+  - RPC `RF.*`, Reiter „Funk“ in der Oberfläche
+- **1-MB-Geräte:** Update über den neuen **Hermit Loader 1 MB** (lädt per HTTPS, prüft SHA-256, Einstellungen
+  bleiben); WLAN aus Tasmota wird vor dem ersten Formatieren gelesen
+- Flasher: RF Bridge von Tasmota (bei Platzmangel automatisch über tasmota-minimal) und Hermit-zu-Hermit-Update über den Loader
+
+## Hermit Cloud 1.7.3
+- Regeln mit Ereignis einer bestimmten Komponente, z. B. `rf:3.button` oder `rf:2.open` (RF Bridge)
+
 ## Hermit Cloud 1.7.2
 - Fehler aus 1.7.1 behoben: Beim Löschen kam das Gerät sofort ohne Daten zurück (leere Nachricht zum
   Entfernen der gespeicherten Daten wurde als „offline“ gelesen). Leere Nachrichten und die Offline-Meldung

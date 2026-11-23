@@ -17,6 +17,7 @@ Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Hermit Clou
 | **Shelly 2.5** (`SHSW-25`) | `hermit-25` | Shelly Plus 2PM (`switch:0`, `switch:1`) | zwei Kanäle mit Leistung, Spannung, Strom, cos φ, Energie (ADE7953), Temperatur |
 | **Shelly 2.5 Rollladen** | `hermit-25-cover` | Shelly Plus 2PM im Rollladenbetrieb (`cover:0`) | Auf/Ab/Stopp, Position nach Kalibrierfahrt, Endlagen am Motorstrom, Hinderniserkennung |
 | **Shelly Dimmer 2** (`SHDM-2`) | `hermit-dimmer2` | Shelly Dimmer Gen3 (`light:0`) | Dimmen per Taster (1 oder 2), Leistung, Energie, Temperatur, Licht bleibt beim Update an |
+| **Sonoff RF Bridge 433** (R2 mit EFM8, 1 MB) | `hermit-rfbridge` | eigene Komponente `rf`, Funksteckdosen als `switch:<n>` | Codes empfangen, speichern (Taste, Kontakt, Schalter), senden; Aktionen je Code; Standard- und Portisch-Firmware |
 
 > Shelly ist eine Marke der Shelly Group. Hermit OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.
@@ -101,7 +102,7 @@ Einrichtung: **[cloud/README.md](cloud/README.md)**
 | Dokument | Inhalt |
 |---|---|
 | **[docs/FLASHEN.md](docs/FLASHEN.md)** | Flasher (grafisch, Konsole, EXE), Wege von Original-Firmware und Tasmota, Hermit Loader, serielles Flashen, Updates, Fehlersuche |
-| **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo, Dimmer 2, Shelly 2.5 |
+| **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo, Dimmer 2, Shelly 2.5, RF Bridge |
 | **[docs/API.md](docs/API.md)** | Alle RPC-Methoden, Statusfelder, Aktionen und Platzhalter, Gen1-Endpunkte, Diagnose, Unterschiede zu Gen2 |
 | **[docs/SCANNER.md](docs/SCANNER.md)** | Hermit Scanner: findet Shelly Gen1/Gen2+, Tasmota und Hermit OS im Netz (Windows) |
 | **[cloud/](cloud/README.md)** | Hermit Cloud: Heim-Cloud mit Übersicht, Schalten, Energieverlauf und Meldungen (Docker) |

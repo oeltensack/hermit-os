@@ -81,6 +81,24 @@
   #define HAS_LED      0
   #define DEF_INITIAL  "on"   // Lampe am Wandschalter: nach Strom an
   #define PWR_CAL_DEFAULT 1.0f
+#elif defined(DEVICE_RFBRIDGE)
+  // Sonoff RF Bridge 433 (R2): ESP8285 mit 1 MB Flash + EFM8BB1 (Portisch- oder Original-Firmware)
+  // UART0 (GPIO1/3, 19200 Baud) gehoert dem EFM8 – keine Debug-Ausgaben ueber Serial!
+  #define DEV_PREFIX   "hermit-rfbridge"
+  #define DEV_MODEL    "HERMIT-RFBRIDGE"
+  #define DEV_APP      "RFBridge"
+  #define GEN1_TYPE    "RFBRIDGE"
+  #define HAS_RF       1
+  #define FLASH_1M     1
+  #define HAS_RELAY    0
+  #define HAS_INPUT    0
+  #define HAS_PM       0
+  #define HAS_TEMP     0
+  #define HAS_LED      1
+  #define PIN_LED      13     // blaue WLAN-LED, invertiert
+  #define PIN_BTN      0      // Taster (gedrueckt = LOW)
+  #define HAS_MGOS     0      // keine Shelly-Original-Firmware als Vorgaenger
+  #define PWR_CAL_DEFAULT 1.0f
 #elif defined(DEVICE_DIMMER2)
   // Shelly Dimmer 2 (SHDM-2): ESP8266 + STM32-Koprozessor (Phasenan-/abschnitt, Leistungsmessung).
   // Tasmota-Template {"NAME":"Shelly Dimmer 2","GPIO":[0,3200,0,3232,5568,5600,0,0,193,0,192,0,320,4736]}
@@ -267,6 +285,16 @@
 #ifndef DEF_INITIAL
   #define DEF_INITIAL "off"
 #endif
+#ifndef HAS_RF
+  #define HAS_RF 0
+#endif
+#ifndef FLASH_1M
+  #define FLASH_1M 0
+#endif
+#ifndef HAS_MGOS
+  #define HAS_MGOS 1
+#endif
+#define SERIAL_BUSY (HAS_DIM || HAS_RF)   // UART0 gehoert einem Koprozessor
 #if IS_COVER
   #define COMP     "cover"      // Gen2-Komponente wie Shelly Plus 2PM im Rollladenbetrieb
   #define EV_ON    "cover.open"

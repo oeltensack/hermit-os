@@ -121,6 +121,25 @@ Ohne `on` ändert `Light.Set` nur die Helligkeit – ausgeschaltet bleibt aus. E
 `light.overpower`, `light.overtemperature`, `light.power_above`/`_below`; Eingänge `input:0` (SW1) und `input:1` (SW2).
 Fehler `stm_no_response`: Der STM32 antwortet nicht.
 
+## RF (Sonoff RF Bridge)
+
+| Methode | Parameter |
+|---|---|
+| `RF.GetStatus` | `{mode, frames, acks, errors, last_rx_ago, recent:[{code, short, ago, count, id?}], entries:[{id, name, type, state, last_ago}]}` |
+| `RF.GetConfig` | `{mode, repeats, entries:[{id, name, type, code1, code2}]}` |
+| `RF.SetConfig` | `config: {mode: "standard"|"protocols"|"raw", repeats: 1–40}` |
+| `RF.Add` | `name`, `type` (`button`, `contact`, `switch`), `code1`, `code2` → `{id}` |
+| `RF.Update` | `id` + Felder wie bei `RF.Add` |
+| `RF.Delete` | `id` |
+| `RF.Send` | `code` (z. B. `S:24E001F40384A1B2C3`, `repeats` optional) oder `id` (+ `on` bei Kontakt/Schalter) |
+| `RF.Beep` | `ms` (10–2000) – Summer der Bridge |
+| `Switch.Set` / `Switch.Toggle` / `Switch.GetStatus` | `id` = Nummer eines gespeicherten **Schalters** (Funksteckdose) |
+
+Codes: `S:` + 9 Byte (Sync, Low, High je 2 Byte in µs, 3 Byte Daten), `P:` + Protokoll-Index + Daten (Portisch),
+`R:` + Rohdaten wie vom EFM8 empfangen (Portisch). Ereignisse mit der Nummer des Eintrags als `cid`:
+`rf.button`, `rf.open`, `rf.closed`, `switch.on`, `switch.off`; `rf.unknown` (cid 0) für nicht gespeicherte Codes.
+Über MQTT kommen sie als `NotifyEvent` mit `component: "rf:3", event: "button"`.
+
 ## Input
 
 | Methode | Parameter |
@@ -214,6 +233,7 @@ und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für 
 | `/status` | Gen1-Status mit `relays`, `meters`, `inputs`, `wifi_sta`, `temperature` |
 | `/relay/0?turn=on|off|toggle&timer=10` | schalten (Shelly 1/1PM/Plug S/Plug; bei der Duo Licht an/aus); Shelly 2.5 auch `/relay/1` |
 | `/roller/0?go=open|close|stop|to_pos&roller_pos=50` | Shelly 2.5 Rollladen |
+| `/status` (RF Bridge) | `relays` = gespeicherte Funksteckdosen, `rfcode` = zuletzt empfangener Code |
 | `/meter/0` | `power`, `total` (Watt-Minuten wie Gen1) |
 | `/light/0?turn=on&brightness=50&temp=3000&transition=500` | Duo und Dimmer 2 (`transition` in ms, `temp` nur Duo) |
 | `/update` | Firmware hochladen (Formularfeld beliebig) |

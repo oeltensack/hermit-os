@@ -350,7 +350,8 @@ def on_status(dev, comp, new, old):
 def on_event(dev, comp, ev):
     try:
         for r, t in _rules(dev, "event"):
-            if t.get("event") in (ev, f"{comp.split(':')[0]}.{ev}") and (not t.get("comp") or t["comp"] == comp):
+            # "single_push", "input.single_push" oder mit Komponente "rf:3.button" (RF Bridge: Code Nr. 3)
+            if t.get("event") in (ev, f"{comp.split(':')[0]}.{ev}", f"{comp}.{ev}") and (not t.get("comp") or t["comp"] == comp):
                 fire(r, f"{dev_name(dev)}: {ev}")
     except Exception as e:
         print("Automatik:", e, flush=True)

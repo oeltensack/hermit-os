@@ -31,7 +31,7 @@
 #endif
 
 // Debug-Ausgaben ueber UART0 – beim Dimmer gehoert die Schnittstelle dem STM32
-#if HAS_DIM
+#if SERIAL_BUSY
   #define LOGLN(x) do {} while (0)
   #define LOGF(...) do {} while (0)
 #else
@@ -125,7 +125,9 @@ struct Cfg {
 
 static const char* EVENTS[] = {
   EV_ON, EV_OFF,
-#if !HAS_LIGHT
+#if HAS_RF
+  "rf.button", "rf.open", "rf.closed", "rf.unknown",
+#elif !HAS_LIGHT
   EV_OVERPOWER, EV_OVERTEMP,
 #endif
 #if IS_METER
@@ -153,6 +155,9 @@ static const char* METHODS[] = {
   "Cover.Open", "Cover.Close", "Cover.Stop", "Cover.GoToPosition", "Cover.Calibrate",
   "Cover.GetStatus", "Cover.GetConfig", "Cover.SetConfig", "Cover.ResetCounters",
   "Switch.Calibrate",
+#elif HAS_RF
+  "RF.GetStatus", "RF.GetConfig", "RF.SetConfig", "RF.Send", "RF.Add", "RF.Update", "RF.Delete", "RF.Beep",
+  "Switch.Set", "Switch.Toggle", "Switch.GetStatus",
 #elif HAS_DIM
   "Light.Set", "Light.Toggle", "Light.GetStatus", "Light.GetConfig", "Light.SetConfig",
   "Light.DimUp", "Light.DimDown", "Light.DimStop", "Light.ResetCounters", "Light.Calibrate", "Hermit.Stm",
@@ -162,7 +167,9 @@ static const char* METHODS[] = {
   "Switch.ResetCounters", "Switch.Calibrate",
 #endif
 #endif
+#if HAS_INPUT || HAS_ADDON
   "Input.GetStatus", "Input.GetConfig", "Input.SetConfig", "Input.Diag",
+#endif
 #if HAS_ADDON
   "SensorAddon.GetPeripherals",
 #endif
@@ -923,9 +930,179 @@ bool coverMoving() { return false; }
 void handleCover() {}
 #endif
 
+
+// ======================= RF-Bridge (Sonoff RF Bridge 433) =======================
+// Empfangene Codes erscheinen in „Zuletzt empfangen“ und koennen gespeichert werden als
+//  - Taste   (Ereignis rf.button, cid = Eintrag)
+//  - Kontakt (zwei Codes: offen/zu -> Ereignisse rf.open / rf.closed, Zustand)
+//  - Schalter (zwei Codes: an/aus -> Gen2-Komponente switch:<id>, schaltbar, Fernbedienung aktualisiert den Zustand)
+#if HAS_RF
+#include "rf_bridge.h"
+RfEfm<HardwareSerial> efm;
+
+struct RfEntry {
+  int id = 0;
+  String name, type = "button";        // button | contact | switch
+  String code1, code2;                 // Taste/Kontakt offen/Schalter an · Kontakt zu/Schalter aus
+  int state = -1;                      // Kontakt: 1 offen, 0 zu; Schalter: 1 an, 0 aus; -1 unbekannt
+  String src = "init";
+  uint32_t lastMs = 0;
+};
+std::vector<RfEntry> rfList;
+struct RfSeen { String code; uint32_t ms; time_t ts; int id; int count; };
+std::vector<RfSeen> rfRecent;           // neueste zuerst, max. 16
+uint8_t rfMode = 0;                     // 0 Standard, 1 alle Protokolle (Portisch), 2 Rohdaten (Portisch)
+uint8_t rfRepeats = 8;
+String rfLastCode; uint32_t rfLastCodeMs = 0;
+uint32_t rfLedMs = 0;                   // LED kurz an bei Empfang
+
+String rfToStr(const RfCode& c) {
+  String s = c.kind == RF_STD ? "S:" : c.kind == RF_PROTO ? "P:" : "R:";
+  char b[3];
+  for (int i = 0; i < c.len; i++) { snprintf(b, sizeof b, "%02X", c.d[i]); s += b; }
+  return s;
+}
+bool rfFromStr(String s, RfCode& c) {
+  s.trim(); s.toUpperCase(); s.replace(" ", "");
+  if (s.length() < 4 || s[1] != ':') return false;
+  c.kind = s[0] == 'S' ? RF_STD : s[0] == 'P' ? RF_PROTO : s[0] == 'R' ? RF_RAW : (RfKind)0;
+  if (!c.kind) return false;
+  String h = s.substring(2);
+  if (h.length() % 2 || h.length() / 2 > sizeof(c.d)) return false;
+  c.len = h.length() / 2;
+  for (int i = 0; i < c.len; i++) {
+    char t[3] = {h[i * 2], h[i * 2 + 1], 0};
+    char* e; long v = strtol(t, &e, 16);
+    if (*e) return false;
+    c.d[i] = (uint8_t)v;
+  }
+  return (c.kind != RF_STD || c.len == 9) && c.len >= 2;
+}
+// Rohdaten sind nie zweimal gleich: Vergleich nur ueber die Daten (ohne Zeitstufen)
+String rfKey(const String& code) {
+  if (code.startsWith("R:") && code.length() > 4) {
+    int n = strtol(code.substring(2, 4).c_str(), nullptr, 16);
+    return "R:" + code.substring(4 + n * 4);
+  }
+  if (code.startsWith("S:") && code.length() == 20) return "S:" + code.substring(14);   // nur die 24 Bit
+  return code;
+}
+String rfShort(const String& code) {
+  if (code.startsWith("S:") && code.length() == 20) return code.substring(14);
+  return code.length() > 26 ? code.substring(0, 24) + "…" : code;
+}
+
+void rfSave() {
+  JsonDocument d;
+  d["mode"] = rfMode; d["rep"] = rfRepeats;
+  JsonArray a = d["list"].to<JsonArray>();
+  for (auto& e : rfList) {
+    JsonObject o = a.add<JsonObject>();
+    o["id"] = e.id; o["n"] = e.name; o["t"] = e.type; o["c1"] = e.code1; o["c2"] = e.code2; o["s"] = e.state;
+  }
+  File f = LittleFS.open("/rf.json", "w");
+  if (f) { serializeJson(d, f); f.close(); }
+}
+void rfLoad() {
+  File f = LittleFS.open("/rf.json", "r");
+  if (!f) return;
+  JsonDocument d;
+  if (deserializeJson(d, f)) { f.close(); return; }
+  f.close();
+  rfMode = d["mode"] | 0; rfRepeats = d["rep"] | 8;
+  rfList.clear();
+  for (JsonObjectConst o : d["list"].as<JsonArrayConst>()) {
+    RfEntry e; e.id = o["id"] | 0; e.name = jstr(o["n"], ""); e.type = jstr(o["t"], "button");
+    e.code1 = jstr(o["c1"], ""); e.code2 = jstr(o["c2"], ""); e.state = o["s"] | -1;
+    rfList.push_back(e);
+  }
+}
+RfEntry* rfFind(int id) { for (auto& e : rfList) if (e.id == id) return &e; return nullptr; }
+int rfFreeId() { for (int i = 0; i < 64; i++) if (!rfFind(i)) return i; return -1; }
+
+bool rfSendStr(const String& code, uint8_t rep = 0) {
+  RfCode c;
+  if (!rfFromStr(code, c)) return false;
+  return efm.send(c, rep ? rep : rfRepeats);
+}
+
+// Schalter (Funksteckdose) schalten: Code senden, Zustand merken
+bool rfSwitch(RfEntry& e, bool on, const String& src) {
+  const String& code = on ? e.code1 : e.code2;
+  if (!code.length() || !rfSendStr(code)) return false;
+  bool was = e.state == 1;
+  e.state = on ? 1 : 0; e.src = src;
+  rfLastCode = rfKey(code); rfLastCodeMs = millis();   // eigenes Echo nicht als Fernbedienung werten
+  if (was != on) fireEvent(on ? "switch.on" : "switch.off", e.id);
+  rfSave();
+  return true;
+}
+
+void rfOnCode(const RfCode& c) {
+  String code = rfToStr(c), key = rfKey(code);
+  uint32_t now = millis();
+  rfLedMs = now | 1;
+  bool repeat = key == rfLastCode && now - rfLastCodeMs < 700;   // Fernbedienungen senden mehrfach
+  rfLastCode = key; rfLastCodeMs = now;
+  int match = -1;
+  for (auto& e : rfList) {
+    bool m1 = e.code1.length() && rfKey(e.code1) == key, m2 = e.code2.length() && rfKey(e.code2) == key;
+    if (!m1 && !m2) continue;
+    match = e.id;
+    if (repeat) break;
+    e.lastMs = now;
+    if (e.type == "button") fireEvent("rf.button", e.id);
+    else if (e.type == "contact") {
+      int s = m1 ? 1 : 0;
+      if (e.state != s) { e.state = s; fireEvent(s ? "rf.open" : "rf.closed", e.id); }
+    } else if (e.type == "switch") {
+      int s = m1 ? 1 : 0;
+      e.src = "rf";
+      if (e.state != s) { e.state = s; fireEvent(s ? "switch.on" : "switch.off", e.id); rfSave(); }
+    }
+    break;
+  }
+  if (!repeat && match < 0) fireEvent("rf.unknown", 0);
+  for (auto it = rfRecent.begin(); it != rfRecent.end(); ++it)
+    if (rfKey(it->code) == key) { RfSeen s = *it; rfRecent.erase(it); s.ms = now; s.ts = time(nullptr); s.count++; s.id = match; s.code = code; rfRecent.insert(rfRecent.begin(), s); return; }
+  rfRecent.insert(rfRecent.begin(), RfSeen{code, now, time(nullptr), match, 1});
+  if (rfRecent.size() > 16) rfRecent.pop_back();
+}
+
+void rfStatus(JsonObject o) {
+  o["mode"] = rfMode == 1 ? "protocols" : rfMode == 2 ? "raw" : "standard";
+  o["frames"] = efm.frames; o["acks"] = efm.acks; o["errors"] = efm.bad;
+  if (efm.lastRxMs) o["last_rx_ago"] = (millis() - efm.lastRxMs) / 1000;
+  JsonArray r = o["recent"].to<JsonArray>();
+  for (auto& s : rfRecent) {
+    JsonObject x = r.add<JsonObject>();
+    x["code"] = s.code; x["short"] = rfShort(s.code); x["ago"] = (millis() - s.ms) / 1000; x["count"] = s.count;
+    if (s.id >= 0) x["id"] = s.id;
+  }
+  JsonArray l = o["entries"].to<JsonArray>();
+  for (auto& e : rfList) {
+    JsonObject x = l.add<JsonObject>();
+    x["id"] = e.id; x["name"] = e.name; x["type"] = e.type;
+    if (e.state >= 0) x["state"] = e.state == 1; else x["state"] = nullptr;
+    if (e.lastMs) x["last_ago"] = (millis() - e.lastMs) / 1000;
+  }
+}
+void rfEntryJson(JsonObject x, const RfEntry& e) {
+  x["id"] = e.id; x["name"] = e.name; x["type"] = e.type; x["code1"] = e.code1; x["code2"] = e.code2;
+}
+void rfSwitchStatus(JsonObject o, const RfEntry& e) {
+  o["id"] = e.id; o["source"] = e.src; o["output"] = e.state == 1;
+}
+
+void handleRf() { efm.poll(); }
+#endif
+
 void handleLed() {
 #if HAS_LED
   if (apActive) digitalWrite(PIN_LED, (millis() / 500) & 1 ? LED_ON_LEVEL : LED_OFF_LEVEL);
+#if HAS_RF
+  else digitalWrite(PIN_LED, (rfLedMs && millis() - rfLedMs < 150) ? LED_ON_LEVEL : LED_OFF_LEVEL);
+#endif
 #endif
 #ifdef PIN_LED_LINK
   // WLAN-LED: AP blinkt, getrennt an, verbunden aus
@@ -1428,6 +1605,10 @@ void handleWifi() {
 // {"version":"1.4.0","files":{"hermit-1pm":{"url":"bin/hermit-1pm.bin","sha256":"…"}, …}}
 // Relative URLs werden relativ zur update.json aufgeloest.
 String updAvailVer, updAvailUrl, updAvailSha, updLastErr, updState = "idle";
+#if FLASH_1M
+#include "upd_handoff.h"
+String updLoaderUrl, updLoaderSha;      // 1 MB: Zwischenschritt ueber den Loader
+#endif
 time_t updLastCheck = 0;
 bool updPendingInstall = false, updPendingCheck = false;
 String updManualUrl;
@@ -1486,6 +1667,12 @@ bool updCheck() {
   updAvailVer = ""; updAvailUrl = ""; updAvailSha = "";
   String ver = jstr(d["version"], "");
   if (!ver.length() || !f["url"].is<const char*>()) { updLastErr = "Keine Datei für " DEV_VARIANT; return false; }
+#if FLASH_1M
+  if (f["loader"].is<const char*>()) {
+    updLoaderUrl = resolveUrl(cfg.updUrl, f["loader"].as<const char*>());
+    updLoaderSha = jstr(f["loader_sha256"], ""); updLoaderSha.toLowerCase();
+  }
+#endif
   if (verCmp(ver, FW_VERSION) > 0) {
     updAvailVer = ver;
     updAvailUrl = resolveUrl(cfg.updUrl, f["url"].as<const char*>());
@@ -1499,8 +1686,38 @@ bool updCheck() {
 // Update auch bei eingeschaltetem Relais: der Relais-Pin bleibt ueber den Neustart gehalten (resetPins)
 #define UPD_RELAY_BLOCKS 0
 
+String updFlash(const String& url, const String& sha);
 String updInstall(const String& url, const String& sha) {
   if (UPD_RELAY_BLOCKS && CH[0].on) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
+#if FLASH_1M
+  // 1 MB Flash: neue Firmware passt nicht neben die laufende. Erst den Hermit Loader installieren;
+  // er laedt nach dem Neustart die eigentliche Datei (Adresse und SHA-256 im RTC-Speicher).
+  // Einstellungen (LittleFS) bleiben dabei erhalten.
+  if (!updLoaderUrl.length()) updCheck();
+  if (!updLoaderUrl.length()) return "update.json nennt keinen Loader für 1-MB-Geräte";
+  if (url.length() >= sizeof(UpdHandoff::url)) return "URL zu lang";
+  UpdHandoff h; memset(&h, 0, sizeof h);
+  h.magic = UPD_MAGIC;
+  updHexToSha(sha, h.sha);
+  strncpy(h.url, url.c_str(), sizeof h.url - 1);
+  String e = updFlash(updLoaderUrl, updLoaderSha);
+  if (e.length()) return "Loader: " + e;
+  updHandoffWrite(h);
+  // Der Loader kennt nur den WLAN-Speicher des ESP – aktuelle Zugangsdaten dort ablegen
+  if (cfg.ssid.length()) {
+    struct station_config sc; memset(&sc, 0, sizeof sc);
+    strncpy((char*)sc.ssid, cfg.ssid.c_str(), sizeof sc.ssid);
+    strncpy((char*)sc.password, cfg.pass.c_str(), sizeof sc.password - 1);
+    wifi_station_set_config(&sc);
+  }
+  updState = "loader";
+  return "";
+#else
+  return updFlash(url, sha);
+#endif
+}
+
+String updFlash(const String& url, const String& sha) {
   updState = "downloading";
   HTTPClient http; std::unique_ptr<WiFiClient> cl;
   if (!updOpen(http, cl, url)) { updState = "idle"; return "URL ungültig"; }
@@ -1861,6 +2078,9 @@ String applyHook(Hook& h, JsonVariantConst p) {
   if (h.event.startsWith("input.")) {
     if (h.cid != 0 && !(HAS_ADDON && h.cid == 100) && !(HAS_IN2 && h.cid == 1))
       return HAS_ADDON ? "cid: 0 (SW) oder 100 (Add-on)" : HAS_IN2 ? "cid: 0 (SW1) oder 1 (SW2)" : "cid muss 0 sein";
+  } else if (HAS_RF && (h.event.startsWith("rf.") || h.event.startsWith("switch."))) {
+    if (h.event == "rf.unknown") h.cid = 0;
+    else if (h.cid < 0 || h.cid > 63) return "cid: Nummer des gespeicherten Codes";
   } else if (h.cid < 0 || h.cid >= NCH || h.event.startsWith("sys.")) h.cid = 0;   // Schalter-Ereignisse: Kanal
   if (p["enable"].is<bool>()) h.enable = p["enable"];
   if (p["name"].is<const char*>()) h.name = p["name"].as<const char*>();
@@ -1928,6 +2148,9 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     lightStatus(o["light:0"].to<JsonObject>());
 #elif IS_COVER
     coverStatus(o["cover:0"].to<JsonObject>());
+#elif HAS_RF
+    rfStatus(o["rf"].to<JsonObject>());
+    for (auto& e : rfList) if (e.type == "switch") rfSwitchStatus(o[String("switch:") + e.id].to<JsonObject>(), e);
 #else
     for (int c = 0; c < NCH; c++) switchStatus(o[String("switch:") + c].to<JsonObject>(), c);
 #endif
@@ -1973,6 +2196,10 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     lightConfig(o["light:0"].to<JsonObject>());
 #elif IS_COVER
     coverConfig(o["cover:0"].to<JsonObject>());
+#elif HAS_RF
+    { JsonObject r = o["rf"].to<JsonObject>(); r["mode"] = rfMode == 1 ? "protocols" : rfMode == 2 ? "raw" : "standard"; r["repeats"] = rfRepeats;
+      JsonArray a = r["entries"].to<JsonArray>(); for (auto& e : rfList) rfEntryJson(a.add<JsonObject>(), e);
+      for (auto& e : rfList) if (e.type == "switch") { JsonObject k = o[String("switch:") + e.id].to<JsonObject>(); k["id"] = e.id; k["name"] = e.name; } }
 #else
     for (int c = 0; c < NCH; c++) switchConfig(o[String("switch:") + c].to<JsonObject>(), c);
 #endif
@@ -2114,7 +2341,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
 
   // ---- Switch / Input: nur id 0 ----
   int pid = p["id"] | 0;
-  if (m.startsWith("switch.") && (pid < 0 || pid >= NCH)) ERR(-103, NCH > 1 ? "Ungültige id – Schalter: 0 oder 1" : "Ungültige id – Schalter hat nur id 0");
+  if (!HAS_RF && m.startsWith("switch.") && (pid < 0 || pid >= NCH)) ERR(-103, NCH > 1 ? "Ungültige id – Schalter: 0 oder 1" : "Ungültige id – Schalter hat nur id 0");
   if (!HAS_INPUT && m.startsWith("input.")) ERR(404, "Gerät hat keinen Eingang");
   if (m.startsWith("input.") && pid != 0 && !(HAS_ADDON && pid == 100) && !(HAS_IN2 && pid == 1))
     ERR(-103, HAS_ADDON ? "Ungültige id – Eingänge: 0 (SW), 100 (Add-on)" : HAS_IN2 ? "Ungültige id – Eingänge: 0 (SW1), 1 (SW2)" : "Ungültige id – Eingang hat nur id 0");
@@ -2154,6 +2381,79 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     if (c["ct_invert"].is<bool>()) { cfg.ctInvert = c["ct_invert"]; lightWrite(); }
     saveCfg();
     out["restart_required"] = false;
+    return 0;
+  }
+#endif
+#if HAS_RF
+  if (m == "rf.getstatus") { rfStatus(out.to<JsonObject>()); return 0; }
+  if (m == "rf.getconfig" || m == "rf.setconfig") {
+    if (m == "rf.setconfig") {
+      JsonVariantConst c = p["config"];
+      if (c["mode"].is<const char*>()) {
+        String v = c["mode"].as<const char*>();
+        if (v != "standard" && v != "protocols" && v != "raw") ERR(-103, "mode: standard|protocols|raw");
+        rfMode = v == "protocols" ? 1 : v == "raw" ? 2 : 0;
+        efm.setMode(rfMode);
+      }
+      if (c["repeats"].is<int>()) rfRepeats = constrain(c["repeats"].as<int>(), 1, 40);
+      rfSave();
+    }
+    JsonObject o = out.to<JsonObject>();
+    o["mode"] = rfMode == 1 ? "protocols" : rfMode == 2 ? "raw" : "standard"; o["repeats"] = rfRepeats;
+    JsonArray a = o["entries"].to<JsonArray>(); for (auto& e : rfList) rfEntryJson(a.add<JsonObject>(), e);
+    return 0;
+  }
+  if (m == "rf.send") {
+    // {code} oder {id, on?}: Taste/Kontakt -> code1, Schalter -> an/aus
+    if (p["code"].is<const char*>()) {
+      if (!rfSendStr(p["code"].as<const char*>(), p["repeats"] | 0)) ERR(-103, "Code ungültig (S:/P:/R: + Hex)");
+      out.set(nullptr); return 0;
+    }
+    RfEntry* e = rfFind(p["id"] | -1);
+    if (!e) ERR(-103, "id unbekannt");
+    if (e->type == "switch") { if (!rfSwitch(*e, p["on"].is<bool>() ? p["on"].as<bool>() : e->state != 1, src)) ERR(-114, "Kein Code für diesen Zustand"); }
+    else if (!rfSendStr(p["on"].is<bool>() && !p["on"].as<bool>() && e->code2.length() ? e->code2 : e->code1)) ERR(-114, "Code ungültig");
+    out.set(nullptr); return 0;
+  }
+  if (m == "rf.add" || m == "rf.update") {
+    RfEntry ne, *e = &ne;
+    if (m == "rf.update") { e = rfFind(p["id"] | -1); if (!e) ERR(-103, "id unbekannt"); }
+    else { if (rfList.size() >= 40) ERR(-114, "Höchstens 40 Einträge"); ne.id = rfFreeId(); }
+    if (p["name"].is<const char*>()) e->name = p["name"].as<const char*>();
+    if (p["type"].is<const char*>()) {
+      String t = p["type"].as<const char*>();
+      if (t != "button" && t != "contact" && t != "switch") ERR(-103, "type: button|contact|switch");
+      e->type = t;
+    }
+    RfCode tc;
+    if (p["code1"].is<const char*>()) { e->code1 = p["code1"].as<const char*>(); e->code1.toUpperCase(); if (e->code1.length() && !rfFromStr(e->code1, tc)) ERR(-103, "code1 ungültig"); }
+    if (p["code2"].is<const char*>()) { e->code2 = p["code2"].as<const char*>(); e->code2.toUpperCase(); if (e->code2.length() && !rfFromStr(e->code2, tc)) ERR(-103, "code2 ungültig"); }
+    if (!e->code1.length()) ERR(-103, "code1 fehlt");
+    if (m == "rf.add") rfList.push_back(ne);
+    rfSave();
+    out["id"] = e->id;
+    return 0;
+  }
+  if (m == "rf.delete") {
+    int id = p["id"] | -1;
+    for (auto it = rfList.begin(); it != rfList.end(); ++it) if (it->id == id) { rfList.erase(it); rfSave(); out.set(nullptr); return 0; }
+    ERR(-103, "id unbekannt");
+  }
+  if (m == "rf.beep") { efm.beep(constrain((int)(p["ms"] | 200), 10, 2000)); out.set(nullptr); return 0; }
+  if (m.startsWith("switch.")) {
+    RfEntry* e = rfFind(pid);
+    if (!e || e->type != "switch") ERR(-103, "Kein Funk-Schalter mit dieser id");
+    if (m == "switch.getstatus") { rfSwitchStatus(out.to<JsonObject>(), *e); return 0; }
+    if (m == "switch.getconfig") { out["id"] = e->id; out["name"] = e->name; return 0; }
+    if (m == "switch.setconfig") {
+      if (p["config"]["name"].is<const char*>()) { e->name = p["config"]["name"].as<const char*>(); rfSave(); }
+      out["restart_required"] = false; return 0;
+    }
+    bool was = e->state == 1;
+    bool on = m == "switch.toggle" ? !was : (p["on"] | false);
+    if (m != "switch.toggle" && !p["on"].is<bool>()) ERR(-103, "on fehlt");
+    if (!rfSwitch(*e, on, src)) ERR(-114, "Kein Code für diesen Zustand");
+    out["was_on"] = was;
     return 0;
   }
 #endif
@@ -2757,6 +3057,10 @@ void gen1Status() {
   JsonObject r = d["lights"].to<JsonArray>().add<JsonObject>();
   r["ison"] = CH[0].on; r["brightness"] = lBri; r["has_timer"] = CH[0].tAct; r["source"] = CH[0].src;
   d["overtemperature"] = overtemp; d["loaderror"] = !stmd.online;
+#elif HAS_RF
+  JsonArray ra = d["relays"].to<JsonArray>();
+  for (auto& e : rfList) if (e.type == "switch") { JsonObject r = ra.add<JsonObject>(); r["id"] = e.id; r["ison"] = e.state == 1; r["source"] = e.src; }
+  if (!rfRecent.empty()) { JsonObject lc = d["rfcode"].to<JsonObject>(); lc["code"] = rfRecent[0].code; lc["ago"] = (millis() - rfRecent[0].ms) / 1000; }
 #elif IS_COVER
   JsonObject ro = d["rollers"].to<JsonArray>().add<JsonObject>();
   ro["state"] = cvDir > 0 ? "open" : (cvDir < 0 ? "close" : "stop");
@@ -2977,6 +3281,8 @@ void setup() {
 #endif
 #if HAS_ADDON
   Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY);   // RX (GPIO3) gehoert dem Add-on
+#elif HAS_RF
+  Serial.begin(19200);                                 // UART0 gehoert dem EFM8 (Portisch)
 #else
   Serial.begin(115200);
 #endif
@@ -3000,8 +3306,14 @@ void setup() {
     safeMode = rb.n >= 3;
     if (safeMode) LOGLN(F("Abgesicherter Start: mehrere Abstuerze in Folge"));
   }
+#if FLASH_1M
+  // 1 MB: das Dateisystem liegt ueber den Tasmota-Einstellungen – WLAN vor dem Formatieren lesen
+  if (!safeMode) { WifiCand c; if (tasimport::readWifi(c.ssid, c.pass, &c.ip)) { c.src = "tasmota"; mgCands.push_back(c); } }
+#endif
   if (!LittleFS.begin()) {
+#if HAS_MGOS
     if (!safeMode) mgosimport::readAll(mgCands);
+#endif
     LittleFS.format(); LittleFS.begin();
   }
 
@@ -3113,7 +3425,13 @@ void setup() {
     else if (cfg.ch[0].initial == "closed") coverMove(-1, "init");
   }
 #endif
-#if !IS_COVER
+#if HAS_RF
+  rfLoad();
+  efm.begin(&Serial, []() -> uint32_t { return millis(); }, rfOnCode);
+  delay(50);
+  efm.setMode(rfMode);
+#endif
+#if !IS_COVER && !HAS_RF
   for (int c = NCH - 1; c >= 0; c--) {      // Kanal 0 zuletzt (setRelay unten)
   bool start = false;
   const String& ini = cfg.ch[c].initial;
@@ -3182,6 +3500,9 @@ void mqStatusComp(const String& comp) {
   else if (comp == "light:0") lightStatus(o);
 #elif IS_COVER
   else if (comp == "cover:0") coverStatus(o);
+#elif HAS_RF
+  else if (comp == "rf") rfStatus(o);
+  else if (comp.startsWith("switch:")) { RfEntry* e = rfFind(comp.substring(7).toInt()); if (e) rfSwitchStatus(o, *e); else return; }
 #else
   else if (comp.startsWith("switch:") && comp.substring(7).toInt() < NCH) switchStatus(o, comp.substring(7).toInt());
 #endif
@@ -3206,6 +3527,8 @@ void mqStatusAll() {
     "light:0",
 #elif IS_COVER
     "cover:0",
+#elif HAS_RF
+    "rf",
 #else
     "switch:0",
 #if NCH > 1
@@ -3223,6 +3546,9 @@ void mqStatusAll() {
 #endif
     "sys", "wifi" };
   for (auto c : comps) mqStatusComp(c);
+#if HAS_RF
+  for (auto& e : rfList) if (e.type == "switch") mqStatusComp(String("switch:") + e.id);
+#endif
   if (cfg.mqRpcNtf) {                       // NotifyStatus mit dem Hauptkomponenten-Status
     JsonDocument d;
     d["src"] = devId; d["dst"] = mqPre() + "/events"; d["method"] = "NotifyStatus";
@@ -3234,6 +3560,8 @@ void mqStatusAll() {
     lightStatus(p["light:0"].to<JsonObject>());
 #elif IS_COVER
     coverStatus(p["cover:0"].to<JsonObject>());
+#elif HAS_RF
+    for (auto& e : rfList) if (e.type == "switch") rfSwitchStatus(p[String("switch:") + e.id].to<JsonObject>(), e);
 #else
     for (int c = 0; c < NCH; c++) switchStatus(p[String("switch:") + c].to<JsonObject>(), c);
 #endif
@@ -3343,6 +3671,9 @@ void loop() {
   handleTimer();
   handlePm();
   handleCover();
+#if HAS_RF
+  handleRf();
+#endif
   handleTemp();
   handleLed();
   processQueue();
