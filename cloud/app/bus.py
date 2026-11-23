@@ -118,6 +118,7 @@ class Bus:
         self.connected = False
         self.ids = itertools.count(1)
         self.wait = {}
+        self.topics = {}                          # Geraet -> gesehene Topics (zum Loeschen gespeicherter Nachrichten)
 
     def start(self):
         self.c.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
@@ -146,10 +147,20 @@ class Bus:
                 w[0].set()
             return
         if topic.startswith("shellies/"):
+            parts = topic.split("/")
+            if len(parts) > 2:
+                self.topics.setdefault(parts[1], set()).add(topic)
+                if retained and not known(parts[1]):
+                    return
             gen1_message(topic, payload, retained)
             return
         dev, _, rest = topic.partition("/")
         if not dev or dev == SRC:
+            return
+        self.topics.setdefault(dev, set()).add(topic)
+        # Gespeicherte Nachricht eines unbekannten (z. B. geloeschten) Geraets legt es nicht neu an –
+        # nur ein Geraet, das wirklich sendet.
+        if retained and not known(dev):
             return
         if rest == "online":
             on = payload.decode().strip() == "true"
@@ -197,6 +208,17 @@ class Bus:
                     elif isinstance(v, dict) and k.startswith(SENSOR_COMPS):
                         shade.sensor(dev, k, v)
                 seen(dev)
+
+    def forget(self, dev):
+        """Gespeicherte (retained) Nachrichten eines geloeschten Geraets beim Broker entfernen."""
+        topics = set(self.topics.pop(dev, set()))
+        topics |= {f"{dev}/online", f"{dev}/info", f"{dev}/status/sys", f"{dev}/status/wifi",
+                   f"{dev}/status/mqtt", f"{dev}/status/switch:0", f"{dev}/status/switch:1",
+                   f"{dev}/status/input:0", f"{dev}/status/cover:0", f"{dev}/status/light:0", f"{dev}/status/cct:0"}
+        if self.connected:
+            for t in topics:
+                self.c.publish(t, b"", retain=True)
+        return len(topics)
 
     def fetch_info(self, dev):
         try:
@@ -272,6 +294,10 @@ BUS = Bus()
 
 
 # ======================= Geraetezustand =======================
+def known(dev):
+    return bool(q("SELECT 1 FROM devices WHERE id=?", (dev,), one=True))
+
+
 def ensure(dev):
     q("INSERT OR IGNORE INTO devices(id, first_seen) VALUES(?,?)", (dev, time.time()))
 

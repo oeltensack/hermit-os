@@ -1,5 +1,10 @@
 # Änderungen
 
+## Hermit Cloud 1.7.1
+- Gelöschte Geräte kommen nach einem Neustart oder Update der Cloud nicht mehr zurück: Beim Löschen werden
+  die beim Broker gespeicherten (retained) Nachrichten des Geräts entfernt, und gespeicherte Nachrichten
+  legen kein unbekanntes Gerät mehr an – nur ein Gerät, das wirklich sendet
+
 ## Hermit Cloud 1.7.0
 - **Shelly Door/Window 2 und H&T (Gen1, Original-Firmware) als Fühler:** MQTT im Gen1-Format
   (`shellies/<id>/sensor/…`); Temperatur, Helligkeit, Feuchte und Batterie gehen in die Fühler und in die

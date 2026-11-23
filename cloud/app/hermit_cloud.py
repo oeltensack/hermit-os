@@ -338,6 +338,8 @@ def dev_delete(dev: str, request: Request):
             except Exception:
                 pass
         q("DELETE FROM devices WHERE id=?", (d,))
+    if "~" not in dev:
+        BUS.forget(dev)                          # sonst legt der Broker es beim naechsten Neustart wieder an
     return {"ok": True}
 
 
