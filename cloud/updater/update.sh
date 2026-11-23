@@ -25,7 +25,7 @@ do_update() {
   fi
   cd "$CLOUD" || return 1
   echo "-- docker compose build"
-  docker compose build cloud updater || return 1
+  docker compose build cloud || return 1
   echo "-- Container neu starten"
   docker compose up -d mosquitto cloud || return 1
   docker image prune -f >/dev/null 2>&1
@@ -39,12 +39,9 @@ while true; do
     { do_update || echo "== FEHLER beim Update"; } > "$DATA/update.log" 2>&1
     rm -f "$DATA/update.request"
     cat "$DATA/update.log"
-    # Zuletzt den Updater selbst erneuern. Das muss ein Hilfscontainer ausserhalb dieses Containers tun:
-    # docker compose stoppt beim Neuanlegen zuerst den alten Container – und damit diesen Prozess.
-    docker run -d --rm --name hermit-cloud-updater-helper \
-      -v /var/run/docker.sock:/var/run/docker.sock -v "$REPO:$REPO" -w "$CLOUD" \
-      hermit-cloud-updater:latest sh -c "sleep 5; cd '$CLOUD' && docker compose up -d --no-deps updater" \
-      >/dev/null 2>&1 || echo "Hinweis: Updater konnte sich nicht selbst erneuern"
+    # Der Container des Updaters bleibt bestehen. Sein Skript liegt im Repo-Ordner und ist durch den
+    # git pull bereits neu – einfach neu einlesen.
+    exec sh "$CLOUD/updater/update.sh"
   fi
   sleep 15
 done

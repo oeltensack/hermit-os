@@ -1,5 +1,9 @@
 # Änderungen
 
+## Hermit Cloud 1.2.3
+- Updater erneuert seinen eigenen Container nicht mehr (das hat ihn zweimal gestoppt). Sein Skript liegt im
+  Repo-Ordner und ist nach dem `git pull` schon neu – er liest es nach dem Update einfach neu ein.
+
 ## Hermit Cloud 1.2.2
 - Kurze Verbindungsaussetzer (z. B. bei schwachem WLAN) erzeugen keine Meldungen mehr: „offline“ wird erst
   gemeldet, wenn ein Gerät länger als 2 Minuten weg ist (`OFFLINE_ALERT_AFTER`), „wieder online“ nur danach.
