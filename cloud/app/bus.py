@@ -157,6 +157,8 @@ class Bus:
         dev, _, rest = topic.partition("/")
         if not dev or dev == SRC:
             return
+        if not payload:
+            return                                # leere Nachricht = geloeschte gespeicherte Nachricht (auch unser Echo)
         self.topics.setdefault(dev, set()).add(topic)
         # Gespeicherte Nachricht eines unbekannten (z. B. geloeschten) Geraets legt es nicht neu an –
         # nur ein Geraet, das wirklich sendet.
@@ -164,6 +166,8 @@ class Bus:
             return
         if rest == "online":
             on = payload.decode().strip() == "true"
+            if not on and not known(dev):
+                return                            # Offline-Meldung (Last Will) eines unbekannten Geraets
             seen(dev, online=on)
             for v in channel_rows(dev):
                 seen(v, online=on)

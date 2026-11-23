@@ -1,5 +1,10 @@
 # Änderungen
 
+## Hermit Cloud 1.7.2
+- Fehler aus 1.7.1 behoben: Beim Löschen kam das Gerät sofort ohne Daten zurück (leere Nachricht zum
+  Entfernen der gespeicherten Daten wurde als „offline“ gelesen). Leere Nachrichten und die Offline-Meldung
+  eines unbekannten Geräts legen kein Gerät mehr an
+
 ## Hermit Cloud 1.7.1
 - Gelöschte Geräte kommen nach einem Neustart oder Update der Cloud nicht mehr zurück: Beim Löschen werden
   die beim Broker gespeicherten (retained) Nachrichten des Geräts entfernt, und gespeicherte Nachrichten
