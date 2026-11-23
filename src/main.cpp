@@ -44,6 +44,8 @@ struct Cfg {
   String name;
   String ssid, pass;
   bool staticIp = false;
+  bool roam = true;                // bei mehreren Access Points mit gleichem Namen den staerksten nehmen
+  int roamRssi = -70;              // unter dieser Signalstaerke alle 5 min nach einem besseren AP suchen
   String ip, mask, gw, dns;
   String apPass;
   String swName, inName;
@@ -134,6 +136,10 @@ String devId, macStr;
 bool apActive = false, wifiWasUp = false, mdnsUp = false, bootEventSent = false, pendingReconnect = false;
 uint32_t wifiLostMs = 0, wifiUpMs = 0, rebootAt = 0, staTryMs = 0;
 bool staOn = false;          // STA sucht gerade das Heim-WLAN (bei aktivem AP nur zeitweise)
+// Access-Point-Wahl: bei mehreren APs mit gleichem Namen gezielt den staerksten (BSSID) verwenden
+uint8_t apBssid[6]; int32_t apChan = 0; bool apTarget = false;
+uint32_t staStartMs = 0, lastRoamCheck = 0, roamCount = 0;
+volatile bool roamPending = false;
 bool safeMode = false;       // nach mehreren Abstuerzen in Folge: keine Uebernahme, AP sofort
 // Erster Start: alle gefundenen WLAN-Zugangsdaten werden der Reihe nach probiert (sichtbare Netze zuerst)
 std::vector<WifiCand> wifiCands;
@@ -203,6 +209,7 @@ void saveCfg() {
   cfg.cfgRev++;
   JsonDocument d;
   d["name"] = cfg.name; d["ssid"] = cfg.ssid; d["pass"] = cfg.pass;
+  d["roam"] = cfg.roam; d["roamthr"] = cfg.roamRssi;
   d["static"] = cfg.staticIp; d["ip"] = cfg.ip; d["mask"] = cfg.mask; d["gw"] = cfg.gw; d["dns"] = cfg.dns;
   d["appass"] = cfg.apPass; d["swname"] = cfg.swName; d["inname"] = cfg.inName;
   d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert; d["infilt"] = cfg.inFilter;
@@ -236,6 +243,7 @@ void loadCfg() {
   if (e) return;
   cfg.name = jstr(d["name"], cfg.name); cfg.ssid = jstr(d["ssid"], ""); cfg.pass = jstr(d["pass"], "");
   cfg.staticIp = d["static"] | false;
+  cfg.roam = d["roam"] | true; cfg.roamRssi = d["roamthr"] | -70;
   cfg.ip = jstr(d["ip"], ""); cfg.mask = jstr(d["mask"], ""); cfg.gw = jstr(d["gw"], ""); cfg.dns = jstr(d["dns"], "");
   cfg.apPass = jstr(d["appass"], ""); cfg.swName = jstr(d["swname"], ""); cfg.inName = jstr(d["inname"], "");
   cfg.initialState = jstr(d["initial"], cfg.initialState); cfg.inMode = jstr(d["inmode"], cfg.inMode);
@@ -720,9 +728,34 @@ void stopAP() {
   updateLed();
 }
 
-void startSTA() {
+// Staerksten AP mit unserem Namen suchen (blockiert ca. 2 s)
+bool pickBestAp() {
+  int n = WiFi.scanNetworks(false, false);
+  int best = -1; int32_t br = -1000;
+  for (int i = 0; i < n; i++)
+    if (WiFi.SSID(i) == cfg.ssid && WiFi.RSSI(i) > br) { best = i; br = WiFi.RSSI(i); }
+  if (best >= 0) { memcpy(apBssid, WiFi.BSSID(best), 6); apChan = WiFi.channel(best); }
+  WiFi.scanDelete();
+  return best >= 0;
+}
+
+// Ergebnis der Hintergrundsuche bei schwachem Empfang: deutlich besseren AP merken
+void onRoamScan(int n) {
+  int best = -1; int32_t br = -1000;
+  for (int i = 0; i < n; i++)
+    if (WiFi.SSID(i) == cfg.ssid && WiFi.RSSI(i) > br) { best = i; br = WiFi.RSSI(i); }
+  if (best >= 0 && WiFi.status() == WL_CONNECTED && memcmp(WiFi.BSSID(best), WiFi.BSSID(), 6) != 0
+      && br >= WiFi.RSSI() + 8) {
+    memcpy(apBssid, WiFi.BSSID(best), 6); apChan = WiFi.channel(best); apTarget = true;
+    roamPending = true;
+  }
+  WiFi.scanDelete();
+}
+
+void startSTA(bool scan = true) {
   if (!cfg.ssid.length()) return;
   WiFi.hostname(devId);
+  staStartMs = millis();
   if (cfg.staticIp) {
     IPAddress ip, gw, m, d;
     ip.fromString(cfg.ip); gw.fromString(cfg.gw); m.fromString(cfg.mask);
@@ -731,7 +764,13 @@ void startSTA() {
   } else {
     WiFi.config(0U, 0U, 0U);
   }
-  WiFi.begin(cfg.ssid, cfg.pass);
+  if (cfg.roam && (!scan || pickBestAp()) && apChan) {
+    apTarget = true;
+    WiFi.begin(cfg.ssid.c_str(), cfg.pass.c_str(), apChan, apBssid);
+  } else {
+    apTarget = false;
+    WiFi.begin(cfg.ssid, cfg.pass);
+  }
 }
 
 void onWifiUp() {
@@ -766,11 +805,29 @@ void handleWifi() {
       candActive = false; applyCand(0); saveCfg();   // keiner passte: ersten behalten, Zugangspunkt folgt
     }
   }
+  if (roamPending) {                         // deutlich staerkeren AP gefunden: direkt wechseln
+    roamPending = false; roamCount++;
+    wifiWasUp = false; wifiLostMs = now;
+    startSTA(false);
+    return;
+  }
+  if (up && cfg.roam && cfg.ssid.length() && !apActive && now - wifiUpMs > 60000UL && now - lastRoamCheck > 300000UL) {
+    lastRoamCheck = now;
+    if (WiFi.RSSI() < cfg.roamRssi) WiFi.scanNetworksAsync(onRoamScan, false);
+  }
   if (up) {
     if (!wifiWasUp) { wifiWasUp = true; wifiUpMs = now; onWifiUp(); }
     if (apActive && now - wifiUpMs > 120000UL) stopAP();
   } else {
     if (wifiWasUp) { wifiWasUp = false; wifiLostMs = now; }
+    // An einen bestimmten AP gebunden und der ist seit 30 s weg: neu suchen (sonst bliebe er an diesem AP
+    // haengen). wifiLostMs bleibt stehen, damit nach 60 s ohne WLAN trotzdem der Zugangspunkt kommt.
+    if (apTarget && !apActive && !candActive && cfg.ssid.length() && now - wifiLostMs > 30000UL
+        && now - staStartMs > 30000UL) {
+      WiFi.disconnect();
+      startSTA();
+      return;
+    }
     if (!apActive && (!cfg.ssid.length() || (now - wifiLostMs > 60000UL && !candActive))) startAP();
     // Zugangspunkt erreichbar halten: Beim Suchen nach dem Heim-WLAN springt der ESP8266 durch die Kanaele,
     // der AP ist dann kaum zu finden. Deshalb STA nur alle 3 min fuer 30 s versuchen – und nie, solange
@@ -1063,9 +1120,11 @@ void sysConfig(JsonObject o) {
 
 void wifiStatus(JsonObject o) {
   bool up = WiFi.status() == WL_CONNECTED;
-  if (up) { o["sta_ip"] = WiFi.localIP().toString(); o["status"] = "got ip"; o["ssid"] = WiFi.SSID(); o["rssi"] = WiFi.RSSI(); }
+  if (up) { o["sta_ip"] = WiFi.localIP().toString(); o["status"] = "got ip"; o["ssid"] = WiFi.SSID(); o["rssi"] = WiFi.RSSI();
+            o["bssid"] = WiFi.BSSIDstr(); o["channel"] = WiFi.channel(); }
   else { o["sta_ip"] = nullptr; o["status"] = cfg.ssid.length() ? "connecting" : "disconnected"; o["ssid"] = nullptr; o["rssi"] = nullptr; }
   o["ap_active"] = apActive;
+  o["roams"] = roamCount;
 }
 
 void wifiConfig(JsonObject o) {
@@ -1073,6 +1132,8 @@ void wifiConfig(JsonObject o) {
   s["ssid"] = cfg.ssid; s["is_open"] = cfg.pass.length() == 0; s["enable"] = cfg.ssid.length() > 0;
   s["ipv4mode"] = cfg.staticIp ? "static" : "dhcp";
   s["ip"] = cfg.ip; s["netmask"] = cfg.mask; s["gw"] = cfg.gw; s["nameserver"] = cfg.dns;
+  JsonObject r = o["roam"].to<JsonObject>();
+  r["enable"] = cfg.roam; r["rssi_thr"] = cfg.roamRssi; r["interval"] = 300;
   JsonObject a = o["ap"].to<JsonObject>();
   a["ssid"] = devId; a["is_open"] = cfg.apPass.length() < 8;
 }
@@ -1597,6 +1658,8 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
       pendingReconnect = true;
     }
     if (c["ap"]["pass"].is<const char*>()) cfg.apPass = c["ap"]["pass"].as<const char*>();
+    if (c["roam"]["enable"].is<bool>()) cfg.roam = c["roam"]["enable"];
+    if (c["roam"]["rssi_thr"].is<int>()) cfg.roamRssi = constrain(c["roam"]["rssi_thr"].as<int>(), -90, -50);
     saveCfg();
     out["restart_required"] = false;
     return 0;

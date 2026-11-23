@@ -23,6 +23,14 @@ Alle Geräte: ESP8266, 2 MB Flash. Die Oberfläche zeigt unter Status → Flash 
 
 ---
 
+## WLAN mit mehreren Access Points
+
+Bei mehreren APs mit gleichem Namen (Mesh, Omada, UniFi …) verbindet sich der ESP8266 von sich aus mit dem
+ersten gefundenen und bleibt dort, auch wenn ein näherer AP da ist. Hermit OS wählt deshalb vor dem Verbinden
+den stärksten AP. Fällt der Empfang unter −70 dBm, sucht es alle 5 Minuten nach einem mindestens 8 dB
+besseren AP und wechselt (kurze Unterbrechung von 1–3 s). Einstellbar unter **WLAN**; dort steht auch, mit
+welchem AP (BSSID) und Kanal das Gerät verbunden ist.
+
 ## Eingang (Shelly 1 / 1PM / Plug S / Plug)
 
 **Eingangsmodus** (Reiter Schalter):

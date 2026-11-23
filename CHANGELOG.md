@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.13.0
+- **Mehrere Access Points mit gleichem Namen:** Hermit OS sucht vor dem Verbinden den stärksten AP und verbindet
+  sich gezielt mit ihm. Liegt der Empfang unter −70 dBm (einstellbar), sucht es alle 5 min nach einem AP, der
+  mindestens 8 dB besser ist, und wechselt. Ist der gewählte AP weg, wird nach 30 s neu gesucht.
+  Einstellung unter WLAN, Status zeigt AP (BSSID), Kanal und Anzahl der Wechsel
+
 ## Hermit Cloud 1.2.3
 - Updater erneuert seinen eigenen Container nicht mehr (das hat ihn zweimal gestoppt). Sein Skript liegt im
   Repo-Ordner und ist nach dem `git pull` schon neu – er liest es nach dem Update einfach neu ein.

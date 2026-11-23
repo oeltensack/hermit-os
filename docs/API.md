@@ -104,9 +104,9 @@ Ohne `on` ändert `CCT.Set` nur Helligkeit/Farbtemperatur – eine ausgeschaltet
 
 | Methode | Parameter |
 |---|---|
-| `WiFi.GetStatus` | → `sta_ip, status, ssid, rssi, ap_active` |
+| `WiFi.GetStatus` | → `sta_ip, status, ssid, rssi, bssid, channel, ap_active, roams` |
 | `WiFi.GetConfig` | → `sta{ssid, ipv4mode, ip, netmask, gw, nameserver}`, `ap{ssid, is_open}` |
-| `WiFi.SetConfig` | `config.sta{ssid, pass, enable, ipv4mode (dhcp/static), ip, netmask, gw, nameserver}`, `config.ap{pass}` |
+| `WiFi.SetConfig` | `config.sta{ssid, pass, enable, ipv4mode (dhcp/static), ip, netmask, gw, nameserver}`, `config.ap{pass}`, `config.roam{enable, rssi_thr}` (stärksten AP wählen, unter `rssi_thr` alle 5 min nach besserem suchen) |
 | `WiFi.Scan` | → `results[{ssid, rssi, channel, auth}]` |
 
 ## Webhook (Aktionen)

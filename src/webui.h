@@ -108,6 +108,8 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label>IPv4</label><select id="w_mode" onchange="stat()"><option value="dhcp">DHCP</option><option value="static">Statisch</option></select>
 <div id="w_static"><div class="row"><div><label>IP</label><input id="w_ip"></div><div><label>Netzmaske</label><input id="w_nm" placeholder="255.255.255.0"></div></div>
 <div class="row"><div><label>Gateway</label><input id="w_gw"></div><div><label>DNS</label><input id="w_dns"></div></div></div>
+<label class="ck"><input type="checkbox" id="w_roam">Stärksten Access Point wählen (mehrere APs mit gleichem Namen)</label>
+<div class="row"><div><label>Bei schwachem Empfang unter … dBm nach besserem AP suchen</label><input id="w_rthr" type="number" min="-90" max="-50"></div><div><label>Verbunden mit</label><div class="v" id="w_bss" style="font-size:14px">–</div></div></div>
 <label>Passwort Access-Point (mind. 8 Zeichen, leer = offen)</label><input id="w_ap" type="password" placeholder="leer lassen = unverändert">
 <button class="bt" onclick="saveWifi()">Speichern &amp; verbinden</button></div></section>
 
@@ -179,7 +181,7 @@ if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv
 MT=!!sw.meter_only;$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':(MT?'AUSGELÖST':'AUS');$('btn').title=MT?'Reset nur am Taster/SW des Geräts':'';document.querySelectorAll('.nm').forEach(e=>e.style.display=MT?'none':'');document.querySelectorAll('.mt').forEach(e=>e.style.display=MT?'':'none');PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
 $('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';$('inw').style.display=s['input:0']?'':'none';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
-if(s.mqtt)$('q_st').textContent=$('q_en').checked?(s.mqtt.connected?'verbunden':'nicht verbunden'):'aus';$('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
+if(s.mqtt)$('q_st').textContent=$('q_en').checked?(s.mqtt.connected?'verbunden':'nicht verbunden'):'aus';$('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('w_bss').textContent=s.wifi.bssid?s.wifi.bssid+' · Kanal '+s.wifi.channel+' · '+s.wifi.rssi+' dBm'+(s.wifi.roams?' · '+s.wifi.roams+'× gewechselt':''):'–';$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
 document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
@@ -191,7 +193,7 @@ async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']|
 showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
 const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
-const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();
+const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();if(c.wifi.roam){$('w_roam').checked=c.wifi.roam.enable;$('w_rthr').value=c.wifi.roam.rssi_thr}
 const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Hermit OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
 showUpd(c.sys.updates,d.ver);showMq(c.mqtt);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
@@ -207,7 +209,7 @@ function addh(){run(async()=>{const p={event:$('h_ev').value,cid:AO&&$('h_ev').v
 function delh(id){run(async()=>{await rpc('Webhook.Delete',{id});loadHooks()})}
 function tgl(id,en){run(()=>rpc('Webhook.Update',{id,enable:en}))}
 function scan(){run(async()=>{$('scan').textContent='Suche …';try{const r=await rpc('WiFi.Scan');$('w_list').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(n=>`<option value="${esc(n.ssid)}">${n.rssi} dBm</option>`).join('');toast(r.results.length+' Netze gefunden')}finally{$('scan').textContent='Netze suchen'}})}
-function saveWifi(){run(async()=>{const s={ssid:$('w_ssid').value,ipv4mode:$('w_mode').value,ip:$('w_ip').value,netmask:$('w_nm').value,gw:$('w_gw').value,nameserver:$('w_dns').value};if($('w_pass').value)s.pass=$('w_pass').value;const c={sta:s};if($('w_ap').value)c.ap={pass:$('w_ap').value};await rpc('WiFi.SetConfig',{config:c})},'Gespeichert – verbinde neu')}
+function saveWifi(){run(async()=>{const s={ssid:$('w_ssid').value,ipv4mode:$('w_mode').value,ip:$('w_ip').value,netmask:$('w_nm').value,gw:$('w_gw').value,nameserver:$('w_dns').value};if($('w_pass').value)s.pass=$('w_pass').value;const c={sta:s,roam:{enable:$('w_roam').checked,rssi_thr:+$('w_rthr').value||-70}};if($('w_ap').value)c.ap={pass:$('w_ap').value};await rpc('WiFi.SetConfig',{config:c})},'Gespeichert – verbinde neu')}
 function saveSys(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('y_name').value},location:{tz:$('y_tz').value},sntp:{server:$('y_sntp').value},ui:{led:$('y_led').checked}}});loadCfg()},'Gespeichert')}
 function setAuth(clear){run(async()=>{if(!clear&&!$('y_auth').value)throw new Error('Kein Passwort eingegeben');await rpc('Shelly.SetAuth',{pass:clear?null:$('y_auth').value});$('y_auth').value='';loadCfg()},clear?'Passwort entfernt':'Passwort gesetzt')}
 const CSRC={default:'Standard (wie Tasmota)',reference:'mit Referenzlast kalibriert',tasmota:'aus Tasmota übernommen',manual:'manuell gesetzt'};
