@@ -138,6 +138,7 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 
 <div class="card admin-only"><h2>Shelly Gen2+ mit Original-Firmware anbinden</h2>
 <p class="l">Gen2/Gen3/Gen4 können Shelly Cloud und MQTT gleichzeitig: Die Hermit Cloud trägt sich am Gerät als MQTT-Server ein, App und Shelly Cloud laufen weiter. Danach startet das Gerät kurz neu (Relais bleiben in ihrem Zustand). Ein Gerät kann nur einen MQTT-Server haben.</p>
+<p class="l">Gen1-Fühler (Door/Window 2, H&amp;T) mit Original-Firmware: vorher den Taster am Gerät kurz drücken, damit er wach ist und gefunden wird. Übernommen werden Temperatur, Helligkeit bzw. Feuchte und Batterie. Bei Gen1 schaltet MQTT die Shelly Cloud ab.</p>
 <div class="f"><label>Netz durchsuchen</label><div class="row"><input id="g2_net" placeholder="192.168.0.0/24 oder 192.168.0.10-80" style="flex:1"><button class="bt g" onclick="g2Scan()">Suchen</button></div>
 <label>Passwort der Geräte</label><input id="g2_pw" type="password" placeholder="nur wenn gesetzt (Benutzer admin)">
 <label>Broker-Adresse für die Geräte</label><input id="g2_br" placeholder="IP dieses Rechners, z. B. 192.168.0.50"></div>
@@ -221,16 +222,19 @@ const nIn=x=>+String(x).replace(',','.')||0;
 
 // ---------- Geraete ----------
 const CVS={open:'offen',closed:'geschlossen',opening:'öffnet …',closing:'schließt …',stopped:'angehalten',calibrating:'kalibriert …'};
-function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:');
+function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),sen=d.comp=='sensor:0';
 const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
-<div class="dm"><span class="dot ${d.online?'on':''}"></span>${d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
+<div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Batteriefühler · zuletzt '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
 <div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
-<div class="dv">${cvr?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canSw()||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>`}
+<div class="dv">${cvr||sen?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canSw()||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>`}
 <div class="kv">${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute · ${eur(d.today_cost)}</div></div>`:''}
 ${s.temperature?`<div><div class="v">${fmt(s.temperature.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`:''}
+${s.humidity?`<div><div class="v">${fmt(s.humidity.rh,0,'%')}</div><div class="l">Feuchte</div></div>`:''}
+${s.lux!=null?`<div><div class="v">${fmt(s.lux,0,'lx')}</div><div class="l">Helligkeit</div></div>`:''}
+${s.battery!=null?`<div><div class="v">${fmt(s.battery,0,'%')}</div><div class="l">Batterie</div></div>`:''}
 ${s.voltage!=null?`<div><div class="v">${fmt(s.voltage,0,'V')}</div><div class="l">Spannung</div></div>`:''}
 ${s.brightness!=null?`<div><div class="v">${s.brightness} %</div><div class="l">Helligkeit</div></div>`:''}${s.ct!=null?`<div><div class="v">${s.ct} K</div><div class="l">Farbtemperatur</div></div>`:''}
 </div></div>
@@ -617,7 +621,7 @@ function shDel(id){if(!confirm('Beschattungsregel löschen?'))return;run(async()
 // ---------- Gen2+ anbinden ----------
 let G2=[];
 function g2Scan(){run(async()=>{$('g2tab').innerHTML='<tr><td class="l">Suche …</td></tr>';G2=await api('gen2/scan',{method:'POST',body:{net:$('g2_net').value}});
-$('g2tab').innerHTML=G2.length?'<tr><th>Gerät</th><th>IP</th><th></th></tr>'+G2.map((d,i)=>`<tr><td><b>${esc(d.name||d.id)}</b><div class="l">${esc(d.model||'')} · Gen${d.gen}${d.auth?' · Passwort':''}${d.hermit?' · Hermit OS':''}</div></td><td>${esc(d.ip)}</td><td class="n">${d.hermit?'<span class="l">unter System → Cloud / MQTT einstellen</span>':d.known?'<span class="tag g">verbunden</span> <a class="lk" onclick="g2Con('+i+')">erneut</a>':'<button class="bt s" onclick="g2Con('+i+')">Verbinden</button>'}</td></tr>`).join(''):'<tr><td class="empty">Keine Gen2+-Geräte gefunden.</td></tr>'})}
+$('g2tab').innerHTML=G2.length?'<tr><th>Gerät</th><th>IP</th><th></th></tr>'+G2.map((d,i)=>`<tr><td><b>${esc(d.name||d.id||d.model)}</b><div class="l">${esc(d.model||'')} · Gen${d.gen}${d.sensor?' · Batteriefühler ('+esc(d.app||'')+')':''}${d.auth?' · Passwort':''}${d.hermit?' · Hermit OS':''}</div></td><td>${esc(d.ip)}</td><td class="n">${d.hermit?'<span class="l">unter System → Cloud / MQTT einstellen</span>':d.known?'<span class="tag g">verbunden</span> <a class="lk" onclick="g2Con('+i+')">erneut</a>':'<button class="bt s" onclick="g2Con('+i+')">Verbinden</button>'}</td></tr>`).join(''):'<tr><td class="empty">Keine passenden Shelly-Geräte gefunden.</td></tr>'})}
 function g2Con(i,force){const d=G2[i];run(async()=>{try{const r=await api('gen2/connect',{method:'POST',body:{ip:d.ip,password:$('g2_pw').value,broker:$('g2_br').value,force:!!force}});d.known=true;toast(`${d.name||d.id} verbunden${r.restarted?' – startet neu':''}`);
 setTimeout(()=>{g2Scan();loadDevs()},8000)}catch(e){if(/schon auf/.test(e.message)&&confirm(e.message+'\n\nTrotzdem umstellen?'))return g2Con(i,true);throw e}})}
 </script></body></html>

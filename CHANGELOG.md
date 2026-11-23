@@ -1,5 +1,13 @@
 # Änderungen
 
+## Hermit Cloud 1.7.0
+- **Shelly Door/Window 2 und H&T (Gen1, Original-Firmware) als Fühler:** MQTT im Gen1-Format
+  (`shellies/<id>/sensor/…`); Temperatur, Helligkeit, Feuchte und Batterie gehen in die Fühler und in die
+  Beschattung, Kontakt/Neigung/Vibration werden ignoriert
+- Gen1-Fühler werden beim Netzsuchen erkannt (wenn wach) und per Klick auf die Cloud als MQTT-Server gestellt
+- Gerätekarte für Batteriefühler: Temperatur, Helligkeit, Feuchte, Batterie, letzte Meldung; kein Schalten,
+  keine Sicherung, nicht in Raum-Schaltungen
+
 ## Hermit Cloud 1.6.0
 - **Beschattung:** neuer Reiter – Rollläden nach Sonnenstand (Azimut/Höhe je Fassade) und Temperatur
   (Fühler oder Wetter von Open-Meteo), optional Innentemperatur, Höchstwert-Vorhersage, Einstrahlung;

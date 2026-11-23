@@ -30,6 +30,75 @@ def row_id(dev, comp):
 
 SENSOR_COMPS = ("temperature:", "humidity:", "illuminance:")
 
+# Gen1-Batteriefuehler mit Original-Firmware (Shelly Door/Window 1/2, H&T): melden per MQTT im Gen1-Format
+# unter shellies/<id>/sensor/<wert>. Uebernommen werden nur Temperatur, Feuchte und Helligkeit (plus Batterie).
+# Die Geraete schlafen zwischen den Meldungen – kein RPC, keine Offline-Meldung, Zeile mit comp "sensor:0".
+GEN1_SENSOR = "sensor:0"
+GEN1_MODELS = {"shellydw2": "SHDW-2", "shellydw": "SHDW-1", "shellyht": "SHHT-1"}
+
+
+def _num(payload):
+    try:
+        return float(payload.decode().strip())
+    except Exception:
+        return None
+
+
+def gen1_message(topic, payload, retained=False):
+    """shellies/<id>/sensor/<name> und shellies/announce."""
+    parts = topic.split("/")
+    if parts[1:2] == ["announce"]:
+        try:
+            d = json.loads(payload)
+        except Exception:
+            return
+        dev = d.get("id") or ""
+        if dev.split("-")[0] not in GEN1_MODELS:
+            return
+        set_info(dev, {"model": d.get("model") or GEN1_MODELS[dev.split("-")[0]], "mac": d.get("mac"),
+                       "ip": d.get("ip"), "ver": d.get("fw_ver"), "gen": 1}, live=False)
+        _gen1_row(dev)
+        return
+    if len(parts) != 4 or parts[2] != "sensor" or not payload:
+        return
+    dev, name = parts[1], parts[3]
+    if dev.split("-")[0] not in GEN1_MODELS:
+        return
+    v = _num(payload)
+    if v is None:
+        return
+    st = {}
+    if name == "temperature":
+        st = {"temperature": {"tC": v}}
+        if not retained:
+            shade.sensor(dev, "temperature:0", {"tC": v})
+    elif name == "lux":
+        st = {"lux": v}
+        if not retained:
+            shade.sensor(dev, "illuminance:0", {"lux": v})
+    elif name == "humidity":
+        st = {"humidity": {"rh": v}}
+        if not retained:
+            shade.sensor(dev, "humidity:0", {"rh": v})
+    elif name == "battery":
+        st = {"battery": v}
+    else:
+        return                                   # Kontakt, Neigung, Vibration usw. werden nicht genutzt
+    _gen1_row(dev)
+    st["sleeping"] = True
+    set_status(dev, GEN1_SENSOR, st, merge=True, live=not retained)
+
+
+def _gen1_row(dev):
+    ensure(dev)
+    q("UPDATE devices SET gen=1, comp=?, model=COALESCE(model, ?) WHERE id=?",
+      (GEN1_SENSOR, GEN1_MODELS.get(dev.split("-")[0]), dev))
+
+
+def is_gen1_sensor(dev):
+    r = q("SELECT comp FROM devices WHERE id=?", (dev,), one=True)
+    return bool(r and r["comp"] == GEN1_SENSOR)
+
 
 def real_id(row):
     return row.split("~", 1)[0]
@@ -58,7 +127,7 @@ class Bus:
         self.connected = not rc.is_failure
         if self.connected:
             c.subscribe([("+/online", 0), ("+/info", 0), ("+/status/+", 0), ("+/events/rpc", 0),
-                         (f"{SRC}/rpc", 0)])
+                         (f"{SRC}/rpc", 0), ("shellies/+/sensor/+", 0), ("shellies/announce", 0)])
 
     def on_message(self, c, userdata, msg):
         try:
@@ -75,6 +144,9 @@ class Bus:
             if w:
                 w[1].append(d)
                 w[0].set()
+            return
+        if topic.startswith("shellies/"):
+            gen1_message(topic, payload, retained)
             return
         dev, _, rest = topic.partition("/")
         if not dev or dev == SRC:
@@ -135,6 +207,8 @@ class Bus:
     def rpc(self, dev, method, params=None, timeout=6):
         if not self.connected:
             raise RuntimeError("Keine Verbindung zum MQTT-Broker")
+        if is_gen1_sensor(real_id(dev)):
+            raise RuntimeError(f"{dev_name(dev)}: Batteriefühler – nur Messwerte, keine Befehle")
         rid = next(self.ids)
         ev, box = threading.Event(), []
         self.wait[rid] = (ev, box)

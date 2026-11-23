@@ -855,7 +855,7 @@ async def firmware_check(request: Request):
     need(request, "admin")
     await asyncio.to_thread(engine.fw_check, True)
     for r in q("SELECT * FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%'"):
-        if is_hermit(r):
+        if is_hermit(r) or r["comp"] == "sensor:0":
             continue
         try:                                     # Shelly Gen2+: beim Geraet nachfragen
             res = await asyncio.to_thread(BUS.rpc, r["id"], "Shelly.CheckForUpdate", None, 10)
@@ -892,7 +892,7 @@ def backups():
 async def backup_now(request: Request):
     need(request, "admin")
     d = await request.json() if (await request.body()) else {}
-    devs = [d["dev"]] if d.get("dev") else [r["id"] for r in q("SELECT id FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%'")]
+    devs = [d["dev"]] if d.get("dev") else [r["id"] for r in q("SELECT id FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%' AND COALESCE(comp,'')!='sensor:0'")]
     res = {}
     for dev in devs:
         try:

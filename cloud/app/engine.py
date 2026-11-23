@@ -157,7 +157,8 @@ def resolve(target):
     if kind == "dev":
         return [val]
     if kind == "room":
-        return [r["id"] for r in q("SELECT id, status FROM devices WHERE room=? AND hidden=0", (val,))
+        return [r["id"] for r in q("SELECT id, status FROM devices WHERE room=? AND hidden=0 "
+                                   "AND COALESCE(comp,'')!='sensor:0'", (val,))
                 if not json.loads(r["status"] or "{}").get("meter_only")]
     return []
 
@@ -437,7 +438,8 @@ def restore_backup(bid, dev, with_hooks=True):
 
 
 def _auto_backups():
-    for d in q("SELECT id FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%'"):
+    for d in q("SELECT id FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%' "
+               "AND COALESCE(comp,'')!='sensor:0'"):
         last = q("SELECT MAX(ts) AS t FROM backups WHERE dev=?", (d["id"],), one=True)
         if last and last["t"] and time.time() - last["t"] < 20 * 3600:
             continue

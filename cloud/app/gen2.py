@@ -4,7 +4,11 @@
 
 Gen2+ kann Shelly Cloud und MQTT gleichzeitig. Die Hermit Cloud traegt sich per lokaler RPC
 (HTTP, bei Passwort Digest SHA-256) als MQTT-Server ein. App, Szenen und Cloud von Shelly laufen weiter.
+
+Dazu Gen1-Batteriefuehler mit Original-Firmware (Door/Window 1/2, H&T): MQTT wird ueber /settings
+eingeschaltet (bei Gen1 schaltet das die Shelly Cloud ab). Sie sind nur erreichbar, solange sie wach sind.
 """
+import base64
 import concurrent.futures as cf
 import hashlib
 import ipaddress
@@ -12,6 +16,7 @@ import json
 import os
 import secrets
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from core import q
@@ -62,6 +67,24 @@ def rpc(ip, method, params=None, password="", timeout=6):
     return d.get("result")
 
 
+GEN1_SENSORS = {"SHDW-2": "Door/Window 2", "SHDW-1": "Door/Window", "SHHT-1": "H&T"}
+
+
+def gen1_get(ip, path, password="", timeout=6):
+    """GET bei Gen1 (Basic-Auth). password: 'passwort' (Benutzer admin) oder 'benutzer:passwort'."""
+    req = urllib.request.Request(f"http://{ip}{path}")
+    if password:
+        up = password if ":" in password else f"admin:{password}"
+        req.add_header("Authorization", "Basic " + base64.b64encode(up.encode()).decode())
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            raise RuntimeError("Passwort falsch" if password else "Gerät hat ein Passwort – bitte angeben")
+        raise RuntimeError(f"HTTP {e.code}")
+
+
 def probe(ip, timeout=1.5):
     try:
         with urllib.request.urlopen(f"http://{ip}/shelly", timeout=timeout) as r:
@@ -69,6 +92,15 @@ def probe(ip, timeout=1.5):
     except Exception:
         return None
     gen = d.get("gen")
+    if not gen and d.get("type") in GEN1_SENSORS:
+        did = None
+        try:
+            did = (gen1_get(ip, "/settings", timeout=3).get("device") or {}).get("hostname")
+        except Exception:
+            pass                                 # mit Passwort: ID erst beim Verbinden
+        return {"ip": str(ip), "id": did, "model": d["type"], "app": GEN1_SENSORS[d["type"]], "gen": 1,
+                "name": None, "auth": bool(d.get("auth")), "hermit": False, "sensor": True,
+                "known": bool(did and q("SELECT 1 FROM devices WHERE id=?", (did,), one=True))}
     if not gen or int(gen) < 2:
         return None
     fw = str(d.get("fw_id", ""))
@@ -103,17 +135,54 @@ def scan(net):
     return sorted(out, key=lambda x: int(ipaddress.ip_address(x["ip"])))
 
 
+def _broker(broker):
+    broker = broker or os.environ.get("PUBLIC_BROKER", "")
+    if not broker:
+        raise RuntimeError("Adresse des Brokers fehlt (PUBLIC_BROKER in .env oder hier eintragen)")
+    return broker if ":" in broker else broker + ":1883"
+
+
+def connect_gen1(ip, password="", broker="", force=False):
+    """Gen1-Batteriefuehler: MQTT auf die Hermit Cloud stellen (Shelly Cloud geht dabei aus)."""
+    st = gen1_get(ip, "/settings", password)
+    dev = st.get("device") or {}
+    if dev.get("type") not in GEN1_SENSORS:
+        raise RuntimeError(f"Kein unterstützter Gen1-Fühler ({dev.get('type')})")
+    broker = _broker(broker)
+    cur = st.get("mqtt") or {}
+    if cur.get("enable") and cur.get("server") and cur.get("server") != broker and not force:
+        raise RuntimeError(f"MQTT ist schon auf {cur.get('server')} eingestellt – mit „trotzdem umstellen“ ersetzen.")
+    did = cur.get("id") or dev.get("hostname")
+    params = {"mqtt_enable": "true", "mqtt_server": broker, "mqtt_id": did, "mqtt_clean_session": "true"}
+    if os.environ.get("MQTT_USER"):
+        params["mqtt_user"] = os.environ["MQTT_USER"]
+        params["mqtt_pass"] = os.environ.get("MQTT_PASS", "")
+    gen1_get(ip, "/settings?" + urllib.parse.urlencode(params), password)
+    try:
+        gen1_get(ip, "/reboot", password, timeout=3)
+    except Exception:
+        pass
+    q("INSERT OR IGNORE INTO devices(id, first_seen) VALUES(?, strftime('%s','now'))", (did,))
+    q("""UPDATE devices SET ip=?, model=?, gen=1, comp='sensor:0', mac=COALESCE(mac, ?),
+         name=COALESCE(NULLIF(name,''), ?) WHERE id=?""",
+      (ip, dev["type"], dev.get("mac"), st.get("name") or None, did))
+    return {"id": did, "model": dev["type"], "restarted": True}
+
+
 def connect(ip, password="", broker="", force=False):
     """MQTT am Geraet auf die Hermit Cloud stellen und neu starten. Liefert Info-Dict."""
+    try:
+        with urllib.request.urlopen(f"http://{ip}/shelly", timeout=4) as r:
+            sh = json.loads(r.read())
+    except Exception:
+        sh = {}
+    if not sh.get("gen") and sh.get("type") in GEN1_SENSORS:
+        return connect_gen1(ip, password, broker, force)
     info = rpc(ip, "Shelly.GetDeviceInfo", password=password)
     if int(info.get("gen") or 0) < 2:
         raise RuntimeError("Kein Gen2+-Gerät")
     did = info["id"]
-    broker = broker or os.environ.get("PUBLIC_BROKER", "")
-    if not broker:
-        raise RuntimeError("Adresse des Brokers fehlt (PUBLIC_BROKER in .env oder hier eintragen)")
-    if ":" not in broker:
-        broker += ":1883"
+    broker = _broker(broker)
     cur = rpc(ip, "MQTT.GetConfig", password=password) or {}
     if cur.get("enable") and cur.get("server") and cur.get("server") != broker and not force:
         raise RuntimeError(f"MQTT ist schon auf {cur.get('server')} eingestellt – ein Gerät kann nur einen "

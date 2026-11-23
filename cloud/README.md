@@ -71,6 +71,20 @@ und startet es neu. Shelly-App und Shelly Cloud laufen weiter – nur ein andere
 Von Hand geht es auch: *Einstellungen → MQTT*, gleicher Server und Zugang, Client-ID und Präfix = Geräte-ID,
 „RPC status notifications over MQTT“ und „Generic status update over MQTT“ einschalten.
 
+**Shelly Door/Window 2 und H&T (Gen1, Original-Firmware)** als Temperatur- und Helligkeitsfühler bzw.
+Temperatur-/Feuchtefühler: Taster am Gerät kurz drücken (dann bleibt es einige Minuten wach), sofort unter
+*Einstellungen → Shelly Gen2+ anbinden* suchen und „Verbinden“. Die Cloud schaltet am Gerät MQTT ein
+(Server, Zugang, ID) – bei Gen1 geht dabei die Shelly Cloud aus. Übernommen werden nur Temperatur,
+Helligkeit (Lux), Feuchte und Batterie; Kontakt, Neigung und Vibration werden ignoriert. Die Fühler stehen
+dann unter *Beschattung → Fühler* und als Temperaturquelle in den Beschattungsregeln.
+
+Von Hand: Geräteoberfläche → *Internet & Security → Advanced – Developer Settings* → MQTT einschalten,
+Server `<IP>:1883`, Benutzer/Passwort aus der `.env`, Client-ID unverändert lassen.
+
+Damit die Werte regelmäßig kommen, am Door/Window 2 unter *Settings* eine **Aufwachzeit** einstellen
+(z. B. 30–60 min) – sonst meldet er nur bei Öffnen/Schließen. Die Beschattung nimmt Fühlerwerte bis 6 h
+Alter; längere Abstände gelten als „Fühler-Wert zu alt“. Jede Meldung kostet Batterie.
+
 Mehrkanal-Geräte (Plus 2PM, Pro 4PM, Pro Dual Cover, Shelly 2.5 mit Hermit OS) erscheinen je Kanal als
 eigenes Gerät. Temperatur-, Feuchte- und Helligkeitsfühler stehen unter *Beschattung → Fühler*.
 
