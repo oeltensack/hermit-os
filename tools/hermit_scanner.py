@@ -342,7 +342,9 @@ def gui():
 
     root = tk.Tk()
     root.title(f"Hermit Scanner {VERSION} – Shelly · Tasmota · Hermit OS")
-    root.geometry("1440x720")
+    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry(f"{min(1440, sw - 40)}x{min(720, sh - 80)}+10+10")
+    root.minsize(760, 400)
     try:
         root.tk.call("tk", "scaling", 1.25)
     except Exception:
