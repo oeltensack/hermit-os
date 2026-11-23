@@ -132,7 +132,9 @@ DNSServer dnsServer;
 
 String devId, macStr;
 bool apActive = false, wifiWasUp = false, mdnsUp = false, bootEventSent = false, pendingReconnect = false;
-uint32_t wifiLostMs = 0, wifiUpMs = 0, rebootAt = 0;
+uint32_t wifiLostMs = 0, wifiUpMs = 0, rebootAt = 0, staTryMs = 0;
+bool staOn = false;          // STA sucht gerade das Heim-WLAN (bei aktivem AP nur zeitweise)
+bool safeMode = false;       // nach mehreren Abstuerzen in Folge: keine Uebernahme, AP sofort
 
 bool relayOn = false;
 String relaySrc = "init";
@@ -697,6 +699,7 @@ void handleTemp() {
 void startAP() {
   if (apActive) return;
   WiFi.mode(cfg.ssid.length() ? WIFI_AP_STA : WIFI_AP);
+  staOn = cfg.ssid.length() > 0; staTryMs = millis();
   WiFi.softAPConfig(IPAddress(192, 168, 33, 1), IPAddress(192, 168, 33, 1), IPAddress(255, 255, 255, 0));
   WiFi.softAP(devId.c_str(), cfg.apPass.length() >= 8 ? cfg.apPass.c_str() : nullptr);
   dnsServer.start(53, "*", IPAddress(192, 168, 33, 1));
@@ -755,6 +758,14 @@ void handleWifi() {
   } else {
     if (wifiWasUp) { wifiWasUp = false; wifiLostMs = now; }
     if (!apActive && (!cfg.ssid.length() || now - wifiLostMs > 60000UL)) startAP();
+    // Zugangspunkt erreichbar halten: Beim Suchen nach dem Heim-WLAN springt der ESP8266 durch die Kanaele,
+    // der AP ist dann kaum zu finden. Deshalb STA nur alle 3 min fuer 30 s versuchen – und nie, solange
+    // jemand mit dem AP verbunden ist.
+    if (apActive && cfg.ssid.length()) {
+      bool client = WiFi.softAPgetStationNum() > 0;
+      if (staOn && (client || now - staTryMs > 30000UL)) { WiFi.mode(WIFI_AP); staOn = false; staTryMs = now; }
+      else if (!staOn && !client && now - staTryMs > 180000UL) { WiFi.mode(WIFI_AP_STA); startSTA(); staOn = true; staTryMs = now; }
+    }
   }
 }
 
@@ -1873,8 +1884,20 @@ void setup() {
   String mgSsid, mgPass;
   ImportIp mgIp;
   bool mgFound = false;
+  // Absturzschutz: zaehlt Neustarts durch Absturz/Watchdog in Folge (RTC-Speicher ueberlebt Soft-Resets)
+  {
+    struct { uint32_t magic, n; } rb;
+    ESP.rtcUserMemoryRead(96, (uint32_t*)&rb, sizeof rb);
+    uint32_t r = ESP.getResetInfoPtr()->reason;
+    if (rb.magic != 0x48524D54) rb.n = 0;
+    rb.magic = 0x48524D54;
+    rb.n = (r == REASON_EXCEPTION_RST || r == REASON_SOFT_WDT_RST || r == REASON_WDT_RST) ? rb.n + 1 : 0;
+    ESP.rtcUserMemoryWrite(96, (uint32_t*)&rb, sizeof rb);
+    safeMode = rb.n >= 3;
+    if (safeMode) Serial.println(F("Abgesicherter Start: mehrere Abstuerze in Folge"));
+  }
   if (!LittleFS.begin()) {
-    mgFound = mgosimport::readWifi(mgSsid, mgPass, &mgIp);
+    if (!safeMode) mgFound = mgosimport::readWifi(mgSsid, mgPass, &mgIp);
     LittleFS.format(); LittleFS.begin();
   }
 
@@ -1889,22 +1912,29 @@ void setup() {
   loadCal();
   bool firstBoot = !LittleFS.exists("/config.json") && !LittleFS.exists("/noimport");
   loadCfg();
-  if (firstBoot && !cfg.ssid.length()) {   // nur beim allerersten Start: WLAN (und feste IP) uebernehmen
+  if (firstBoot && !cfg.ssid.length() && !safeMode) {   // nur beim allerersten Start: WLAN (und feste IP) uebernehmen
     String ts, tp;
     ImportIp tIp;
     bool tasFound = tasimport::readWifi(ts, tp, &tIp);
     struct station_config sc;
-    if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {      // vom Hermit Loader
+    bool sdk = wifi_station_get_config_default(&sc) && sc.ssid[0];
+    // Reihenfolge: Original-Firmware (deren Konfiguration ist massgeblich; der SDK-Speicher kann dort einen
+    // alten Stand enthalten) -> Hermit Loader (SDK-Speicher) -> Tasmota
+    if (mgFound) { cfg.ssid = mgSsid; cfg.pass = mgPass; }
+    else if (sdk) {
       char ss[33] = {0}, pw[65] = {0};
       memcpy(ss, sc.ssid, 32); memcpy(pw, sc.password, 64);
       cfg.ssid = ss; cfg.pass = pw;
-    } else if (tasFound) { cfg.ssid = ts; cfg.pass = tp; }           // direkt von Tasmota
-    else if (mgFound) { cfg.ssid = mgSsid; cfg.pass = mgPass; }      // Original-Shelly-Firmware
+    } else if (tasFound) { cfg.ssid = ts; cfg.pass = tp; }
     // Feste IP der vorherigen Firmware beibehalten, damit das Geraet unter derselben Adresse bleibt
-    ImportIp* ipSrc = mgFound && mgIp.ip.length() ? &mgIp : (tasFound && tIp.ip.length() ? &tIp : nullptr);
+    ImportIp* ipSrc = mgFound ? (mgIp.ip.length() ? &mgIp : nullptr) : (tasFound && tIp.ip.length() ? &tIp : nullptr);
     if (cfg.ssid.length() && ipSrc) {
       IPAddress a, m, g;
-      if (a.fromString(ipSrc->ip) && m.fromString(ipSrc->mask) && g.fromString(ipSrc->gw)) {
+      // nur uebernehmen, wenn ip/netmask/gw zusammenpassen (gleiches Netz, gueltige Maske)
+      bool ok = a.fromString(ipSrc->ip) && m.fromString(ipSrc->mask) && g.fromString(ipSrc->gw)
+                && (uint32_t)m != 0 && (uint32_t)a != 0 && (uint32_t)a != (uint32_t)g
+                && (((uint32_t)a & (uint32_t)m) == ((uint32_t)g & (uint32_t)m));
+      if (ok) {
         cfg.staticIp = true; cfg.ip = ipSrc->ip; cfg.mask = ipSrc->mask; cfg.gw = ipSrc->gw;
         cfg.dns = ipSrc->dns.length() ? ipSrc->dns : ipSrc->gw;
       }
@@ -1973,7 +2003,8 @@ void setup() {
   WiFi.setAutoReconnect(true);
   WiFi.mode(WIFI_STA);
   wifiLostMs = millis();
-  if (cfg.ssid.length()) startSTA(); else startAP();
+  if (cfg.ssid.length()) startSTA();
+  if (!cfg.ssid.length() || safeMode) startAP();
 
   setupServer();
   Serial.println("ID: " + devId);
@@ -2074,7 +2105,7 @@ void mqCallback(char* topic, uint8_t* payload, unsigned int len) {
 }
 
 void handleMqtt() {
-  if (!cfg.mqEnable) { if (mq.connected()) mq.disconnect(); return; }
+  if (!cfg.mqEnable || safeMode) { if (mq.connected()) mq.disconnect(); return; }
   if (WiFi.status() != WL_CONNECTED) return;
   if (!mq.connected()) {
     if ((int32_t)(millis() - mqNextTry) < 0) return;
@@ -2111,6 +2142,12 @@ void handleMqtt() {
 }
 
 void loop() {
+  static bool bootOk = false;
+  if (!bootOk && millis() > 60000) {        // eine Minute stabil: Absturzzaehler zuruecksetzen
+    bootOk = true;
+    struct { uint32_t magic, n; } rb = {0x48524D54, 0};
+    ESP.rtcUserMemoryWrite(96, (uint32_t*)&rb, sizeof rb);
+  }
   server.handleClient();
   if (apActive) dnsServer.processNextRequest();
   if (mdnsUp) MDNS.update();

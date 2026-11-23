@@ -144,6 +144,7 @@ Bei der Duo ist das Gehäuse verklebt – dieser Weg ist dort nur mit Aufwand m�
 | Update-Status springt auf `idle`, ohne dass etwas geladen wird | Ein früherer Versuch hängt. Gerät kurz vom Strom trennen und erneut starten |
 | „Verbindung abgebrochen“ beim Laden von mg2hermit | Das Gerät hat das Paket verworfen – Protokoll aufheben und melden |
 | Gerät meldet sich nicht unter der alten IP | Der Flasher sucht per MAC. Findet er nichts: Zugangspunkt `hermit-…` suchen |
+| Nach dem Flashen weder im WLAN noch Zugangspunkt | Gerät aus- und einstecken, **innerhalb der ersten Minute 5× kurz den Taster** (bzw. 10 Flanken am SW-Eingang) drücken: WLAN-Daten werden gelöscht, der Zugangspunkt `hermit-…` öffnet unter 192.168.33.1. Ab 1.12.3 bleibt der Zugangspunkt auch erreichbar, während das Gerät das Heim-WLAN sucht |
 | Tasmota: „Not enough space“ | Den Hermit Loader (`.bin.gz`) statt Hermit OS hochladen |
 | Auto-Update: `update.json: HTTP 404` | URL falsch; bei privatem Fork Token fehlt oder abgelaufen |
 

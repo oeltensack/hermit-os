@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.12.3
+- WLAN-Übernahme von der Original-Firmware: deren Konfiguration hat jetzt Vorrang vor dem SDK-Speicher
+  (der kann einen alten Stand enthalten); feste IP nur, wenn IP, Maske und Gateway zusammenpassen
+- Zugangspunkt bleibt erreichbar, während das Gerät das Heim-WLAN sucht: Suche nur noch alle 3 min für 30 s
+  und nie, solange jemand mit dem Zugangspunkt verbunden ist
+- Absturzschutz: nach 3 Abstürzen in Folge abgesicherter Start (keine Übernahme, kein MQTT, Zugangspunkt sofort)
+
 ## Hermit Cloud 1.2.1
 - Updater: erneuert sich jetzt über einen Hilfscontainer – vorher blieb er nach einem Update, das ihn selbst
   betraf, gestoppt („Updater-Container läuft nicht“)
