@@ -94,7 +94,11 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 <div class="row"><a class="lk" id="xcsv">Energie als CSV</a><a class="lk" id="pcsv">Leistung als CSV</a></div></div></div>
 <div class="card" id="pcard"><div class="row sp"><h2 style="margin:0">Leistung</h2><div class="row rng" id="prng"><a data-h="6">6 h</a><a data-h="24" class="a">24 h</a><a data-h="168">7 Tage</a><a data-h="720">30 Tage</a><a id="pzr" style="display:none">⟲ zurück</a></div></div>
 <div class="l" style="margin:6px 0">Linie = Durchschnitt, Fläche = Spitzenwert. Mit der Maus einen Bereich ziehen zum Vergrößern.</div><div class="chart" id="pchart"></div></div>
-<div class="card"><h2>Energie pro Tag – letzte 31 Tage</h2><div class="chart" id="dchart"></div></div>
+<div class="card"><div class="row sp"><h2 style="margin:0">Verbrauch</h2><div class="row rng" id="vrng"><a data-k="day">Tag</a><a data-k="week">Woche</a><a data-k="month" class="a">Monat</a><a data-k="year">Jahr</a></div></div>
+<div class="row sp" style="margin:12px 0 4px"><button class="bt g s" id="vprev">‹</button><div style="text-align:center"><div class="v" id="vtitle">–</div><a class="lk" style="font-size:12px" id="vnow">heute</a></div><button class="bt g s" id="vnext">›</button></div>
+<div class="row" style="gap:16px;font-size:12px;color:var(--m);margin:6px 0"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2f9be0;margin-right:5px"></span>Zeitraum</span><span><span style="display:inline-block;width:16px;border-top:2px dashed #8a96a3;margin-right:5px;vertical-align:middle"></span>Zeitraum davor</span></div>
+<div class="chart" id="dchart"></div>
+<div class="stats4" style="margin-top:12px" id="vtiles"></div></div>
 <div class="row" style="align-items:stretch">
 <div class="card" style="flex:1;min-width:280px"><h2>Energie pro Monat</h2><table id="mtab"></table></div>
 <div class="card" style="flex:1;min-width:280px" id="rcard"><h2>Verbrauch je Gerät – 30 Tage</h2><div id="rchart"></div></div>
@@ -313,14 +317,16 @@ function frSave(){run(async()=>{await api('fridges/'+encodeURIComponent($('fr_d'
 function frDel(id){if(!confirm('Kühlgerät-Überwachung entfernen? Die aufgezeichneten Zyklen werden gelöscht.'))return;run(async()=>{await api('fridges/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadFridges()})}
 
 // ---------- Diagramme ----------
-const W=1000,PAD={l:58,r:12,t:12,b:28};
-function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p}
-function divs(max){const m=max/Math.pow(10,Math.floor(Math.log10(max)));return Math.abs(m-2)<1e-9?4:5}
+let W=1000;const PAD={l:58,r:12,t:12,b:28};
+const setW=box=>{W=box.clientWidth&&box.clientWidth<600?520:1000};
+const NICE=[[1,5],[1.2,4],[1.5,5],[2,4],[2.5,5],[3,3],[4,4],[5,5],[6,3],[8,4],[10,5]];
+function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return NICE.find(x=>x[0]>=n-1e-9)[0]*p}
+function divs(max){const m=max/Math.pow(10,Math.floor(Math.log10(max)));const e=NICE.find(x=>Math.abs(x[0]-m)<1e-6);return e?e[1]:5}
 function axisY(h,max,unit){let g='';const n=divs(max);for(let i=0;i<=n;i++){const y=PAD.t+(h-PAD.t-PAD.b)*(1-i/n),v=max*i/n;
 g+=`<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="#2a333c"/><text x="${PAD.l-8}" y="${y+4}" text-anchor="end" font-size="12" fill="#8a96a3">${v.toLocaleString('de-DE',{maximumFractionDigits:max<10?1:0})}${i==n?' '+unit:''}</text>`}return g}
 function tip(box,html,x,y){const t=box.querySelector('.tt');t.innerHTML=html;t.style.display='block';const bw=box.clientWidth;t.style.left=Math.min(Math.max(x-t.offsetWidth/2,0),bw-t.offsetWidth)+'px';t.style.top=Math.max(y-t.offsetHeight-10,0)+'px'}
 let PZ=null,PH=24;
-function powerChart(box,res){const h=280,pts=res.data;if(!pts.length){box.innerHTML='<div class="empty">Keine Messwerte in diesem Zeitraum.</div>';return}
+function powerChart(box,res){setW(box);const h=280,pts=res.data;if(!pts.length){box.innerHTML='<div class="empty">Keine Messwerte in diesem Zeitraum.</div>';return}
 const t0=res.start,t1=res.end,max=niceMax(Math.max(...pts.map(p=>p[2]))*1.05);
 const X=t=>PAD.l+(W-PAD.l-PAD.r)*(t-t0)/(t1-t0),Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max),gap=Math.max(300,(res.bucket_s||60)*3);
 let d='',area='',seg=[],prev=null;const flush=()=>{if(seg.length){area+='M'+seg.map(p=>X(p[0]).toFixed(1)+','+Y(p[2]).toFixed(1)).join('L')+`L${X(seg[seg.length-1][0]).toFixed(1)},${Y(0)}L${X(seg[0][0]).toFixed(1)},${Y(0)}Z`;seg=[]}};
@@ -344,7 +350,7 @@ ch.setAttribute('x1',bx);ch.setAttribute('x2',bx);ch.style.display='';hp.setAttr
 tip(box,`<b>${fmt(b[1],1,'W')}</b>${b[2]>b[1]+0.5?` · Spitze ${fmt(b[2],0,'W')}`:''}<br>${new Date(b[0]*1000).toLocaleString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${eur(costOf(b[1]))} pro Stunde`,bx*r.width/W,by*r.height/h)};
 svg.onmouseup=e=>{if(drag==null)return;const x=sx(e),a=Math.min(drag,x),b=Math.max(drag,x);drag=null;sel.style.display='none';if(b-a>8){PZ=[tAt(a),tAt(b)];loadPower()}};
 svg.onmouseleave=()=>{drag=null;sel.style.display='none';ch.style.display='none';hp.style.display='none';box.querySelector('.tt').style.display='none'}}
-function barChart(box,rows,unit,lab){const h=240,vals=rows.map(r=>r[1]);if(!rows.length||!vals.some(v=>v>0)){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
+function barChart(box,rows,unit,lab){setW(box);const h=240,vals=rows.map(r=>r[1]);if(!rows.length||!vals.some(v=>v>0)){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
 const max=niceMax(Math.max(...vals)*1.05),n=rows.length,slot=(W-PAD.l-PAD.r)/n,bw=Math.max(Math.min(slot-2,28),2);
 const Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max),base=Y(0);let g='',xt='';
 rows.forEach((r,i)=>{const x=PAD.l+i*slot+(slot-bw)/2,y=Y(r[1]),hh=base-y;
@@ -359,6 +365,32 @@ function rankChart(box,rows){if(!rows.length){box.innerHTML='<div class="empty">
 const max=Math.max(...rows.map(r=>r.wh))||1;box.innerHTML='<table>'+rows.map(r=>`<tr><td style="width:38%">${esc(r.name)}</td>
 <td style="vertical-align:middle"><div style="height:10px;border-radius:0 4px 4px 0;background:#2f9be0;width:${Math.max(r.wh/max*100,1)}%"></div></td><td class="n" style="width:80px">${kwh(r.wh)}</td><td class="n" style="width:70px">${eur(r.cost)}</td></tr>`).join('')+'</table>'}
 
+// ---------- Verbrauch je Zeitraum ----------
+let VK='month',VD='';
+document.querySelectorAll('#vrng a').forEach(a=>a.onclick=()=>{document.querySelectorAll('#vrng a').forEach(x=>x.classList.remove('a'));a.classList.add('a');VK=a.dataset.k;VD='';loadPeriod()});
+$('vprev').onclick=()=>{VD=window._VP.prev_date;loadPeriod()};$('vnext').onclick=()=>{if(window._VP.next_date){VD=window._VP.next_date;loadPeriod()}};$('vnow').onclick=()=>{VD='';loadPeriod()};
+function periodChart(box,r){setW(box);const h=W<1000?300:250,n=r.labels.length,vals=[...r.cur,...r.prev].filter(v=>v!=null);
+if(!vals.some(v=>v>0)){box.innerHTML='<div class="empty">Keine Energiewerte in diesem Zeitraum.</div>';return}
+const big=Math.max(...vals)>=1000,div=big?1000:1,unit=big?'kWh':'Wh',max=niceMax(Math.max(...vals)/div*1.08);
+const slot=(W-PAD.l-PAD.r)/n,bw=Math.max(Math.min(slot*0.62,34),2),Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/div/max),base=Y(0),cx=i=>PAD.l+i*slot+slot/2;
+let g='',line='',dots='',xt='';
+r.cur.forEach((v,i)=>{if(v>0){const x=cx(i)-bw/2,y=Y(v),rr=Math.min(4,bw/2,base-y);g+=`<path d="M${x},${base}V${y+rr}Q${x},${y} ${x+rr},${y}H${x+bw-rr}Q${x+bw},${y} ${x+bw},${y+rr}V${base}Z" fill="#2f9be0" fill-opacity="${r.state[i]=='now'?0.55:1}"/>`}
+g+=`<rect x="${PAD.l+i*slot}" y="0" width="${slot}" height="${h}" fill="transparent" data-i="${i}"/>`;
+const step=Math.ceil(n/(W<1000?7:12));if(i%step==0||i==n-1)xt+=`<text x="${cx(i)}" y="${h-8}" text-anchor="middle" font-size="12" fill="#8a96a3">${r.labels[i]}</text>`});
+const pp=r.prev.map((v,i)=>v==null?null:[cx(i),Y(v)]).filter(Boolean);
+if(pp.length>1)line=`<path d="M${pp.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join('L')}" fill="none" stroke="#8a96a3" stroke-width="2" stroke-dasharray="5 4" pointer-events="none"/>`;
+box.innerHTML=`<svg viewBox="0 0 ${W} ${h}">${axisY(h,max,unit)}<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${base}" y2="${base}" stroke="#56606b"/>${xt}${g}${line}</svg><div class="tt"></div>`;
+const svg=box.querySelector('svg');svg.querySelectorAll('rect[data-i]').forEach(el=>{el.onmouseenter=()=>{const i=+el.dataset.i,k=svg.getBoundingClientRect().width/W,v=r.cur[i],pv=r.prev[i];
+tip(box,`<b>${r.labels[i]}${VK=='month'?'.':''}</b>${r.state[i]=='now'?' (läuft)':''}<br>${v==null?'–':kwh(v)+' · '+eur(costOf(v))}${pv!=null?`<br><span style="color:#8a96a3">davor: ${kwh(pv)}</span>`:''}`,cx(i)*k,Y(Math.max(v||0,pv||0))*k)};
+el.onmouseleave=()=>box.querySelector('.tt').style.display='none'})}
+async function loadPeriod(){const dev=$('esel').value;const r=await api(`energy/period?kind=${VK}&date=${VD}`+(dev?'&dev='+encodeURIComponent(dev):''));window._VP=r;
+$('vtitle').textContent=r.title;$('vnext').disabled=!r.next_date;$('vnow').style.visibility=VD?'visible':'hidden';periodChart($('dchart'),r);
+const cmp=r.cmp_pct==null?'–':(r.cmp_pct>0?'▲ ':r.cmp_pct<0?'▼ ':'')+num(Math.abs(r.cmp_pct),1)+' %';
+$('vtiles').innerHTML=`<div><div class="v">${kwh(r.total_wh)}</div><div class="l">Gesamt · ${eur(r.total_cost)}</div></div>
+<div><div class="v">${cmp}</div><div class="l">${r.cmp_pct==null?'Vergleich zum Zeitraum davor':r.cmp_pct>0?'mehr als im Zeitraum davor':'weniger als im Zeitraum davor'}</div></div>
+<div><div class="v">${kwh(r.avg_wh)}</div><div class="l">Ø pro ${r.unit} · ${eur(costOf(r.avg_wh))}</div></div>
+<div><div class="v">${kwh(r.max_wh)}</div><div class="l">Max${r.max_label?' ('+r.max_label+(VK=='month'?'.':VK=='day'?' Uhr':'')+')':''} · Min ${kwh(r.min_wh)}</div></div>`}
+
 // ---------- Energie ----------
 function fillSel(){const s=$('esel'),v=s.value;s.innerHTML='<option value="">Alle Geräte</option>'+devOpts(null,d=>'apower' in (d.status||{}));if([...s.options].some(o=>o.value==v))s.value=v}
 $('esel').onchange=()=>{PZ=null;loadEn()};
@@ -370,8 +402,7 @@ async function loadEn(){fillSel();const dev=$('esel').value,qd=dev?'dev='+encode
 $('pcard').style.display=dev?'':'none';$('rcard').style.display=dev?'none':'';$('bcard').style.display=dev?'none':'';$('pcsv').style.display=dev?'':'none';
 $('xcsv').href='/api/export/energy.csv?'+qd;
 if(dev)await loadPower();
-const days=await api('energy?'+qd+'days=31'),big=days.some(r=>r[1]>=1000);
-barChart($('dchart'),days.map(r=>[r[0],big?r[1]/1000:r[1],r[1]]),big?'kWh':'Wh',d=>new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}));
+await loadPeriod();
 const m=await api('energy/months?'+qd);$('mtab').innerHTML=m.length?'<tr><th>Monat</th><th class="n">Energie</th><th class="n">Kosten</th></tr>'+m.map(r=>`<tr><td>${new Date(r[0]+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</td><td class="n">${kwh(r[1])}</td><td class="n">${eur(r[2])}</td></tr>`).join(''):'<tr><td class="empty">Noch keine Werte.</td></tr>';
 if(!dev){rankChart($('rchart'),await api('energy/by_device?days=30'));const b=await api('baseload');
 $('btab').innerHTML=b.devices.length?'<tr><th>Gerät</th><th class="n">Grundlast</th><th class="n">pro Jahr</th><th class="n">Kosten/Jahr</th></tr>'+b.devices.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${fmt(x.w,1,'W')}</td><td class="n">${fmt(x.kwh_year,0,'kWh')}</td><td class="n">${eur(x.cost_year)}</td></tr>`).join('')+`<tr><th>Summe</th><th class="n">${fmt(b.total_w,1,'W')}</th><th class="n">${fmt(b.total_kwh_year,0,'kWh')}</th><th class="n">${eur(b.total_cost_year)}</th></tr>`:'<tr><td class="empty">Noch zu wenige Messwerte (mindestens eine Stunde je Gerät).</td></tr>'}}

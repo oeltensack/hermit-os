@@ -63,6 +63,7 @@ def init_db():
       last_total REAL, today_wh REAL DEFAULT 0, hidden INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS power(dev TEXT, ts INTEGER, w REAL, PRIMARY KEY(dev, ts));
     CREATE TABLE IF NOT EXISTS energy(dev TEXT, day TEXT, wh REAL, PRIMARY KEY(dev, day));
+    CREATE TABLE IF NOT EXISTS energy_h(dev TEXT, hour TEXT, wh REAL, PRIMARY KEY(dev, hour));
     CREATE TABLE IF NOT EXISTS alerts(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, dev TEXT,
       kind TEXT, text TEXT, ack INTEGER DEFAULT 0);
     CREATE INDEX IF NOT EXISTS alerts_ts ON alerts(ts);

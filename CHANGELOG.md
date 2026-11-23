@@ -1,5 +1,11 @@
 # Änderungen
 
+## Hermit Cloud 1.4.0
+- **Verbrauch je Zeitraum** (wie in der Shelly-App): Tag (Stunden), Woche, Monat, Jahr – mit Blättern,
+  gestrichelter Linie für den Zeitraum davor, Gesamt mit Kosten, Abweichung in %, Durchschnitt, Max, Min
+- Stundenwerte werden ab jetzt gespeichert (für ältere Tage aus dem Leistungsverlauf berechnet)
+- Diagramme: feinere Skalen, auf dem Handy größere Beschriftung
+
 ## Hermit Cloud 1.3.1
 - Kühlgerät anlegen ergab „HTTP 500“ (Geräte-ID fehlte beim Speichern)
 

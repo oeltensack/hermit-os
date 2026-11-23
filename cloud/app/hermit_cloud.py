@@ -24,6 +24,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 import core
+import energy_view
 import engine
 import fridge
 from bus import BUS, check_offline, seen
@@ -367,6 +368,11 @@ def energy(dev: str = "", days: int = 31):
         d = (now_local() - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
         out.append([d, round(have.get(d, 0.0), 1)])
     return out
+
+
+@app.get("/api/energy/period")
+def energy_period(dev: str = "", kind: str = "month", date: str = ""):
+    return energy_view.period(dev, kind, date)
 
 
 @app.get("/api/energy/months")

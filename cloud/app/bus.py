@@ -10,7 +10,7 @@ import time
 import paho.mqtt.client as mqtt
 
 import engine
-from core import OFFLINE_ALERT_AFTER, alert, dev_name, q, today
+from core import OFFLINE_ALERT_AFTER, alert, dev_name, now_local, q, today
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
@@ -210,6 +210,9 @@ def set_status(dev, comp, st, merge=False, live=True):
         if last is not None and tot > last:
             q("""INSERT INTO energy(dev, day, wh) VALUES(?,?,?)
                  ON CONFLICT(dev, day) DO UPDATE SET wh = wh + excluded.wh""", (dev, today(), tot - last))
+            q("""INSERT INTO energy_h(dev, hour, wh) VALUES(?,?,?)
+                 ON CONFLICT(dev, hour) DO UPDATE SET wh = wh + excluded.wh""",
+              (dev, now_local().strftime("%Y-%m-%d %H"), tot - last))
         q("UPDATE devices SET last_total=? WHERE id=?", (tot, dev))   # kleiner = Zaehler zurueckgesetzt
     engine.on_status(dev, comp, new, old)
 
