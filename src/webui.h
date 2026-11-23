@@ -13,8 +13,9 @@ h1{font-size:18px;margin:0}main{max-width:760px;margin:auto;padding:12px}
 .card{background:var(--c);border-radius:10px;padding:16px;margin:12px 0}
 h2{font-size:13px;margin:0 0 12px;color:var(--m);text-transform:uppercase;letter-spacing:.06em}
 .big{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
-#btn{width:104px;height:104px;border-radius:50%;border:0;font-size:22px;font-weight:700;color:#fff;background:var(--off);cursor:pointer;transition:.2s}
-#btn.on{background:var(--on);box-shadow:0 0 24px #3fb95066}
+#btn,#btn2{width:104px;height:104px;border-radius:50%;border:0;font-size:22px;font-weight:700;color:#fff;background:var(--off);cursor:pointer;transition:.2s}
+#btn.on,#btn2.on{background:var(--on);box-shadow:0 0 24px #3fb95066}.c2,.cv,.cvp,.chs,.cvx{display:none}
+.cvb{display:flex;gap:10px;flex-wrap:wrap}.cvb .bt{flex:1;min-width:90px;font-size:16px;padding:12px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;flex:1}
 .v{font-size:19px;font-weight:600}.l{font-size:12px;color:var(--m)}
 label{display:block;margin:10px 0 3px;font-size:13px;color:var(--m)}
@@ -59,12 +60,22 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="row"><button class="bt g" onclick="setL({ct:2700})">Warmweiß</button><button class="bt g" onclick="setL({ct:4000})">Neutral</button><button class="bt g" onclick="setL({ct:6500})">Tageslicht</button></div></div>
 <div class="dm"><div class="row"><button class="bt g" onclick="setL({brightness:10,on:true})">10 %</button><button class="bt g" onclick="setL({brightness:50,on:true})">50 %</button><button class="bt g" onclick="setL({brightness:100,on:true})">100 %</button></div>
 <div class="l" id="stm" style="margin-top:10px"></div></div></div>
+<div class="card c2"><h2>Kanal 2</h2><div class="big"><button id="btn2">–</button><div class="grid">
+<div class="pm"><div class="v" id="pw2">–</div><div class="l">Leistung</div></div>
+<div class="pm"><div class="v" id="en2">–</div><div class="l">Energie</div></div>
+<div class="vi"><div class="v" id="cu2">–</div><div class="l">Strom · cos φ</div></div>
+<div><div class="v" id="in2b">–</div><div class="l">Eingang SW2</div></div></div></div><div class="l" id="src2" style="margin-top:12px"></div></div>
+<div class="card cv"><h2>Rollladen</h2><div class="v" id="cvst" style="margin-bottom:10px">–</div>
+<div class="cvb"><button class="bt" onclick="cv('Open')">▲ Auf</button><button class="bt g" onclick="cv('Stop')">■ Stopp</button><button class="bt" onclick="cv('Close')">▼ Zu</button></div>
+<div class="cvp"><label>Position: <b id="cvv">–</b></label><input type="range" id="cvpos" min="0" max="100" onchange="cvGo(+this.value)" oninput="$('cvv').textContent=this.value+' %'"></div>
+<div class="l" id="cvh" style="margin-top:10px"></div></div>
 <div class="card nm"><h2>Zeitschaltung</h2><div class="row">
 <div><label>Einschalten für (s)</label><input id="ta" type="number" min="1" value="60"></div></div>
 <button class="bt" onclick="pulse()">Für Dauer einschalten</button></div>
 </section>
 
-<section class="tab" id="sw"><div class="card"><h2 id="swh">Schalter</h2>
+<section class="tab" id="sw"><div class="card" id="swc"><h2 id="swh">Schalter</h2>
+<div class="chs"><label>Kanal</label><select id="s_ch" onchange="fillSw()"><option value="0">Kanal 1 (Relais 1, Eingang SW1)</option><option value="1">Kanal 2 (Relais 2, Eingang SW2)</option></select></div>
 <p class="mt" style="display:none">Messfirmware: Das Relais bleibt eingeschaltet und wird nicht ferngeschaltet. Nach einer Abschaltung wegen Überlast oder Übertemperatur schaltet es nur der Taster bzw. der SW-Eingang am Gerät wieder ein.</p>
 <label>Name</label><input id="s_name">
 <div class="row"><div class="so nm"><label>Eingangsmodus</label><select id="s_in_mode">
@@ -97,6 +108,23 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="l">Der Eingangsfilter gilt für SW1 und SW2.</div>
 <button class="bt g" onclick="diag(1)">SW2 messen (roh)</button></div></div>
 <button class="bt" onclick="saveSw()">Speichern</button></div>
+<div class="card cv"><h2>Rollladen</h2>
+<label>Name</label><input id="c_name" placeholder="z. B. Rollladen Wohnzimmer">
+<div class="row"><div><label>Eingänge</label><select id="c_in_mode"><option value="dual">Zwei Eingänge: SW1 auf, SW2 zu</option><option value="single">Ein Eingang: SW1 auf / stopp / zu</option><option value="detached">Getrennt (nur Ereignisse)</option></select></div>
+<div><label>Art der Eingänge</label><select id="c_itype"><option value="switch">Schalter (an = fahren, aus = stopp)</option><option value="button">Taster (drücken = fahren / stopp)</option></select></div></div>
+<div class="row"><div><label>Nach Stromausfall</label><select id="c_initial"><option value="stopped">Stehen bleiben</option><option value="open">Öffnen</option><option value="closed">Schließen</option></select></div>
+<div><label>Eingangsfilter</label><select id="c_filter"><option value="ac">Wechselspannung</option><option value="dc">Nur Pegel</option></select></div></div>
+<div class="row"><div><label>Max. Fahrzeit auf (s)</label><input id="c_mo" type="number" step="0.1"></div><div><label>Max. Fahrzeit zu (s)</label><input id="c_mc" type="number" step="0.1"></div></div>
+<div class="row"><div><label>Fahrzeit auf, kalibriert (s, 0 = ohne Position)</label><input id="c_to" type="number" step="0.01"></div><div><label>Fahrzeit zu, kalibriert (s)</label><input id="c_tc" type="number" step="0.01"></div></div>
+<div class="row"><div><label>Endlage erkannt unter (W)</label><input id="c_it" type="number" step="0.5"></div><div><label>… für (s)</label><input id="c_ic" type="number" step="0.1"></div></div>
+<div class="row"><div><label>Abschaltleistung (W, 0 = aus)</label><input id="c_pl" type="number"></div><div><label>Abschalttemperatur (°C)</label><input id="c_tl" type="number"></div></div>
+<label class="ck"><input type="checkbox" id="c_swap">Eingänge tauschen</label>
+<label class="ck"><input type="checkbox" id="c_inv">Richtungen tauschen (Relais 1 = zu)</label>
+<label class="ck"><input type="checkbox" id="c_ob">Hinderniserkennung</label>
+<div class="row"><div><label>Hindernis über (W)</label><input id="c_ot" type="number"></div><div><label>nach Anlauf (s)</label><input id="c_oh" type="number" step="0.1"></div>
+<div><label>Dann</label><select id="c_oa"><option value="stop">Anhalten</option><option value="reverse">Kurz zurückfahren</option></select></div></div>
+<div class="l" style="margin-top:8px">Kalibrieren: Der Rollladen fährt ganz zu, ganz auf und wieder zu und misst dabei die Fahrzeiten. Danach kann er Positionen anfahren. Die Endlagen erkennt Hermit OS am Abschalten des Motors.</div>
+<div class="row"><button class="bt" onclick="saveCv()">Speichern</button><button class="bt g" onclick="if(confirm('Kalibrierfahrt starten? Der Rollladen fährt ganz zu, auf und wieder zu.'))cv('Calibrate')">Kalibrieren</button></div></div>
 <div class="card ao"><h2>Add-on-Taster (input:100)</h2>
 <div class="l">Taster zwischen DATA und GND des Add-ons.</div>
 <label>Name</label><input id="x_name">
@@ -137,6 +165,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label>Passwort für Benutzer <code>admin</code></label><input id="y_auth" type="password">
 <div class="row"><button class="bt" onclick="setAuth(0)">Passwort setzen</button><button class="bt g" onclick="setAuth(1)">Passwort entfernen</button></div></div>
 <div class="card pm"><h2>Leistung kalibrieren</h2>
+<div class="cvx"><label>Kanal</label><select id="y_ch" onchange="showCal()"><option value="0">Kanal 1 (Relais 1)</option><option value="1">Kanal 2 (Relais 2)</option></select></div>
 <div class="v" id="y_cf" style="font-size:16px">–</div><div class="l dm">Der Dimmer misst über seinen STM32. Der Faktor korrigiert diesen Messwert.</div>
 <div class="l">Der Faktor bleibt auch bei Werkseinstellungen und Firmware-Updates erhalten.</div>
 <label>a) Referenzlast: Relais an, gemessene Wirkleistung (W)</label><input id="y_cal" type="number" step="0.1">
@@ -188,31 +217,49 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function fmt(v,d,u){return v==null||isNaN(v)?'–':(+v).toFixed(d)+' '+u}
 function upt(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+h+'h '+m+'m'}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');if(a.dataset.t=='wh')loadHooks()});
-let LT=false,LS=null,MT=false,DM=false;
+let LT=false,LS=null,MT=false,DM=false,CH2=false,CV=false,CFG=null;
 const IM_SW='<option value="follow">Folgen (Schalter = Relais)</option><option value="flip">Umschalten bei jeder Flanke</option><option value="momentary">Taster (toggle bei Druck)</option><option value="detached">Getrennt (nur Ereignis)</option>';
 const IM_DM='<option value="dim">Ein Taster: kurz an/aus, halten = dimmen</option><option value="dual_dim">Zwei Taster: SW1 an/heller, SW2 aus/dunkler</option><option value="follow">Schalter: Licht folgt SW1</option><option value="flip">Schalter: jede Flanke an SW1 schaltet um</option><option value="detached">Getrennt (nur Ereignisse)</option>';
-function cmp(){return LT?'CCT':DM?'Light':'Switch'}
-function showLT(){const L=LT||DM;document.querySelectorAll('.lt').forEach(e=>e.style.display=L?'block':'none');document.querySelectorAll('.dm').forEach(e=>e.style.display=DM?'block':'none');document.querySelectorAll('.cto').forEach(e=>e.style.display=DM?'none':'');document.querySelectorAll('.tpc').forEach(e=>e.style.display=DM?'none':'');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');document.querySelectorAll('option.so').forEach(e=>e.style.display=(LT||DM)?'none':'');$('inl').textContent=$('ioh').textContent=DM?'Eingang SW1':'Eingang SW';
-if(DM&&!$('s_in_mode').dataset.dm){$('s_in_mode').innerHTML=IM_DM;$('s_in_mode').dataset.dm=1}$('swh').textContent=L?'Licht':'Schalter';$('swtab').textContent=L?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=L?'z. B. Deckenlampe Bad':'';if(MT)document.querySelectorAll('.nm').forEach(e=>e.style.display='none')}
+function cmp(){return LT?'CCT':DM?'Light':CV?'Cover':'Switch'}
+const SH=(c,v,d)=>document.querySelectorAll(c).forEach(e=>e.style.display=v?(d||'block'):'none');
+const CVN={open:'Offen',closed:'Geschlossen',opening:'Öffnet …',closing:'Schließt …',stopped:'Angehalten',calibrating:'Kalibriert …'};
+function cv(m){run(async()=>{await rpc('Cover.'+m,{id:0});poll()})}
+function cvGo(p){run(async()=>{await rpc('Cover.GoToPosition',{id:0,pos:p});poll()})}
+function showLT(){const L=LT||DM;document.querySelectorAll('.lt').forEach(e=>e.style.display=L?'block':'none');document.querySelectorAll('.dm').forEach(e=>e.style.display=DM?'block':'none');document.querySelectorAll('.cto').forEach(e=>e.style.display=DM?'none':'');document.querySelectorAll('.tpc').forEach(e=>e.style.display=(DM||CH2||CV)?'none':'');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');document.querySelectorAll('option.so').forEach(e=>e.style.display=(LT||DM)?'none':'');$('inl').textContent=$('ioh').textContent=(DM||CH2||CV)?'Eingang SW1':'Eingang SW';SH('.c2',CH2);SH('.cv',CV);SH('.chs',CH2);SH('.cvx',CH2||CV);$('swc').style.display=CV?'none':'';$('btn').style.display=CV?'none':'';if(CV)SH('.nm',false);if(CH2)$('ioh').textContent='Eingang (zum gewählten Kanal)';
+if(DM&&!$('s_in_mode').dataset.dm){$('s_in_mode').innerHTML=IM_DM;$('s_in_mode').dataset.dm=1}$('swh').textContent=L?'Licht':'Schalter';$('swtab').textContent=CV?'Rollladen':L?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=L?'z. B. Deckenlampe Bad':'';if(MT)document.querySelectorAll('.nm').forEach(e=>e.style.display='none')}
 function setL(p){run(async()=>{p.id=0;await rpc(cmp()+'.Set',p);poll()})}
-async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0']||s['light:0'];LT=!!s['cct:0'];DM=!!s['light:0'];LS=s['cct:0']||s['light:0']||null;showLT();
+async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0']||s['light:0']||s['cover:0'];LT=!!s['cct:0'];DM=!!s['light:0'];CH2=!!s['switch:1'];CV=!!s['cover:0'];LS=s['cct:0']||s['light:0']||null;showLT();
 if(DM){$('in2').textContent=s['input:1']?(s['input:1'].state?'AN':'AUS'):'–';if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}}
 if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}if(document.activeElement!==$('ctr')){$('ctr').value=sw.ct;$('ctv').textContent=sw.ct+' K'}}
-MT=!!sw.meter_only;$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':(MT?'AUSGELÖST':'AUS');$('btn').title=MT?'Reset nur am Taster/SW des Geräts':'';document.querySelectorAll('.nm').forEach(e=>e.style.display=MT?'none':'');document.querySelectorAll('.mt').forEach(e=>e.style.display=MT?'':'none');PM='apower' in sw;
+if(CH2){const k=s['switch:1'];$('btn2').className=k.output?'on':'';$('btn2').textContent=k.output?'AN':'AUS';$('pw2').textContent=fmt(k.apower,1,'W');$('en2').textContent=k.aenergy?fmt(k.aenergy.total/1000,3,'kWh'):'–';$('cu2').textContent=k.current==null?'–':fmt(k.current,3,'A')+(k.pf!=null?' · '+k.pf.toFixed(2):'');$('in2b').textContent=s['input:1']?(s['input:1'].state?'AN':'AUS'):'–';$('src2').textContent='Quelle: '+k.source+(k.timer_duration?' · Timer '+k.timer_duration+' s':'')+(k.errors?' · Fehler: '+k.errors.join(', '):'')}
+if(CV){$('cvst').textContent=(CVN[sw.state]||sw.state)+(sw.current_pos!=null?' · '+sw.current_pos+' %':'');SH('.cvp',sw.pos_control);if(sw.pos_control&&sw.current_pos!=null&&document.activeElement!==$('cvpos')){$('cvpos').value=sw.current_pos;$('cvv').textContent=sw.current_pos+' %'}
+$('cvh').textContent=sw.pos_control?'':'Ohne Kalibrierung nur Auf/Stopp/Zu – unter „Rollladen“ kalibrieren.';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–'}
+MT=!!sw.meter_only;$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':(MT?'AUSGELÖST':'AUS');$('btn').title=MT?'Reset nur am Taster/SW des Geräts':'';document.querySelectorAll('.nm').forEach(e=>e.style.display=(MT||CV)?'none':'');document.querySelectorAll('.mt').forEach(e=>e.style.display=MT?'':'none');PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
 $('tc').textContent=sw.temperature?fmt(sw.temperature.tC,1,'°C'):'–';$('in').textContent=s['input:0']?(s['input:0'].state?'AN':'AUS'):'–';$('inw').style.display=s['input:0']?'':'none';AO=!!s['input:100'];if(AO)$('ex').textContent=s['input:100'].state?'AN':'AUS';document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 if(s.mqtt)$('q_st').textContent=$('q_en').checked?(s.mqtt.connected?'verbunden':'nicht verbunden'):'aus';$('rs').textContent=s.wifi.rssi!=null?s.wifi.rssi+' dBm':(s.wifi.ap_active?'AP':'–');$('w_bss').textContent=s.wifi.bssid?s.wifi.bssid+' · Kanal '+s.wifi.channel+' · '+s.wifi.rssi+' dBm'+(s.wifi.roams?' · '+s.wifi.roams+'× gewechselt':''):'–';$('ip').textContent=s.wifi.sta_ip||'–';$('up').textContent=upt(s.sys.uptime);
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
-$('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
+$('src').textContent=(CH2?'Kanal 1 · ':'')+'Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
 document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
 $('btn').onclick=()=>MT||run(async()=>{await rpc(cmp()+'.Toggle',{id:0});poll()});
+$('btn2').onclick=()=>run(async()=>{await rpc('Switch.Toggle',{id:1});poll()});
 function pulse(){run(async()=>{await rpc(cmp()+'.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
-async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0']||c['light:0'],inp=c['input:0']||{};LT=!!c['cct:0'];DM=!!c['light:0'];MT=!!sw.meter_only;showLT();if(LT||DM){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=!!sw.ct_invert}
+function fillSw(){const ch=CH2?+$('s_ch').value:0,sw=CFG['switch:'+ch],inp=CFG['input:'+ch]||{};
+['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
+$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac'}
+function fillCv(){const v=CFG['cover:0'],i0=CFG['input:0']||{};$('c_name').value=v.name||'';$('c_in_mode').value=v.in_mode;$('c_initial').value=v.initial_state;$('c_itype').value=i0.type||'switch';$('c_filter').value=i0.filter||'ac';
+$('c_mo').value=v.maxtime_open;$('c_mc').value=v.maxtime_close;$('c_to').value=v.pos_calibration.open_time;$('c_tc').value=v.pos_calibration.close_time;$('c_it').value=v.motor.idle_power_thr;$('c_ic').value=v.motor.idle_confirm_period;
+$('c_pl').value=v.power_limit;$('c_tl').value=v.temp_limit;$('c_swap').checked=v.swap_inputs;$('c_inv').checked=v.invert_directions;const o=v.obstruction_detection;$('c_ob').checked=o.enable;$('c_ot').value=o.power_thr;$('c_oh').value=o.holdoff;$('c_oa').value=o.action}
+function saveCv(){run(async()=>{const n=i=>+$(i).value;await rpc('Cover.SetConfig',{id:0,config:{name:$('c_name').value,in_mode:$('c_in_mode').value,initial_state:$('c_initial').value,maxtime_open:n('c_mo'),maxtime_close:n('c_mc'),power_limit:n('c_pl'),temp_limit:n('c_tl'),swap_inputs:$('c_swap').checked,invert_directions:$('c_inv').checked,
+motor:{idle_power_thr:n('c_it'),idle_confirm_period:n('c_ic')},obstruction_detection:{enable:$('c_ob').checked,power_thr:n('c_ot'),holdoff:n('c_oh'),action:$('c_oa').value},pos_calibration:{open_time:n('c_to'),close_time:n('c_tc')}}});
+for(const id of[0,1])await rpc('Input.SetConfig',{id,config:{type:$('c_itype').value,filter:$('c_filter').value}});CFG=await rpc('Shelly.GetConfig');fillCv()},'Gespeichert')}
+async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0']||c['light:0']||c['cover:0'],inp=c['input:0']||{};CFG=c;LT=!!c['cct:0'];DM=!!c['light:0'];CH2=!!c['switch:1'];CV=!!c['cover:0'];MT=!!sw.meter_only;showLT();if(CV)fillCv();if(LT||DM){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=!!sw.ct_invert}
 if(DM){$('d_min').value=sw.range_map[0];$('d_max').value=sw.range_map[1];$('d_edge').value=sw.leading_edge?1:0;$('d_fade').value=sw.fade_rate;$('d_bfade').value=sw.button_fade_rate;const i2=c['input:1']||{};$('i2_name').value=i2.name||'';$('i2_type').value=i2.type||'button';$('i2_invert').checked=!!i2.invert;
 stmLine()}
-['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
-showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';
+if(!CV){['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
+$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';if(CH2)fillSw()}
+showCal();
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
 const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();if(c.wifi.roam){$('w_roam').checked=c.wifi.roam.enable;$('w_rthr').value=c.wifi.roam.rssi_thr}
@@ -225,12 +272,12 @@ function diag(id){run(async()=>{const r=await rpc('Input.Diag',{id:id});$('i_dia
 function saveSw(){if(DM)return run(async()=>{const n=i=>+$(i).value;await rpc('Light.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),transition_duration:n('l_tr'),range_map:[n('d_min'),n('d_max')],leading_edge:$('d_edge').value=='1',fade_rate:n('d_fade'),button_fade_rate:n('d_bfade'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
 await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}});await rpc('Input.SetConfig',{id:1,config:{name:$('i2_name').value,type:$('i2_type').value,invert:$('i2_invert').checked}});stmLine()},'Gespeichert');
 if(LT)return run(()=>rpc('CCT.SetConfig',{id:0,config:{name:$('s_name').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:+$('s_auto_on_delay').value,auto_off:$('s_auto_off').checked,auto_off_delay:+$('s_auto_off_delay').value,transition_duration:+$('l_tr').value,ct_invert:$('l_ctinv').checked}}),'Gespeichert');
-run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
-await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}})},'Gespeichert')}
-async function loadHooks(){await run(async()=>{if(!SUP.length){const s=await rpc('Webhook.ListSupported');SUP=Object.keys(s.types);$('h_ev').innerHTML=SUP.map(e=>`<option>${e}</option>`).join('')}
-const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.event.startsWith('input.')&&DM?(h.cid==1?' · SW2':' · SW1'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
-$('h_ev').onchange=()=>{const v=$('h_ev').value;$('h_thrw').style.display=v.includes('power_')?'':'none';$('h_cid').innerHTML=DM?'<option value="0">SW1 (input:0)</option><option value="1">SW2 (input:1)</option>':'<option value="0">SW (input:0)</option><option value="100">Add-on (input:100)</option>';$('h_cidw').style.display=(AO||DM)&&v.startsWith('input.')?'':'none'};
-function addh(){run(async()=>{const p={event:$('h_ev').value,cid:(AO||DM)&&$('h_ev').value.startsWith('input.')?+$('h_cid').value:0,name:$('h_name').value,enable:true,urls:$('h_urls').value.split('\n').map(s=>s.trim()).filter(Boolean)};const t=$('h_thr').value;if(t!=='')p.threshold=+t;await rpc('Webhook.Create',p);$('h_urls').value='';$('h_name').value='';loadHooks()},'Aktion angelegt')}
+run(async()=>{const n=i=>+$(i).value,ch=CH2?+$('s_ch').value:0;await rpc('Switch.SetConfig',{id:ch,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
+await rpc('Input.SetConfig',{id:ch,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}});CFG=await rpc('Shelly.GetConfig')},'Gespeichert')}
+async function loadHooks(){await run(async()=>{if(!SUP.length){const s=await rpc('Webhook.ListSupported');SUP=Object.keys(s.types);$('h_ev').innerHTML=SUP.map(e=>`<option>${e}</option>`).join('');$('h_ev').onchange()}
+const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.event.startsWith('input.')&&(DM||CH2||CV)?(h.cid==1?' · SW2':' · SW1'):''}${CH2&&h.event.startsWith('switch.')?(h.cid==1?' · Kanal 2':' · Kanal 1'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
+$('h_ev').onchange=()=>{const v=$('h_ev').value;$('h_thrw').style.display=v.includes('power_')?'':'none';const isIn=v.startsWith('input.'),isSw=CH2&&v.startsWith('switch.');$('h_cid').innerHTML=isSw?'<option value="0">Kanal 1 (switch:0)</option><option value="1">Kanal 2 (switch:1)</option>':(DM||CH2||CV)?'<option value="0">SW1 (input:0)</option><option value="1">SW2 (input:1)</option>':'<option value="0">SW (input:0)</option><option value="100">Add-on (input:100)</option>';$('h_cidw').style.display=((AO||DM||CH2||CV)&&isIn)||isSw?'':'none'};
+function addh(){run(async()=>{const p={event:$('h_ev').value,cid:$('h_cidw').style.display==''?+$('h_cid').value:0,name:$('h_name').value,enable:true,urls:$('h_urls').value.split('\n').map(s=>s.trim()).filter(Boolean)};const t=$('h_thr').value;if(t!=='')p.threshold=+t;await rpc('Webhook.Create',p);$('h_urls').value='';$('h_name').value='';loadHooks()},'Aktion angelegt')}
 function delh(id){run(async()=>{await rpc('Webhook.Delete',{id});loadHooks()})}
 function tgl(id,en){run(()=>rpc('Webhook.Update',{id,enable:en}))}
 function scan(){run(async()=>{$('scan').textContent='Suche …';try{const r=await rpc('WiFi.Scan');$('w_list').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(n=>`<option value="${esc(n.ssid)}">${n.rssi} dBm</option>`).join('');toast(r.results.length+' Netze gefunden')}finally{$('scan').textContent='Netze suchen'}})}
@@ -238,9 +285,10 @@ function saveWifi(){run(async()=>{const s={ssid:$('w_ssid').value,ipv4mode:$('w_
 function saveSys(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('y_name').value},location:{tz:$('y_tz').value},sntp:{server:$('y_sntp').value},ui:{led:$('y_led').checked}}});loadCfg()},'Gespeichert')}
 function setAuth(clear){run(async()=>{if(!clear&&!$('y_auth').value)throw new Error('Kein Passwort eingegeben');await rpc('Shelly.SetAuth',{pass:clear?null:$('y_auth').value});$('y_auth').value='';loadCfg()},clear?'Passwort entfernt':'Passwort gesetzt')}
 const CSRC={default:'Standard (wie Tasmota)',reference:'mit Referenzlast kalibriert',tasmota:'aus Tasmota übernommen',manual:'manuell gesetzt'};
-function showCal(c){if(!c)return;$('y_cf').textContent=(DM?'Faktor ':'')+c.factor.toFixed(4)+(DM?' · ':' W/Hz · ')+(DM&&c.source=='default'?'Standard':(CSRC[c.source]||c.source))+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
+function calCh(){return(CH2||CV)?+$('y_ch').value:0}
+function showCal(c){if(!c&&CFG){const ch=calCh();if(CV){const k=CFG['cover:0'].pm_calibration[ch];c={factor:k.factor,source:k.factor==1?'default':'manual',default:1}}else c=(CFG['switch:'+ch]||CFG['switch:0']||CFG['light:0']||{}).pm_calibration}if(!c)return;const FX=DM||CH2||CV;$('y_cf').textContent=(FX?'Faktor ':'')+c.factor.toFixed(4)+(FX?' · ':' W/Hz · ')+(FX&&c.source=='default'?'Standard':(CSRC[c.source]||c.source))+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
 function calVI(){const p={};if($('y_vr').value)p.voltage=+$('y_vr').value;if($('y_ir').value)p.current=+$('y_ir').value;calib(p)}
-function calib(p){run(async()=>{p.id=0;const r=await rpc(cmp()+'.Calibrate',p);if(r.factor!=null){showCal(r);toast('Faktor: '+r.factor.toFixed(4)+(DM?'':' W/Hz'))}else toast('Spannung/Strom kalibriert')})}
+function calib(p){run(async()=>{p.id=calCh();const r=await rpc(CV?'Switch.Calibrate':cmp()+'.Calibrate',p);CFG=await rpc('Shelly.GetConfig');if(r.factor!=null){showCal();toast('Faktor: '+r.factor.toFixed(4)+(DM||CH2||CV?'':' W/Hz'))}else toast('Spannung/Strom kalibriert')})}
 function showUpd(u,ver){if(!u)return;$('u_mode').value=u.mode;$('u_hour').value=u.hour;$('u_url').value=u.url;$('u_tok').placeholder=u.token_set?'gesetzt – leer lassen = unverändert':'kein Token';
 $('u_st').textContent=u.available?'Neue Version '+u.available+' verfügbar':'Aktuell ('+ver+')';$('u_inst').style.display=u.available?'':'none';
 $('u_info').textContent='Variante '+u.variant+(u.last_check?' · zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE'):'')+(u.last_error?' · '+u.last_error:'')+(u.state!='idle'?' · '+u.state:'')}
@@ -250,7 +298,7 @@ async function loadUpd(){const c=await rpc('Sys.GetConfig');const d=await rpc('S
 function saveUpd(){run(async()=>{const u={mode:$('u_mode').value,hour:+$('u_hour').value,url:$('u_url').value};if($('u_tok').value)u.token=$('u_tok').value;await rpc('Sys.SetConfig',{config:{updates:u}});$('u_tok').value='';await loadUpd()},'Gespeichert')}
 function chkUpd(){run(async()=>{const r=await rpc('Shelly.CheckForUpdate');await loadUpd();toast(r.stable?'Neue Version '+r.stable.version:'Firmware ist aktuell')})}
 function instUpd(){if(confirm('Update jetzt installieren? Das Gerät startet danach neu.'))run(async()=>{await rpc('Shelly.Update',{stage:'stable'});toast('Update läuft – Gerät startet gleich neu')})}
-function rstc(){if(confirm('Energiezähler nullen?'))run(()=>rpc(cmp()+'.ResetCounters',{id:0}),'Zähler genullt')}
+function rstc(){if(confirm('Energiezähler nullen?'))run(()=>rpc(cmp()+'.ResetCounters',{id:CV?0:calCh()}),'Zähler genullt')}
 function sendRpc(){run(async()=>{const t=$('r_p').value.trim();const p=t?JSON.parse(t):{};try{$('r_o').textContent=JSON.stringify(await rpc($('r_m').value,p),null,2)}catch(e){$('r_o').textContent='Fehler: '+e.message}})}
 function init(){loadCfg().catch(()=>setTimeout(init,3000))}
 let pb=false;async function tick(){if(pb)return;pb=true;await poll();pb=false}

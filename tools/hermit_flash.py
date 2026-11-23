@@ -37,7 +37,8 @@ GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "herm
                "SHPLG-S": ("ShellyPlugS", "hermit-plugs"),
                "SHPLG-1": ("ShellyPlug2", "hermit-plug"), "SHPLG2-1": ("ShellyPlug2", "hermit-plug"),
                "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo"),
-               "SHDM-2": ("ShellyDimmer2", "hermit-dimmer2")}
+               "SHDM-2": ("ShellyDimmer2", "hermit-dimmer2"),
+               "SHSW-25": ("Shelly25", "hermit-25")}
 
 
 def log(msg):
@@ -129,10 +130,12 @@ def detect(dev):
     return None, None
 
 
-def variant_from(dev, kind, info, addon, meter=False):
+def variant_from(dev, kind, info, addon, meter=False, cover=None):
     v = None
     if kind == "stock":
         v = GEN1_MODELS[info["type"]][1]
+        if v == "hermit-25" and str((jget(dev, "/settings") or {}).get("mode", "")) == "roller":
+            v = "hermit-25-cover"                # Original-Firmware im Rollladenbetrieb
     elif kind == "hermit":                       # Modell z. B. HERMIT-1PM-ADDON
         m = str(info.get("model", "")).lower()
         v = m.replace("-addon", "").replace("-meter", "") if m.startswith("hermit-") else None
@@ -147,6 +150,8 @@ def variant_from(dev, kind, info, addon, meter=False):
             v = "hermit-plugs"
         elif "plug" in name and "us" not in name.split():
             v = "hermit-plug"
+        elif "2.5" in name:
+            v = "hermit-25-cover" if (jget(dev, "/cm?cmnd=SetOption80") or {}).get("SetOption80") == "ON" else "hermit-25"
         elif "dimmer 2" in name:
             v = "hermit-dimmer2"
         elif "duo" in name and "rgbw" not in name:
@@ -156,9 +161,11 @@ def variant_from(dev, kind, info, addon, meter=False):
         elif "shelly 1" in name:
             v = "hermit-1"
     if v and addon:
-        if v in ("hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2"):
-            die("Plug / Plug S / Duo / Dimmer 2 haben keinen Add-on-Anschluss")
+        if v in ("hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover"):
+            die("Plug / Plug S / Duo / Dimmer 2 / Shelly 2.5 haben keinen Add-on-Anschluss")
         v += "-addon"
+    if v and cover is not None and v.startswith("hermit-25"):
+        v = "hermit-25-cover" if cover else "hermit-25"
     if v and meter:
         if v not in ("hermit-1pm", "hermit-plugs", "hermit-plug"):
             die("Messfirmware gibt es nur für Shelly 1PM, Plug S und Plug")
@@ -448,6 +455,8 @@ def main():
     ap.add_argument("ip", help="IP-Adresse des Shelly")
     ap.add_argument("--addon", action="store_true", help="Variante mit Add-on-Taster installieren")
     ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S / Plug): nur Energiemessung, Reset nur am Taster/SW")
+    ap.add_argument("--cover", action="store_true", default=None, help="Shelly 2.5: Rollladen-Firmware (hermit-25-cover)")
+    ap.add_argument("--switch", dest="cover", action="store_false", help="Shelly 2.5: Schalter-Firmware mit zwei Kanälen (hermit-25)")
     ap.add_argument("--variant", help="z. B. hermit-1pm, hermit-1pm-addon, hermit-1pm-meter, hermit-plugs-meter (sonst automatisch)")
     ap.add_argument("--bin", help="eigene .bin statt bin/<variante>.bin")
     ap.add_argument("--user", default="admin")
@@ -463,7 +472,7 @@ def main():
     if not kind:
         die(f"Unter {args.ip} kein unterstützter Shelly (Original, Tasmota, Loader oder Hermit) gefunden")
     names = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
-    variant = args.variant or variant_from(dev, kind, info, args.addon, args.meter)
+    variant = args.variant or variant_from(dev, kind, info, args.addon, args.meter, args.cover)
     if not variant:
         die("Modell nicht erkannt – bitte --variant angeben")
     log(f"Gefunden: {names[kind]}  →  installiere {variant}")
@@ -471,6 +480,7 @@ def main():
         log("Hinweis: mg2hermit überschreibt den Bootloader per OTA. Bricht der Vorgang ab, hilft im Zweifel nur")
         log("Flashen per Kabel." + (" Lampe während des Vorgangs nicht ausschalten." if "duo" in variant
                                     else " Das Licht kann während des Vorgangs kurz ausgehen." if "dimmer" in variant
+                                    else " Beide Relais bleiben während des Vorgangs aus." if "hermit-25" in variant
                                     else " Relais bleibt während des Vorgangs aus."))
     if not args.yes and input("Fortfahren? [j/N] ").strip().lower() not in ("j", "ja", "y", "yes"):
         sys.exit(0)

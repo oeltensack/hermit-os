@@ -18,6 +18,8 @@ VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in up
     "plug": "hermit-plug",
     "duo": "hermit-duo",
     "dimmer2": "hermit-dimmer2",
+    "shelly25": "hermit-25",
+    "shelly25_cover": "hermit-25-cover",
     "shelly1pm_meter": "hermit-1pm-meter",
     "plugs_meter": "hermit-plugs-meter",
     "plug_meter": "hermit-plug-meter",
@@ -59,6 +61,7 @@ MODELS = {
     "Shelly-Plug":   ["hermit-plug", "hermit-plug-meter"],
     "Shelly-Duo":    ["hermit-duo"],
     "Shelly-Dimmer-2": ["hermit-dimmer2"],
+    "Shelly-2.5":    ["hermit-25", "hermit-25-cover"],
 }
 dist = ROOT / "dist"
 dist.mkdir(exist_ok=True)

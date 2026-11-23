@@ -1,5 +1,23 @@
 # Änderungen
 
+## 1.15.0
+- **Shelly 2.5** – zwei Firmwares:
+  - `hermit-25`: zwei Schaltkanäle wie Shelly Plus 2PM (`switch:0`, `switch:1`), je Kanal Leistung, Spannung,
+    Strom, cos φ, Frequenz und Energie (ADE7953), eigene Einstellungen, Timer, Aktionen, Kalibrierung
+  - `hermit-25-cover`: Rollladen wie Shelly Plus 2PM (`cover:0`) – Auf/Ab/Stopp, Position nach Kalibrierfahrt,
+    Endlagen am Motorstrom, Höchstfahrzeit, Hinderniserkennung, ein oder zwei Eingänge (Schalter/Taster),
+    Richtungs- und Eingangstausch, 0,5 s Pause beim Richtungswechsel, nie beide Relais an
+  - WLAN-Reset auch über den Taster auf der Platine (10 s)
+- Firmware intern auf mehrere Kanäle umgebaut (Relais, Timer, Messung, Einstellungen)
+- Flasher: Shelly 2.5 von Original-Firmware (erkennt Rollladenbetrieb) und Tasmota; `--cover` / `--switch`
+
+## Hermit Cloud 1.5.0
+- Shelly 2.5: Kanal 2 erscheint als eigenes Gerät (eigene Leistung, Energie, Raum, Regeln)
+- Rollladen: Auf/Stopp/Zu und Positionsregler in der Gerätekarte; in Zeitplänen und Regeln gilt
+  „an“ = öffnen, „aus“ = schließen; Meldungen bei Hindernis und fehlgeschlagener Kalibrierung
+- Gerät löschen entfernt auch die Stundenwerte
+
+
 ## 1.14.0
 - **Shelly Dimmer 2** (`hermit-dimmer2`): verhält sich wie ein Shelly Dimmer Gen3 (`light:0`, `Light.Set`,
   `Light.DimUp/DimDown/DimStop`), zwei Eingänge (`input:0` SW1, `input:1` SW2)

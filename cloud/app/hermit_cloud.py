@@ -241,7 +241,12 @@ def dev_row(r, latest=None):
         "last_seen": r["last_seen"], "comp": r["comp"], "status": st, "hermit": hermit,
         "today_wh": wh, "today_cost": round(wh / 1000 * price_eur_kwh(), 2), "fw_new": None,
     }
-    if hermit and latest:
+    if "~" in r["id"]:                           # zweiter Kanal eines Geraets
+        base = q("SELECT name FROM devices WHERE id=?", (r["id"].split("~")[0],), one=True)
+        out["channel_of"] = r["id"].split("~")[0]
+        if not out["name"]:
+            out["name"] = f"{(base['name'] if base and base['name'] else out['channel_of'])} · Kanal {int(r['id'].split('~')[1]) + 1}"
+    elif hermit and latest:
         out["fw_new"] = latest if engine.ver_tuple(latest) > engine.ver_tuple(r["ver"]) else None
     elif r["id"] in engine.FW["gen2"]:
         out["fw_new"] = engine.FW["gen2"][r["id"]]
@@ -258,7 +263,9 @@ def dev_row(r, latest=None):
 def devices():
     latest = engine.FW["hermit"]
     rows = q("SELECT * FROM devices WHERE hidden=0 ORDER BY COALESCE(NULLIF(room,''),'~'), COALESCE(NULLIF(name,''), id)")
-    return [dev_row(r, latest) for r in rows]
+    out = [dev_row(r, latest) for r in rows]
+    out.sort(key=lambda d: (d["room"] == "", d["room"].lower(), (d["name"] or d["id"]).lower()))   # Kanal 2 neben Kanal 1
+    return out
 
 
 def get_dev(dev):
@@ -282,7 +289,8 @@ async def dev_switch(dev: str, request: Request):
     get_dev(dev)
     d = await request.json()
     try:
-        res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None, d.get("brightness"))
+        res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None, d.get("brightness"),
+                                      d.get("cover"), d.get("pos"))
     except Exception as e:
         raise HTTPException(502, str(e))
     return {"result": res}
@@ -300,7 +308,11 @@ async def dev_meta(dev: str, request: Request):
         name = str(d["name"]).strip()
         q("UPDATE devices SET name=? WHERE id=?", (name, dev))
         try:
-            await asyncio.to_thread(BUS.rpc, dev, "Sys.SetConfig", {"config": {"device": {"name": name}}}, 4)
+            if "~" in dev:                         # zweiter Kanal: Name des Schaltkanals am Geraet
+                await asyncio.to_thread(BUS.rpc, dev, "Switch.SetConfig",
+                                        {"id": int(dev.split("~")[1]), "config": {"name": name}}, 4)
+            else:
+                await asyncio.to_thread(BUS.rpc, dev, "Sys.SetConfig", {"config": {"device": {"name": name}}}, 4)
         except Exception:
             pass
     return {"ok": True}
@@ -315,9 +327,14 @@ async def dev_rename(dev: str, request: Request):
 def dev_delete(dev: str, request: Request):
     need(request, "admin")
     get_dev(dev)
-    for t in ("power", "energy", "appliances", "runs", "backups", "fridges", "fridge_cycles"):
-        q(f"DELETE FROM {t} WHERE dev=?", (dev,))
-    q("DELETE FROM devices WHERE id=?", (dev,))
+    rows = [dev] + ([] if "~" in dev else [r["id"] for r in q("SELECT id FROM devices WHERE id LIKE ?", (dev + "~%",))])
+    for d in rows:                               # mit zweitem Kanal (Shelly 2.5)
+        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles"):
+            try:
+                q(f"DELETE FROM {t} WHERE dev=?", (d,))
+            except Exception:
+                pass
+        q("DELETE FROM devices WHERE id=?", (d,))
     return {"ok": True}
 
 
@@ -746,7 +763,7 @@ async def push_test(request: Request):
 def firmware():
     latest = engine.FW["hermit"]
     out = []
-    for r in q("SELECT * FROM devices WHERE hidden=0 ORDER BY COALESCE(NULLIF(name,''), id)"):
+    for r in q("SELECT * FROM devices WHERE hidden=0 AND id NOT LIKE '%~%' ORDER BY COALESCE(NULLIF(name,''), id)"):
         d = dev_row(r, latest)
         out.append({k: d.get(k) for k in ("id", "name", "model", "ver", "online", "hermit", "fw_new")})
     return {"hermit_latest": latest, "checked": engine.FW["checked"], "devices": out}
@@ -756,7 +773,7 @@ def firmware():
 async def firmware_check(request: Request):
     need(request, "admin")
     await asyncio.to_thread(engine.fw_check, True)
-    for r in q("SELECT * FROM devices WHERE online=1 AND hidden=0"):
+    for r in q("SELECT * FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%'"):
         if is_hermit(r):
             continue
         try:                                     # Shelly Gen2+: beim Geraet nachfragen
@@ -794,7 +811,7 @@ def backups():
 async def backup_now(request: Request):
     need(request, "admin")
     d = await request.json() if (await request.body()) else {}
-    devs = [d["dev"]] if d.get("dev") else [r["id"] for r in q("SELECT id FROM devices WHERE online=1 AND hidden=0")]
+    devs = [d["dev"]] if d.get("dev") else [r["id"] for r in q("SELECT id FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%'")]
     res = {}
     for dev in devs:
         try:

@@ -82,6 +82,29 @@ Wie die Shelly Duo Bulb Gen3.
 Ohne `on` ändert `CCT.Set` nur Helligkeit/Farbtemperatur – eine ausgeschaltete Lampe bleibt aus.
 `Switch.*` gibt es bei der Duo nicht.
 
+## Mehrere Kanäle (Shelly 2.5)
+
+Alle `Switch.*`-Methoden nehmen `id:0` (Kanal 1) oder `id:1` (Kanal 2). `Shelly.GetStatus` liefert `switch:0` und
+`switch:1` mit `apower`, `voltage`, `current`, `pf`, `freq`, `aenergy`. Ereignisse (`switch.on` …) und Aktionen
+haben den Kanal als `cid`. `Switch.Calibrate` mit `id` kalibriert den jeweiligen Kanal (`apower`, `voltage`,
+`current`, `factor`).
+
+## Cover (Shelly 2.5 Rollladen)
+
+| Methode | Parameter |
+|---|---|
+| `Cover.Open` / `Cover.Close` | `id:0`, `duration` (s, optional) |
+| `Cover.Stop` | `id:0` |
+| `Cover.GoToPosition` | `id:0`, `pos` (0–100, 0 = zu) oder `rel` (±) – nur nach Kalibrierung |
+| `Cover.Calibrate` | `id:0` – Kalibrierfahrt zu/auf/zu |
+| `Cover.GetStatus` | `{id, source, state, apower, voltage, current, pf, freq, aenergy, temperature, pos_control, current_pos, target_pos, move_timeout, move_started_at, last_direction, errors}`; `state`: `open`, `closed`, `opening`, `closing`, `stopped`, `calibrating` |
+| `Cover.GetConfig` / `Cover.SetConfig` | `name`, `in_mode` (`dual`/`single`/`detached`), `initial_state` (`stopped`/`open`/`closed`), `power_limit`, `maxtime_open`, `maxtime_close`, `swap_inputs`, `invert_directions`, `motor{idle_power_thr, idle_confirm_period}`, `obstruction_detection{enable, action, power_thr, holdoff}`, `pos_calibration{open_time, close_time}`, `temp_limit` |
+| `Cover.ResetCounters` | `id:0` |
+
+Ereignisse: `cover.open`, `cover.closed`, `cover.opening`, `cover.closing`, `cover.stopped`, `cover.calibrating`,
+`cover.calibration_failed`, `cover.obstruction`, `cover.overpower`, `cover.overtemperature`.
+Leistung kalibrieren: `Switch.Calibrate` mit `id:0`/`1` (Relais auf/zu).
+
 ## Light (Dimmer 2)
 
 | Methode | Parameter |
@@ -189,7 +212,8 @@ und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für 
 |---|---|
 | `/shelly` | Geräteinfo (ohne Passwort), Gen2-Format plus `type` |
 | `/status` | Gen1-Status mit `relays`, `meters`, `inputs`, `wifi_sta`, `temperature` |
-| `/relay/0?turn=on|off|toggle&timer=10` | schalten (Shelly 1/1PM/Plug S/Plug; bei der Duo Licht an/aus) |
+| `/relay/0?turn=on|off|toggle&timer=10` | schalten (Shelly 1/1PM/Plug S/Plug; bei der Duo Licht an/aus); Shelly 2.5 auch `/relay/1` |
+| `/roller/0?go=open|close|stop|to_pos&roller_pos=50` | Shelly 2.5 Rollladen |
 | `/meter/0` | `power`, `total` (Watt-Minuten wie Gen1) |
 | `/light/0?turn=on&brightness=50&temp=3000&transition=500` | Duo und Dimmer 2 (`transition` in ms, `temp` nur Duo) |
 | `/update` | Firmware hochladen (Formularfeld beliebig) |

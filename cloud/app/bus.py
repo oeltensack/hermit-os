@@ -17,7 +17,22 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_USER = os.environ.get("MQTT_USER", "")
 MQTT_PASS = os.environ.get("MQTT_PASS", "")
 SRC = "hermit-cloud"
-MAIN_COMPS = ("switch:", "cct:", "light:")
+MAIN_COMPS = ("switch:", "cct:", "light:", "cover:")
+
+
+# Geraete mit mehreren Schaltkanaelen (Shelly 2.5): Kanal 2 wird als eigene Zeile "<id>~1" gefuehrt –
+# mit eigener Leistung, Energie, Raum, Regeln. Das Geraet selbst (MQTT-Topic) bleibt <id>.
+def row_id(dev, comp):
+    kind, _, cid = comp.partition(":")
+    return f"{dev}~{cid}" if kind == "switch" and cid.isdigit() and int(cid) > 0 else dev
+
+
+def real_id(row):
+    return row.split("~", 1)[0]
+
+
+def channel_rows(dev):
+    return [r["id"] for r in q("SELECT id FROM devices WHERE id LIKE ?", (dev + "~%",))]
 
 
 class Bus:
@@ -63,6 +78,8 @@ class Bus:
         if rest == "online":
             on = payload.decode().strip() == "true"
             seen(dev, online=on)
+            for v in channel_rows(dev):
+                seen(v, online=on)
             if on and not q("SELECT info FROM devices WHERE id=? AND info!='{}'", (dev,), one=True):
                 threading.Thread(target=self.fetch_info, args=(dev,), daemon=True).start()
             return
@@ -72,10 +89,19 @@ class Bus:
         live = not retained
         if rest == "info":
             set_info(dev, d, live=live)
+            for v in channel_rows(dev):
+                set_info(v, {k: d.get(k) for k in ("model", "app", "ver", "mac", "gen", "ip")}, live=live)
         elif rest.startswith("status/"):
             comp = rest[7:]
             if comp.startswith(MAIN_COMPS):
-                set_status(dev, comp, d, live=live)
+                rid = row_id(dev, comp)
+                if rid != dev and not q("SELECT 1 FROM devices WHERE id=?", (rid,), one=True):
+                    ensure(rid)                  # neuer Kanal: Grunddaten vom Geraet uebernehmen
+                    base = q("SELECT model, app, ver, mac, gen, ip, room FROM devices WHERE id=?", (dev,), one=True)
+                    if base:
+                        q("UPDATE devices SET model=?, app=?, ver=?, mac=?, gen=?, ip=?, room=? WHERE id=?",
+                          (base["model"], base["app"], base["ver"], base["mac"], base["gen"], base["ip"], base["room"], rid))
+                set_status(rid, comp, d, live=live)
             elif live:
                 seen(dev)
         elif rest == "events/rpc" and live:
@@ -87,7 +113,7 @@ class Bus:
             elif m in ("NotifyStatus", "NotifyFullStatus"):
                 for k, v in p.items():
                     if isinstance(v, dict) and k.startswith(MAIN_COMPS):
-                        set_status(dev, k, v, merge=True)
+                        set_status(row_id(dev, k), k, v, merge=True)
                 seen(dev)
 
     def fetch_info(self, dev):
@@ -106,7 +132,7 @@ class Bus:
             req = {"id": rid, "src": SRC, "method": method}
             if params is not None:
                 req["params"] = params
-            self.c.publish(f"{dev}/rpc", json.dumps(req))
+            self.c.publish(f"{real_id(dev)}/rpc", json.dumps(req))
             if not ev.wait(timeout):
                 raise TimeoutError(f"{dev_name(dev)} antwortet nicht")
             r = box[0]
@@ -117,7 +143,7 @@ class Bus:
             self.wait.pop(rid, None)
 
     # ---- Schalten (fuer Oberflaeche, Zeitplaene, Regeln) ----
-    def switch(self, dev, on=None, brightness=None):
+    def switch(self, dev, on=None, brightness=None, cover=None, pos=None):
         r = q("SELECT comp, status FROM devices WHERE id=?", (dev,), one=True)
         if not r:
             raise RuntimeError(f"Unbekanntes Gerät {dev}")
@@ -125,6 +151,20 @@ class Bus:
             raise RuntimeError(f"{dev_name(dev)}: Messfirmware – nicht schaltbar")
         comp = r["comp"] or "switch:0"
         kind, cid = comp.split(":")
+        if kind == "cover":                       # Rollladen: an = oeffnen, aus = schliessen
+            st = json.loads(r["status"] or "{}")
+            if pos is not None:
+                res = self.rpc(dev, "Cover.GoToPosition", {"id": int(cid), "pos": max(0, min(100, int(round(float(pos)))))})
+            else:
+                act = cover or ("open" if on is True else "close" if on is False else
+                                "stop" if st.get("state") in ("opening", "closing", "calibrating") else
+                                "close" if st.get("last_direction") == "open" else "open")
+                res = self.rpc(dev, {"open": "Cover.Open", "close": "Cover.Close", "stop": "Cover.Stop"}[act], {"id": int(cid)})
+            try:
+                set_status(dev, comp, self.rpc(dev, "Cover.GetStatus", {"id": int(cid)}), merge=True)
+            except Exception:
+                pass
+            return res
         m = {"switch": "Switch", "cct": "CCT", "light": "Light"}.get(kind, "Switch")
         if brightness is not None and kind in ("light", "cct"):
             b = max(0, min(100, int(round(float(brightness)))))
@@ -225,6 +265,8 @@ def set_status(dev, comp, st, merge=False, live=True):
 
 EVENT_TEXT = {
     "overpower": ("overpower", "Überlast – abgeschaltet"),
+    "obstruction": ("obstruction", "Rollladen: Hindernis erkannt – angehalten"),
+    "calibration_failed": ("calibration", "Rollladen: Kalibrierung fehlgeschlagen (Endlage nicht erkannt)"),
     "overtemperature": ("overtemp", "Übertemperatur – abgeschaltet"),
     "overtemp": ("overtemp", "Übertemperatur – abgeschaltet"),
     "reset": ("reset", "Schutzabschaltung am Gerät zurückgesetzt"),
@@ -234,6 +276,7 @@ EVENT_TEXT = {
 
 def on_event(dev, e):
     seen(dev)
+    dev = row_id(dev, e.get("component", ""))
     ev = e.get("event", "")
     if ev in EVENT_TEXT:
         kind, text = EVENT_TEXT[ev]

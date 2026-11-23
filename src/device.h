@@ -106,6 +106,33 @@
   #define DEF_INITIAL   "restore_last"
   #define DEF_POWER_LIMIT 250      // Dimmer 2: 220 W bei 230 V
   #define DEF_TEMP_LIMIT  85
+#elif defined(DEVICE_SHELLY25)
+  // Shelly 2.5 (SHSW-25): zwei Relais, zwei Eingaenge, ADE7953 an I2C, NTC
+  // Tasmota-Template {"NAME":"Shelly 2.5","GPIO":[320,0,32,0,224,193,0,0,640,192,608,225,3456,4736]}
+  #define DEV_PREFIX   "hermit-25"
+  #define DEV_MODEL    "HERMIT-25"
+  #define DEV_APP      "Shelly25"
+  #define GEN1_TYPE    "SHSW-25"
+  #define NCH          2
+  #define PIN_RELAY    4      // Relais 1 (Rollladen: auf)
+  #define PIN_RELAY2   15     // Relais 2 (Rollladen: zu)
+  #define PIN_INPUT    13     // SW1
+  #define PIN_INPUT2   5      // SW2
+  #define PIN_LED      0      // invertiert
+  #define PIN_BTN      2      // Taster auf der Platine (gedrueckt = LOW)
+  #define PIN_SDA      12     // ADE7953
+  #define PIN_SCL      14
+  #define HAS_PM       1
+  #define PM_ADE       1
+  #define PWR_CAL_DEFAULT 1.0f     // Korrekturfaktoren auf die ADE7953-Werte
+  #define V_CAL_DEFAULT   1.0f
+  #define I_CAL_DEFAULT   1.0f
+  #define HAS_TEMP     1
+  #define HAS_LED      1
+  #define DEF_POWER_LIMIT 2300     // je Kanal (10 A)
+  #if defined(COVER_MODE)
+    #define IS_COVER   1
+  #endif
 #elif defined(DEVICE_SHELLY1)
   #define DEV_PREFIX   "hermit-1"
   #define DEV_MODEL    "HERMIT-1"
@@ -124,8 +151,8 @@
 // Variante mit Shelly-Temperatur-Add-on (Gen1), genutzt als externer Tastereingang input:100.
 // Das Add-on fuehrt die Datenleitung ueber Optokoppler: GPIO0 = Ausgang (Leitung freigeben),
 // GPIO3 = Eingang. Taster zwischen DATA und GND des Add-ons.
-#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_PLUG) || defined(DEVICE_DUO) || defined(DEVICE_DIMMER2))
-  #error "Plug / Plug S / Duo / Dimmer 2 haben keinen Add-on-Anschluss"
+#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_PLUG) || defined(DEVICE_DUO) || defined(DEVICE_DIMMER2) || defined(DEVICE_SHELLY25))
+  #error "Plug / Plug S / Duo / Dimmer 2 / Shelly 2.5 haben keinen Add-on-Anschluss"
 #endif
 // Messfirmware: nur Energiemessung, Relais bleibt an. Abschaltung bei Ueberlast/Uebertemperatur,
 // Wiedereinschalten nur von Hand am Taster bzw. SW-Eingang. Kein Schalten per RPC/HTTP.
@@ -148,6 +175,16 @@
   #define HAS_LED        0     // GPIO0 wird vom Add-on belegt
   #define DEV_MODEL_STR  DEV_MODEL "-ADDON"
   #define DEV_VARIANT    DEV_PREFIX "-addon"
+#elif defined(COVER_MODE)
+  #define HAS_ADDON      0
+  #define DEV_MODEL_STR  DEV_MODEL "-COVER"
+  #define DEV_VARIANT    DEV_PREFIX "-cover"
+  #undef  DEF_IN_MODE
+  #define DEF_IN_MODE    "dual"
+  #undef  DEF_IN_TYPE
+  #define DEF_IN_TYPE    "switch"
+  #undef  DEF_INITIAL
+  #define DEF_INITIAL    "stopped"
 #elif IS_METER
   #define HAS_ADDON      0
   #define DEV_MODEL_STR  DEV_MODEL "-METER"
@@ -189,6 +226,9 @@
 #ifndef DEF_POWER_LIMIT
   #define DEF_POWER_LIMIT 3500
 #endif
+#ifndef NCH
+  #define NCH 1               // Anzahl Ausgangskanaele (Relais)
+#endif
 #ifndef DEF_TEMP_LIMIT
   #define DEF_TEMP_LIMIT 95
 #endif
@@ -203,8 +243,18 @@
 #else
   #define HAS_IN2 0
 #endif
-#define V_CAL_DEFAULT 0.16029f      // Tasmota BL0937: 822 * 1950 / 10 / T_us  -> V pro Hz
-#define I_CAL_DEFAULT 0.01155f      // Tasmota BL0937: 3300 * 3500 / 1000 / T_us -> A pro Hz
+#ifndef V_CAL_DEFAULT
+  #define V_CAL_DEFAULT 0.16029f    // Tasmota BL0937: 822 * 1950 / 10 / T_us  -> V pro Hz
+#endif
+#ifndef I_CAL_DEFAULT
+  #define I_CAL_DEFAULT 0.01155f    // Tasmota BL0937: 3300 * 3500 / 1000 / T_us -> A pro Hz
+#endif
+#ifndef PM_ADE
+  #define PM_ADE 0
+#endif
+#ifndef IS_COVER
+  #define IS_COVER 0
+#endif
 #ifndef HAS_LIGHT
   #define HAS_LIGHT 0
 #endif
@@ -217,7 +267,11 @@
 #ifndef DEF_INITIAL
   #define DEF_INITIAL "off"
 #endif
-#if HAS_LIGHT
+#if IS_COVER
+  #define COMP     "cover"      // Gen2-Komponente wie Shelly Plus 2PM im Rollladenbetrieb
+  #define EV_ON    "cover.open"
+  #define EV_OFF   "cover.closed"
+#elif HAS_LIGHT
   #define COMP     "cct"        // Gen2-Komponente wie Shelly Duo Bulb Gen3
   #define EV_ON    "cct.on"
   #define EV_OFF   "cct.off"

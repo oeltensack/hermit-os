@@ -413,7 +413,7 @@ def restore_backup(bid, dev, with_hooks=True):
         step("System (Name, Zeit, LED)", "Sys.SetConfig", {"config": sc})
     for key, c in cfg.items():
         kind, _, cid = key.partition(":")
-        m = {"switch": "Switch", "cct": "CCT", "light": "Light", "input": "Input"}.get(kind)
+        m = {"switch": "Switch", "cct": "CCT", "light": "Light", "cover": "Cover", "input": "Input"}.get(kind)
         if m and cid.isdigit():
             step(f"{key}", f"{m}.SetConfig", {"id": int(cid), "config": _clean(c)})
     if with_hooks and data.get("hooks") is not None:
@@ -424,7 +424,7 @@ def restore_backup(bid, dev, with_hooks=True):
 
 
 def _auto_backups():
-    for d in q("SELECT id FROM devices WHERE online=1 AND hidden=0"):
+    for d in q("SELECT id FROM devices WHERE online=1 AND hidden=0 AND id NOT LIKE '%~%'"):
         last = q("SELECT MAX(ts) AS t FROM backups WHERE dev=?", (d["id"],), one=True)
         if last and last["t"] and time.time() - last["t"] < 20 * 3600:
             continue

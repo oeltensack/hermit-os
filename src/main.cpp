@@ -26,6 +26,9 @@
 #if HAS_DIM
 #include "stm_dimmer.h"
 #endif
+#if PM_ADE
+#include "ade7953.h"
+#endif
 
 // Debug-Ausgaben ueber UART0 – beim Dimmer gehoert die Schnittstelle dem STM32
 #if HAS_DIM
@@ -52,6 +55,16 @@ struct Hook {
   bool armed = true;
 };
 
+// Einstellungen je Ausgangskanal (Shelly 2.5: zwei, sonst einer)
+struct ChCfg {
+  String name;
+  String initial = DEF_INITIAL;     // off | on | restore_last | match_input
+  String inMode = DEF_IN_MODE;      // follow | flip | momentary | detached
+  bool autoOn = false;  float autoOnDelay = 60;
+  bool autoOff = false; float autoOffDelay = 60;
+  float powerLimit = DEF_POWER_LIMIT;
+};
+
 struct Cfg {
   String name;
   String ssid, pass;
@@ -60,9 +73,8 @@ struct Cfg {
   int roamRssi = -70;              // unter dieser Signalstaerke alle 5 min nach einem besseren AP suchen
   String ip, mask, gw, dns;
   String apPass;
-  String swName, inName;
-  String initialState = DEF_INITIAL;     // off | on | restore_last | match_input
-  String inMode = DEF_IN_MODE;     // follow | flip | momentary | detached
+  ChCfg ch[NCH];
+  String inName;
   String inType = DEF_IN_TYPE;     // switch | button
   bool inInvert = false;
   String inFilter = DEF_IN_FILTER;          // ac = 50-Hz-Halbwellen ueberbruecken | dc = reiner Pegel
@@ -71,12 +83,16 @@ struct Cfg {
   bool exInvert = false;
   bool exOutLow = false;           // Add-on-Ausgang invertiert (Leitung mit LOW freigeben)
   String exRelay = "none";         // none | momentary | flip | follow
-  bool autoOn = false;  float autoOnDelay = 60;
-  bool autoOff = false; float autoOffDelay = 60;
-  float powerLimit = DEF_POWER_LIMIT;
   float vCal = V_CAL_DEFAULT, iCal = I_CAL_DEFAULT;   // Plug S: Spannung/Strom
   float tempLimit = DEF_TEMP_LIMIT;
   float pwrCal = PWR_CAL_DEFAULT;  // Watt pro Hz am CF-Pin (eigene Datei /calib)
+  float pwrCal1 = PWR_CAL_DEFAULT, iCal1 = I_CAL_DEFAULT;   // zweiter Kanal (Shelly 2.5)
+  // Rollladen (cover:0)
+  float cvMaxOpen = 60, cvMaxClose = 60;  // Hoechstfahrzeit in s
+  float cvTOpen = 0, cvTClose = 0;        // kalibrierte Fahrzeiten (eigene Datei /cover), 0 = keine Positionssteuerung
+  bool cvSwapIn = false, cvInvert = false;
+  float cvIdleThr = 5, cvIdleConf = 0.5f; // Endlage: unter … W fuer … s
+  bool cvObst = false; float cvObstThr = 1000, cvObstHold = 1; String cvObstAction = "stop";
   String calSrc = "default";       // default | reference | tasmota | manual
   bool led = true;
   float transition = HAS_DIM ? 1.0f : 0.5f;   // Licht: Ueberblendzeit in s
@@ -115,6 +131,9 @@ static const char* EVENTS[] = {
 #if IS_METER
   "switch.reset",
 #endif
+#if IS_COVER
+  "cover.opening", "cover.closing", "cover.stopped", "cover.calibrating", "cover.calibration_failed", "cover.obstruction",
+#endif
 #if HAS_PM
   EV_PABOVE, EV_PBELOW,
 #endif
@@ -130,7 +149,11 @@ static const char* METHODS[] = {
   "Shelly.GetDeviceInfo", "Shelly.GetStatus", "Shelly.GetConfig", "Shelly.ListMethods",
   "Shelly.Reboot", "Shelly.FactoryReset", "Shelly.SetAuth",
   "Shelly.CheckForUpdate", "Shelly.Update",
-#if HAS_DIM
+#if IS_COVER
+  "Cover.Open", "Cover.Close", "Cover.Stop", "Cover.GoToPosition", "Cover.Calibrate",
+  "Cover.GetStatus", "Cover.GetConfig", "Cover.SetConfig", "Cover.ResetCounters",
+  "Switch.Calibrate",
+#elif HAS_DIM
   "Light.Set", "Light.Toggle", "Light.GetStatus", "Light.GetConfig", "Light.SetConfig",
   "Light.DimUp", "Light.DimDown", "Light.DimStop", "Light.ResetCounters", "Light.Calibrate", "Hermit.Stm",
 #else
@@ -170,11 +193,19 @@ size_t candIdx = 0;
 bool candActive = false;
 uint32_t candStartMs = 0;
 
-bool relayOn = false;
-String relaySrc = "init";
-bool timerActive = false, timerTarget = false;
-uint32_t timerStartMs = 0, timerDurMs = 0;
-time_t timerStartedAt = 0;
+// Laufzustand je Ausgangskanal: Relais/Licht, Timer, Messung
+struct Chan {
+  bool on = false;
+  String src = "init";
+  bool tAct = false, tTarget = false;            // Timer (toggle_after, Auto-An/Aus)
+  uint32_t tStartMs = 0, tDurMs = 0;
+  time_t tStartedAt = 0;
+  float apower = 0, avolt = NAN, acurr = NAN, pf = NAN, freq = NAN;
+  double energyWh = 0, energySavedWh = 0, minuteAccWh = 0;
+  float byMinute[3] = {0, 0, 0};
+  bool overpower = false;
+};
+Chan CH[NCH];
 
 volatile bool inPulse = false;
 volatile uint8_t inActiveLevel = HIGH;
@@ -189,16 +220,13 @@ bool in2State = false, in2Cand = false;
 int bootEdges = 0;
 
 volatile uint32_t cfLastUs = 0, cfSumUs = 0, cfCnt = 0;
-float apower = 0, avolt = NAN, acurr = NAN;
 volatile uint32_t cf1LastUs = 0, cf1SumUs = 0, cf1Cnt = 0;
 volatile bool cf1Arm = false;
 bool selVolt = true; uint32_t selSinceMs = 0;
-double energyWh = 0, energySavedWh = 0, minuteAccWh = 0;
-float byMinute[3] = {0, 0, 0};
 uint32_t minuteStartMs = 0;
 time_t minuteTs = 0;
 float tempC = NAN;
-bool overtemp = false, overpower = false;
+bool overtemp = false;
 uint32_t lastPmMs = 0, lastTempMs = 0, lastEnergySaveMs = 0;
 
 std::vector<String> httpQueue;
@@ -219,7 +247,11 @@ void saveCal() {
   File f = LittleFS.open("/calib", "w");
   if (f) {
     f.print(cfg.pwrCal, 6); f.print('\n'); f.print(cfg.calSrc); f.print('\n');
-    f.print(cfg.vCal, 6); f.print('\n'); f.print(cfg.iCal, 6); f.close();
+    f.print(cfg.vCal, 6); f.print('\n'); f.print(cfg.iCal, 6);
+#if NCH > 1
+    f.print('\n'); f.print(cfg.pwrCal1, 6); f.print('\n'); f.print(cfg.iCal1, 6);
+#endif
+    f.close();
   }
 }
 void loadCal() {
@@ -228,9 +260,14 @@ void loadCal() {
   float v = f.readStringUntil('\n').toFloat();
   String src = f.readStringUntil('\n'); src.trim();
   float vv = f.readStringUntil('\n').toFloat(), ii = f.readStringUntil('\n').toFloat();
+#if NCH > 1
+  float p1 = f.readStringUntil('\n').toFloat(), i1 = f.readStringUntil('\n').toFloat();
+  if (p1 > 0.05f && p1 < 100.0f) cfg.pwrCal1 = p1;
+  if (i1 > 0.0001f && i1 < 10) cfg.iCal1 = i1;
+#endif
   f.close();
   if (vv > 0.001f && vv < 10) cfg.vCal = vv;
-  if (ii > 0.0001f && ii < 1) cfg.iCal = ii;
+  if (ii > 0.0001f && ii < (PM_ADE ? 10 : 1)) cfg.iCal = ii;
   if (v > 0.05f && v < 100.0f) { cfg.pwrCal = v; cfg.calSrc = src.length() ? src : "manual"; }
 }
 
@@ -240,12 +277,22 @@ void saveCfg() {
   d["name"] = cfg.name; d["ssid"] = cfg.ssid; d["pass"] = cfg.pass;
   d["roam"] = cfg.roam; d["roamthr"] = cfg.roamRssi;
   d["static"] = cfg.staticIp; d["ip"] = cfg.ip; d["mask"] = cfg.mask; d["gw"] = cfg.gw; d["dns"] = cfg.dns;
-  d["appass"] = cfg.apPass; d["swname"] = cfg.swName; d["inname"] = cfg.inName;
-  d["initial"] = cfg.initialState; d["inmode"] = cfg.inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert; d["infilt"] = cfg.inFilter;
+  d["appass"] = cfg.apPass; d["swname"] = cfg.ch[0].name; d["inname"] = cfg.inName;
+  d["initial"] = cfg.ch[0].initial; d["inmode"] = cfg.ch[0].inMode; d["intype"] = cfg.inType; d["ininv"] = cfg.inInvert; d["infilt"] = cfg.inFilter;
   d["exname"] = cfg.exName; d["extype"] = cfg.exType; d["exinv"] = cfg.exInvert; d["exout"] = cfg.exOutLow; d["exrel"] = cfg.exRelay;
-  d["aon"] = cfg.autoOn; d["aond"] = cfg.autoOnDelay; d["aoff"] = cfg.autoOff; d["aoffd"] = cfg.autoOffDelay;
-  d["plim"] = cfg.powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led; d["trans"] = cfg.transition; d["ctinv"] = cfg.ctInvert;
+  d["aon"] = cfg.ch[0].autoOn; d["aond"] = cfg.ch[0].autoOnDelay; d["aoff"] = cfg.ch[0].autoOff; d["aoffd"] = cfg.ch[0].autoOffDelay;
+  for (int c = 1; c < NCH; c++) {            // weitere Kanaele: eigenes Objekt ch1, ch2 …
+    JsonObject k = d[String("ch") + c].to<JsonObject>(); ChCfg& kc = cfg.ch[c];
+    k["name"] = kc.name; k["initial"] = kc.initial; k["inmode"] = kc.inMode;
+    k["aon"] = kc.autoOn; k["aond"] = kc.autoOnDelay; k["aoff"] = kc.autoOff; k["aoffd"] = kc.autoOffDelay; k["plim"] = kc.powerLimit;
+  }
+  d["plim"] = cfg.ch[0].powerLimit; d["tlim"] = cfg.tempLimit; d["led"] = cfg.led; d["trans"] = cfg.transition; d["ctinv"] = cfg.ctInvert;
   d["in2name"] = cfg.in2Name; d["in2type"] = cfg.in2Type; d["in2inv"] = cfg.in2Invert;
+#if IS_COVER
+  { JsonObject v = d["cv"].to<JsonObject>();
+    v["mo"] = cfg.cvMaxOpen; v["mc"] = cfg.cvMaxClose; v["si"] = cfg.cvSwapIn; v["inv"] = cfg.cvInvert;
+    v["it"] = cfg.cvIdleThr; v["ic"] = cfg.cvIdleConf; v["ob"] = cfg.cvObst; v["ot"] = cfg.cvObstThr; v["oh"] = cfg.cvObstHold; v["oa"] = cfg.cvObstAction; }
+#endif
   d["dmin"] = cfg.dimMin; d["dmax"] = cfg.dimMax; d["lead"] = cfg.leadEdge; d["sfade"] = cfg.stmFade; d["bfade"] = cfg.btnFade;
   d["auth"] = cfg.authPass; d["tz"] = cfg.tz; d["sntp"] = cfg.sntp;
   d["uurl"] = cfg.updUrl; d["utok"] = cfg.updToken; d["umode"] = cfg.updMode; d["uhour"] = cfg.updHour;
@@ -276,20 +323,33 @@ void loadCfg() {
   cfg.staticIp = d["static"] | false;
   cfg.roam = d["roam"] | true; cfg.roamRssi = d["roamthr"] | -70;
   cfg.ip = jstr(d["ip"], ""); cfg.mask = jstr(d["mask"], ""); cfg.gw = jstr(d["gw"], ""); cfg.dns = jstr(d["dns"], "");
-  cfg.apPass = jstr(d["appass"], ""); cfg.swName = jstr(d["swname"], ""); cfg.inName = jstr(d["inname"], "");
-  cfg.initialState = jstr(d["initial"], cfg.initialState); cfg.inMode = jstr(d["inmode"], cfg.inMode);
+  cfg.apPass = jstr(d["appass"], ""); cfg.ch[0].name = jstr(d["swname"], ""); cfg.inName = jstr(d["inname"], "");
+  cfg.ch[0].initial = jstr(d["initial"], cfg.ch[0].initial); cfg.ch[0].inMode = jstr(d["inmode"], cfg.ch[0].inMode);
   cfg.inType = jstr(d["intype"], cfg.inType); cfg.inInvert = d["ininv"] | false; cfg.inFilter = jstr(d["infilt"], cfg.inFilter);
   cfg.exName = jstr(d["exname"], ""); cfg.exType = jstr(d["extype"], cfg.exType);
   cfg.exInvert = d["exinv"] | false; cfg.exOutLow = d["exout"] | false; cfg.exRelay = jstr(d["exrel"], cfg.exRelay);
-  cfg.autoOn = d["aon"] | false; cfg.autoOnDelay = d["aond"] | 60.0f;
-  cfg.autoOff = d["aoff"] | false; cfg.autoOffDelay = d["aoffd"] | 60.0f;
-  cfg.powerLimit = d["plim"] | cfg.powerLimit; cfg.tempLimit = d["tlim"] | cfg.tempLimit;
+  cfg.ch[0].autoOn = d["aon"] | false; cfg.ch[0].autoOnDelay = d["aond"] | 60.0f;
+  cfg.ch[0].autoOff = d["aoff"] | false; cfg.ch[0].autoOffDelay = d["aoffd"] | 60.0f;
+  cfg.ch[0].powerLimit = d["plim"] | cfg.ch[0].powerLimit; cfg.tempLimit = d["tlim"] | cfg.tempLimit;
+  for (int c = 1; c < NCH; c++) {
+    JsonObjectConst k = d[String("ch") + c]; ChCfg& kc = cfg.ch[c];
+    if (k.isNull()) continue;
+    kc.name = jstr(k["name"], ""); kc.initial = jstr(k["initial"], kc.initial); kc.inMode = jstr(k["inmode"], kc.inMode);
+    kc.autoOn = k["aon"] | false; kc.autoOnDelay = k["aond"] | 60.0f; kc.autoOff = k["aoff"] | false; kc.autoOffDelay = k["aoffd"] | 60.0f;
+    kc.powerLimit = k["plim"] | kc.powerLimit;
+  }
   cfg.led = d["led"] | true;
   cfg.transition = d["trans"] | cfg.transition; cfg.ctInvert = d["ctinv"] | false;
   // Uebernahme aus Version 1.0.0 (Faktor stand in config.json, Standard war falsch 12.53)
   float old = d["pcal"] | 0.0f;
   if (old > 0 && fabsf(old - 12.53f) > 0.001f && !LittleFS.exists("/calib")) { cfg.pwrCal = old; cfg.calSrc = "reference"; saveCal(); }
   cfg.in2Name = jstr(d["in2name"], ""); cfg.in2Type = jstr(d["in2type"], cfg.in2Type); cfg.in2Invert = d["in2inv"] | false;
+#if IS_COVER
+  { JsonObjectConst v = d["cv"];
+    cfg.cvMaxOpen = v["mo"] | 60.0f; cfg.cvMaxClose = v["mc"] | 60.0f; cfg.cvSwapIn = v["si"] | false; cfg.cvInvert = v["inv"] | false;
+    cfg.cvIdleThr = v["it"] | 5.0f; cfg.cvIdleConf = v["ic"] | 0.5f; cfg.cvObst = v["ob"] | false;
+    cfg.cvObstThr = v["ot"] | 1000.0f; cfg.cvObstHold = v["oh"] | 1.0f; cfg.cvObstAction = jstr(v["oa"], "stop"); }
+#endif
   cfg.dimMin = d["dmin"] | 0; cfg.dimMax = d["dmax"] | 100; cfg.leadEdge = d["lead"] | false;
   cfg.stmFade = d["sfade"] | 3; cfg.btnFade = d["bfade"] | 3;
   cfg.authPass = jstr(d["auth"], ""); cfg.tz = jstr(d["tz"], cfg.tz); cfg.sntp = jstr(d["sntp"], cfg.sntp);
@@ -311,29 +371,36 @@ void loadCfg() {
   }
 }
 
+// Energiezaehler: Kanal 0 in /energy, weitere in /energy1 …
+static String energyFile(int c) { return c ? String("/energy") + c : String("/energy"); }
 void saveEnergy() {
 #if HAS_PM
-  File f = LittleFS.open("/energy", "w");
-  if (f) { f.print(energyWh, 4); f.close(); energySavedWh = energyWh; }
+  for (int c = 0; c < NCH; c++) {
+    File f = LittleFS.open(energyFile(c), "w");
+    if (f) { f.print(CH[c].energyWh, 4); f.close(); CH[c].energySavedWh = CH[c].energyWh; }
+  }
   lastEnergySaveMs = millis();
 #endif
 }
 void loadEnergy() {
 #if HAS_PM
-  File f = LittleFS.open("/energy", "r");
-  if (f) { energyWh = f.readString().toFloat(); energySavedWh = energyWh; f.close(); }
+  for (int c = 0; c < NCH; c++) {
+    File f = LittleFS.open(energyFile(c), "r");
+    if (f) { CH[c].energyWh = f.readString().toFloat(); CH[c].energySavedWh = CH[c].energyWh; f.close(); }
+  }
 #endif
 }
+// Letzter Schaltzustand: ein Zeichen je Kanal ("1", "10" …)
 void saveRelayState() {
   File f = LittleFS.open("/relay", "w");
-  if (f) { f.print(relayOn ? '1' : '0'); f.close(); }
+  if (f) { for (int c = 0; c < NCH; c++) f.print(CH[c].on ? '1' : '0'); f.close(); }
 }
-bool loadRelayState() {
+bool loadRelayState(int c = 0) {
   File f = LittleFS.open("/relay", "r");
   if (!f) return false;
-  bool on = f.read() == '1';
+  String v = f.readString();
   f.close();
-  return on;
+  return c < (int)v.length() && v[c] == '1';
 }
 
 // ======================= Ereignisse / Webhooks =======================
@@ -344,13 +411,18 @@ int h_cid_tmp = 0;
 String expandUrl(String u, const String& ev) {
   u.replace("${event}", ev);
   u.replace("${cid}", String(h_cid_tmp));
-  u.replace("${output}", relayOn ? "true" : "false");
+  int hc = (h_cid_tmp >= 0 && h_cid_tmp < NCH) ? h_cid_tmp : 0;
+  u.replace("${output}", CH[hc].on ? "true" : "false");
+#if HAS_IN2
+  u.replace("${input}", (h_cid_tmp == 1 ? in2State : inState) ? "true" : "false");
+#else
   u.replace("${input}", inState ? "true" : "false");
+#endif
   u.replace("${id}", devId);
   u.replace("${name}", cfg.name);
   u.replace("${ip}", WiFi.localIP().toString());
-  u.replace("${apower}", String(r1(apower), 1));
-  u.replace("${aenergy}", String(energyWh, 3));
+  u.replace("${apower}", String(r1(CH[hc].apower), 1));
+  u.replace("${aenergy}", String(CH[hc].energyWh, 3));
   u.replace("${tC}", isnan(tempC) ? String("null") : String(tempC, 1));
 #if HAS_DIM
   u.replace("${brightness}", String(lBri));
@@ -394,7 +466,6 @@ int lBri = 100, lCt = 4000;                  // Sollwerte (Helligkeit %, Farbtem
 float curBri = 0, curCt = 4000, fromBri = 0, fromCt = 4000, toBri = 0, toCt = 4000;
 uint32_t fadeStart = 0, fadeMs = 0, lightSaveAt = 0;
 float nextTransition = -1;                   // einmalige Ueberblendzeit (CCT.Set transition_duration)
-extern bool relayOn;
 
 void lightWrite() {
   // Helligkeit (Gamma) auf Kalt- und Warmkanal verteilen; Summe = Gesamthelligkeit
@@ -411,7 +482,7 @@ void lightWrite() {
 
 void lightUpdate() {                          // neues Ziel aus relayOn/lBri/lCt, sanft ueberblenden
   fromBri = curBri; fromCt = curCt;
-  toBri = relayOn ? lBri : 0; toCt = lCt;
+  toBri = CH[0].on ? lBri : 0; toCt = lCt;
   float t = nextTransition >= 0 ? nextTransition : cfg.transition;
   nextTransition = -1;
   fadeMs = (uint32_t)(t * 1000); fadeStart = millis();
@@ -473,7 +544,6 @@ uint32_t fadeStart = 0, fadeMs = 0, lightSaveAt = 0, lastHwMs = 0;
 uint16_t lastHw = 0xFFFF;
 float nextTransition = -1;
 int8_t rampDir = 0; float rampBri = 0; uint32_t rampLastMs = 0; float rampRate = 25;
-extern bool relayOn;
 
 static uint32_t msClock() { return millis(); }
 static void msPause(uint32_t ms) { delay(ms); }
@@ -511,7 +581,7 @@ void dimWrite(bool force) {
 void lightUpdate() {                          // neues Ziel aus relayOn/lBri, sanft ueberblenden
   rampDir = 0;
   fromBri = curBri;
-  toBri = relayOn ? lBri : 0;
+  toBri = CH[0].on ? lBri : 0;
   float t = nextTransition >= 0 ? nextTransition : cfg.transition;
   nextTransition = -1;
   fadeMs = (uint32_t)(t * 1000); fadeStart = millis();
@@ -538,7 +608,7 @@ void lightSet(int bri) {
 // Dauerdimmen (Taster gehalten bzw. Light.DimUp/DimDown), dir +1/-1
 void rampBegin(int8_t dir, float ratePct) {
   fadeMs = 0;
-  rampBri = relayOn ? (curBri > 0 ? curBri : lBri) : 1;
+  rampBri = CH[0].on ? (curBri > 0 ? curBri : lBri) : 1;
   rampDir = dir; rampRate = ratePct; rampLastMs = millis();
 }
 void rampStop() {
@@ -585,57 +655,273 @@ void setTrip(bool t) {
 #endif
 }
 
-bool setRelay(bool on, const String& src, float toggleAfter = -1) {
+#if HAS_RELAY
+#ifdef PIN_RELAY2
+static const uint8_t RELAY_PIN[NCH] = {PIN_RELAY, PIN_RELAY2};
+#else
+static const uint8_t RELAY_PIN[NCH] = {PIN_RELAY};
+#endif
+#endif
+
+bool setRelayC(int c, bool on, const String& src, float toggleAfter = -1) {
+  if (c < 0 || c >= NCH) return false;
   if (on && overtemp) return false;
 #if IS_METER
   // nur Start, Hand-Reset und Schutzabschaltung duerfen das Relais bewegen
   if (!(src == "init" || src == "reset" || src == "overpower" || src == "overtemp")) return false;
   toggleAfter = 0;
 #endif
-  bool was = relayOn;
-  relayOn = on;
-  relaySrc = src;
+  Chan& k = CH[c];
+  ChCfg& kc = cfg.ch[c];
+  bool was = k.on;
+  k.on = on;
+  k.src = src;
 #if HAS_RELAY
-  digitalWrite(PIN_RELAY, on ? HIGH : LOW);
+  digitalWrite(RELAY_PIN[c], on ? HIGH : LOW);
 #endif
 #if HAS_LIGHT || HAS_DIM
   lightUpdate();
 #endif
-  if (on) overpower = false;
-  timerActive = false;
+  if (on) k.overpower = false;
+  k.tAct = false;
   float ta = toggleAfter;
   if (ta < 0) {
-    if (on && cfg.autoOff) ta = cfg.autoOffDelay;
-    else if (!on && cfg.autoOn) ta = cfg.autoOnDelay;
+    if (on && kc.autoOff) ta = kc.autoOffDelay;
+    else if (!on && kc.autoOn) ta = kc.autoOnDelay;
     else ta = 0;
   }
   if (ta > 0) {
-    timerActive = true; timerTarget = !on;
-    timerStartMs = millis(); timerDurMs = (uint32_t)(ta * 1000);
-    timerStartedAt = time(nullptr);
+    k.tAct = true; k.tTarget = !on;
+    k.tStartMs = millis(); k.tDurMs = (uint32_t)(ta * 1000);
+    k.tStartedAt = time(nullptr);
   }
   if (on && src == "reset") setTrip(false);
   if (was != on) {
-    if (cfg.initialState == "restore_last") saveRelayState();
-    fireEvent(on ? EV_ON : EV_OFF);
+    if (kc.initial == "restore_last") saveRelayState();
+    fireEvent(on ? EV_ON : EV_OFF, c);
   }
   updateLed();
   return true;
 }
+bool setRelay(bool on, const String& src, float toggleAfter = -1) { return setRelayC(0, on, src, toggleAfter); }
 
 void handleTimer() {
-  if (timerActive && millis() - timerStartMs >= timerDurMs) {
-    timerActive = false;
-    setRelay(timerTarget, "timer");
-  }
+  for (int c = 0; c < NCH; c++)
+    if (CH[c].tAct && millis() - CH[c].tStartMs >= CH[c].tDurMs) {
+      CH[c].tAct = false;
+      setRelayC(c, CH[c].tTarget, "timer");
+    }
 }
+
+static bool anyOn() { for (int c = 0; c < NCH; c++) if (CH[c].on) return true; return false; }
 
 void updateLed() {
 #if HAS_LED
   if (apActive) return;
-  digitalWrite(PIN_LED, (cfg.led && relayOn) ? LED_ON_LEVEL : LED_OFF_LEVEL);
+  digitalWrite(PIN_LED, (cfg.led && anyOn()) ? LED_ON_LEVEL : LED_OFF_LEVEL);
 #endif
 }
+
+
+// ======================= Rollladen (Shelly 2.5, cover:0) =======================
+// Relais 1 = auf, Relais 2 = zu (tauschbar). Nie beide zugleich; beim Richtungswechsel 0,5 s Pause.
+// Endlagen: Motor schaltet ab -> Leistung faellt unter idle_power_thr. Position ueber Fahrzeit (nach Kalibrierung).
+#if IS_COVER
+enum CvState : uint8_t { CV_STOPPED, CV_OPENING, CV_CLOSING, CV_OPEN, CV_CLOSED, CV_CALIBRATING };
+const char* CV_NAMES[] = {"stopped", "opening", "closing", "open", "closed", "calibrating"};
+CvState cvState = CV_STOPPED;
+String cvSrc = "init";
+int8_t cvDir = 0, cvLastDir = 0;            // +1 auf, -1 zu
+float cvPos = NAN, cvStartPos = NAN, cvTarget = NAN;
+uint32_t cvStartMs = 0, cvMaxMs = 0, cvIdleMs = 0, cvPendMs = 0;
+int8_t cvPendDir = 0; float cvPendTarget = NAN; String cvPendSrc;
+time_t cvStartedAt = 0;
+bool cvObstructed = false, cvOverpower = false, cvSeenPw = false;
+bool pmOk();
+// Kalibrierfahrt: 1 = zu bis Endlage, 2 = auf (Zeit messen), 3 = zu (Zeit messen)
+uint8_t cvCal = 0; float cvCalOpen = 0, cvCalClose = 0;
+
+bool coverMoving() { return cvDir != 0; }
+float coverPower() { return CH[0].apower + CH[1].apower; }
+
+void cvSave() {
+  File f = LittleFS.open("/cover", "w");
+  if (f) { f.printf("%.2f %.2f %.1f %d", cfg.cvTOpen, cfg.cvTClose, isnan(cvPos) ? -1.0f : cvPos, (int)cvLastDir); f.close(); }
+}
+void cvLoad() {
+  File f = LittleFS.open("/cover", "r");
+  if (!f) return;
+  float to = f.parseFloat(), tc = f.parseFloat(), p = f.parseFloat(); int ld = f.parseInt();
+  f.close();
+  if (to > 0.5f && to < 600) cfg.cvTOpen = to;
+  if (tc > 0.5f && tc < 600) cfg.cvTClose = tc;
+  if (cfg.cvTOpen > 0 && cfg.cvTClose > 0 && p >= 0 && p <= 100) cvPos = p;
+  cvLastDir = ld > 0 ? 1 : (ld < 0 ? -1 : 0);
+}
+bool cvPosControl() { return cfg.cvTOpen > 0 && cfg.cvTClose > 0; }
+
+void cvRelays(int8_t dir) {
+  uint8_t pOpen = RELAY_PIN[cfg.cvInvert ? 1 : 0], pClose = RELAY_PIN[cfg.cvInvert ? 0 : 1];
+  // erst abschalten, dann einschalten – nie beide an
+  if (dir <= 0) digitalWrite(pOpen, LOW);
+  if (dir >= 0) digitalWrite(pClose, LOW);
+  if (dir > 0) digitalWrite(pOpen, HIGH);
+  if (dir < 0) digitalWrite(pClose, HIGH);
+  CH[cfg.cvInvert ? 1 : 0].on = dir > 0;
+  CH[cfg.cvInvert ? 0 : 1].on = dir < 0;
+  updateLed();
+}
+
+// aktuelle Position waehrend der Fahrt
+float cvLivePos() {
+  if (!cvDir || isnan(cvStartPos) || !cvPosControl()) return cvPos;
+  float t = (millis() - cvStartMs) / 1000.0f;
+  float full = cvDir > 0 ? cfg.cvTOpen : cfg.cvTClose;
+  float p = cvStartPos + cvDir * t / full * 100.0f;
+  return p < 0 ? 0 : (p > 100 ? 100 : p);
+}
+
+void cvEvent(const char* ev) { fireEvent(String("cover.") + ev, 0); }
+
+void coverStop(const String& src) {
+  cvPendDir = 0;
+  if (!cvDir) { cvRelays(0); return; }
+  float p = cvLivePos();
+  cvRelays(0);
+  cvDir = 0; cvSrc = src; cvTarget = NAN;
+  if (cvCal) { cvCal = 0; }                  // Kalibrierung abgebrochen
+  cvPos = p;
+  if (!isnan(p) && p >= 99.5f) { cvPos = 100; cvState = CV_OPEN; cvEvent("open"); }
+  else if (!isnan(p) && p <= 0.5f) { cvPos = 0; cvState = CV_CLOSED; cvEvent("closed"); }
+  else { cvState = CV_STOPPED; cvEvent("stopped"); }
+  cvSave();
+}
+
+void cvStart(int8_t dir, const String& src, float target, float maxSec) {
+  cvRelays(dir);
+  cvDir = dir; cvLastDir = dir; cvSrc = src; cvTarget = target;
+  cvStartPos = cvPos; cvStartMs = millis(); cvStartedAt = time(nullptr); cvIdleMs = 0;
+  float mx = maxSec > 0 ? maxSec : (dir > 0 ? cfg.cvMaxOpen : cfg.cvMaxClose);
+  cvMaxMs = (uint32_t)(mx * 1000);
+  cvObstructed = false; cvOverpower = false; cvSeenPw = false;
+  if (cvCal) cvState = CV_CALIBRATING;
+  else { cvState = dir > 0 ? CV_OPENING : CV_CLOSING; cvEvent(dir > 0 ? "opening" : "closing"); }
+}
+
+// Fahrt anfordern; laeuft der Motor gerade andersherum, erst stoppen und kurz warten
+bool coverMove(int8_t dir, const String& src, float target = NAN, float maxSec = 0) {
+  if (overtemp) return false;
+  if (cvDir == dir && isnan(target) && isnan(cvTarget)) return true;
+  if (cvDir && cvDir != dir) {
+    coverStop(src);
+    cvPendDir = dir; cvPendTarget = target; cvPendSrc = src; cvPendMs = millis() + 500;
+    return true;
+  }
+  if (cvDir == dir) { cvTarget = target; cvSrc = src; return true; }
+  cvStart(dir, src, target, maxSec);
+  return true;
+}
+
+bool coverGoTo(float pos, const String& src) {
+  if (!cvPosControl() || isnan(cvPos)) return false;
+  pos = pos < 0 ? 0 : (pos > 100 ? 100 : pos);
+  float cur = cvLivePos();
+  if (fabsf(pos - cur) < 0.5f && !cvDir) return true;
+  if (pos >= 100) return coverMove(1, src);            // Endlagen anfahren: bis der Motor abschaltet
+  if (pos <= 0) return coverMove(-1, src);
+  return coverMove(pos > cur ? 1 : -1, src, pos);
+}
+
+void coverCalibrate(const String& src) {
+  coverStop(src);
+  cvCal = 1; cvPos = NAN;
+  cvStart(-1, src, NAN, cfg.cvMaxClose);
+  cvEvent("calibrating");
+}
+
+// Endlage erreicht (Motor hat abgeschaltet)
+void cvEndReached() {
+  int8_t d = cvDir;
+  // Fahrzeit bis zum Abschalten des Motors (nicht bis zum Ende der Bestaetigungszeit)
+  float t = ((cvIdleMs ? cvIdleMs : millis()) - cvStartMs) / 1000.0f;
+  cvRelays(0);
+  cvDir = 0; cvTarget = NAN;
+  cvPos = d > 0 ? 100 : 0;
+  if (cvCal == 1) { cvCal = 2; cvStart(1, cvSrc, NAN, cfg.cvMaxOpen); return; }
+  if (cvCal == 2) { cvCalOpen = t; cvCal = 3; cvStart(-1, cvSrc, NAN, cfg.cvMaxClose); return; }
+  if (cvCal == 3) {
+    cvCalClose = t; cvCal = 0;
+    if (cvCalOpen > 1 && cvCalClose > 1) { cfg.cvTOpen = cvCalOpen; cfg.cvTClose = cvCalClose; }
+  }
+  cvState = d > 0 ? CV_OPEN : CV_CLOSED;
+  cvEvent(d > 0 ? "open" : "closed");
+  cvSave();
+}
+
+void handleCover() {
+  uint32_t now = millis();
+  if (cvPendDir && (int32_t)(now - cvPendMs) >= 0) {
+    int8_t d = cvPendDir; cvPendDir = 0;
+    cvStart(d, cvPendSrc, cvPendTarget, 0);
+  }
+  if (!cvDir) return;
+  uint32_t run = now - cvStartMs;
+  float pw = coverPower();
+  // Ziel erreicht (nur mit Positionssteuerung)
+  if (!isnan(cvTarget) && !cvCal) {
+    float p = cvLivePos();
+    if ((cvDir > 0 && p >= cvTarget) || (cvDir < 0 && p <= cvTarget)) { coverStop(cvSrc); return; }
+  }
+  // Schutz: Leistungsgrenze, Hindernis
+  if (cfg.ch[0].powerLimit > 0 && pw > cfg.ch[0].powerLimit) {
+    coverStop("overpower"); cvOverpower = true; fireEvent(EV_OVERPOWER, 0); return;
+  }
+  if (cfg.cvObst && run > (uint32_t)(cfg.cvObstHold * 1000) && pw > cfg.cvObstThr) {
+    int8_t d = cvDir;
+    coverStop("obstruction"); cvObstructed = true; cvEvent("obstruction");
+    if (cfg.cvObstAction == "reverse") coverMove(-d, "obstruction", NAN, 2);
+    return;
+  }
+  // Endlage: Motor zieht nach dem Anlaufen keinen Strom mehr (nur wenn vorher Leistung gemessen wurde)
+  if (pw > cfg.cvIdleThr * 3) cvSeenPw = true;
+  if (run > 1500 && pmOk() && cvSeenPw) {
+    if (pw < cfg.cvIdleThr) { if (!cvIdleMs) cvIdleMs = now; else if (now - cvIdleMs >= (uint32_t)(cfg.cvIdleConf * 1000)) { cvEndReached(); return; } }
+    else cvIdleMs = 0;
+  }
+  // Hoechstfahrzeit
+  if (run >= cvMaxMs) {
+    if (cvCal) { cvCal = 0; coverStop("timeout"); cvEvent("calibration_failed"); return; }
+    if (isnan(cvTarget)) { cvEndReached(); return; }   // ohne Leistungsabfall: Fahrzeit gilt als Endlage
+    coverStop("timeout");
+  }
+}
+
+// Eingaenge: dual (SW1 auf, SW2 zu), single (SW1 auf/stopp/zu/stopp), detached
+void coverInput(int in, bool st) {
+  const String& mode = cfg.ch[0].inMode;
+  if (mode == "detached") return;
+  bool button = (in == 0 ? cfg.inType : cfg.in2Type) == "button";
+  if (cfg.cvSwapIn) in = 1 - in;
+  if (mode == "single") {
+    if (in != 0) return;
+    if (button && !st) return;
+    if (cvDir) coverStop(button ? "button" : "switch");
+    else coverMove(cvLastDir > 0 ? -1 : 1, button ? "button" : "switch");
+    return;
+  }
+  int8_t dir = in == 0 ? 1 : -1;
+  if (button) {
+    if (!st) return;
+    if (cvDir) coverStop("button"); else coverMove(dir, "button");
+  } else {
+    if (st) coverMove(dir, "switch");
+    else if (cvDir == dir) coverStop("switch");
+  }
+}
+#else
+bool coverMoving() { return false; }
+void handleCover() {}
+#endif
 
 void handleLed() {
 #if HAS_LED
@@ -693,10 +979,10 @@ void btnTick(int cid, bool st, BtnState& b) {
 }
 
 // Relaisaktion eines Eingangs: follow | flip | momentary | detached/none
-void inputAction(const String& mode, bool st, const char* src) {
-  if (mode == "follow") setRelay(st, src);
-  else if (mode == "flip") setRelay(!relayOn, src);
-  else if (mode == "momentary") { if (st) setRelay(!relayOn, src); }
+void inputAction(const String& mode, bool st, const char* src, int c = 0) {
+  if (mode == "follow") setRelayC(c, st, src);
+  else if (mode == "flip") setRelayC(c, !CH[c].on, src);
+  else if (mode == "momentary") { if (st) setRelayC(c, !CH[c].on, src); }
 }
 
 #if HAS_DIM
@@ -709,7 +995,7 @@ DimBtn dbt[2];
 bool dimUpNext = true;
 static const float BTN_RATE[6] = {25, 10, 16, 25, 40, 60};   // %/s je Stufe 1..5
 
-bool dimButtons(int cid) { return cfg.inMode == "dual_dim" || (cfg.inMode == "dim" && cid == 0); }
+bool dimButtons(int cid) { return cfg.ch[0].inMode == "dual_dim" || (cfg.ch[0].inMode == "dim" && cid == 0); }
 
 void dimEdge(int cid, bool st) {
   DimBtn& b = dbt[cid];
@@ -718,11 +1004,11 @@ void dimEdge(int cid, bool st) {
     if (!b.down) return;
     b.down = false;
     if (b.ramping) { b.ramping = false; rampStop(); return; }
-    if (cfg.inMode == "dim") setRelay(!relayOn, "button");
+    if (cfg.ch[0].inMode == "dim") setRelay(!CH[0].on, "button");
     else setRelay(cid == 0, "button");
     return;
   }
-  if (cid == 0) inputAction(cfg.inMode, st, cfg.inMode == "momentary" ? "button" : "switch");
+  if (cid == 0) inputAction(cfg.ch[0].inMode, st, cfg.ch[0].inMode == "momentary" ? "button" : "switch");
 }
 
 void dimTick() {
@@ -730,14 +1016,14 @@ void dimTick() {
     DimBtn& b = dbt[cid];
     if (!b.down || b.ramping || millis() - b.downMs < 500 || !dimButtons(cid)) continue;
     int8_t dir;
-    if (cfg.inMode == "dual_dim") dir = cid == 0 ? 1 : -1;
+    if (cfg.ch[0].inMode == "dual_dim") dir = cid == 0 ? 1 : -1;
     else {
-      dir = (!relayOn || dimUpNext) ? 1 : -1;
-      if (relayOn && dir > 0 && lBri >= 100) dir = -1;
-      if (relayOn && dir < 0 && lBri <= 1) dir = 1;
+      dir = (!CH[0].on || dimUpNext) ? 1 : -1;
+      if (CH[0].on && dir > 0 && lBri >= 100) dir = -1;
+      if (CH[0].on && dir < 0 && lBri <= 1) dir = 1;
       dimUpNext = dir < 0;
     }
-    if (!relayOn) {
+    if (!CH[0].on) {
       if (dir < 0) { b.down = false; continue; }
       int keep = lBri;
       lBri = 1; nextTransition = 0;
@@ -756,11 +1042,13 @@ void onInputEdge(bool st) {
   btnEdge(0, cfg.inType, st, bs0);
 #if IS_METER
   // Taster: Druck, Schalter/SW: jede Flanke – quittiert eine Schutzabschaltung
-  if ((cfg.inType != "button" || st) && !relayOn && setRelay(true, "reset")) fireEvent("switch.reset");
+  if ((cfg.inType != "button" || st) && !CH[0].on && setRelay(true, "reset")) fireEvent("switch.reset");
 #elif HAS_DIM
   dimEdge(0, st);
+#elif IS_COVER
+  coverInput(0, st);
 #else
-  inputAction(cfg.inMode, st, cfg.inMode == "momentary" ? "button" : "switch");
+  inputAction(cfg.ch[0].inMode, st, cfg.ch[0].inMode == "momentary" ? "button" : "switch");
 #endif
 }
 
@@ -785,6 +1073,19 @@ void handleInput() {
   btnTick(0, inState, bs0);
 }
 
+// ---- Taster auf der Platine (Shelly 2.5): 10 s halten = WLAN zuruecksetzen ----
+#ifdef PIN_BTN
+uint32_t pbDownMs = 0;
+void handleBoardBtn() {
+  bool down = digitalRead(PIN_BTN) == LOW;
+  if (!down) { pbDownMs = 0; return; }
+  if (!pbDownMs) pbDownMs = millis() | 1;
+  else if (millis() - pbDownMs > 10000) { pbDownMs = 0; resetWifiAndReboot(); }
+}
+#else
+void handleBoardBtn() {}
+#endif
+
 // ---- Zweiter Eingang (SW2, input:1) – gleicher Filter wie SW1 ----
 #if HAS_IN2
 bool sampleInput2(uint32_t now) {
@@ -801,6 +1102,10 @@ void handleInput2() {
     btnEdge(1, cfg.in2Type, in2State, bs1);
 #if HAS_DIM
     dimEdge(1, in2State);
+#elif IS_COVER
+    coverInput(1, in2State);
+#elif NCH > 1
+    inputAction(cfg.ch[1].inMode, in2State, cfg.ch[1].inMode == "momentary" ? "button" : "switch", 1);
 #endif
   }
   btnTick(1, in2State, bs1);
@@ -840,7 +1145,7 @@ void handleAddon() {}
 #endif
 
 // ======================= Leistungsmessung / Temperatur =======================
-#if HAS_PM && !PM_STM
+#if HAS_PM && !PM_STM && !PM_ADE
 IRAM_ATTR void cfIsr() {
   uint32_t now = micros();
   if (cfLastUs) { cfSumUs += now - cfLastUs; cfCnt++; }
@@ -865,13 +1170,22 @@ void handleCf1() {
   cf1Arm = false;
   interrupts();
   float hz = (cnt > 0 && sum > 0) ? cnt * 1e6f / sum : 0;
-  if (selVolt) avolt = r1(cfg.vCal * hz);
-  else acurr = (apower > 0.5f) ? roundf(cfg.iCal * hz * 1000) / 1000 : 0;
+  if (selVolt) CH[0].avolt = r1(cfg.vCal * hz);
+  else CH[0].acurr = (CH[0].apower > 0.5f) ? roundf(cfg.iCal * hz * 1000) / 1000 : 0;
   selVolt = !selVolt;
   digitalWrite(PIN_SEL, selVolt ? SEL_VOLT_LEVEL : !SEL_VOLT_LEVEL);
   selSinceMs = now;
 }
 #endif
+
+#if PM_ADE
+bool pmOk() { return ade::ok; }
+#else
+bool pmOk() { return true; }
+#endif
+// Kalibrierfaktoren je Kanal (Kanal 0 wie bisher, Kanal 1 nur beim Shelly 2.5)
+float& pcalOf(int c) { return c ? cfg.pwrCal1 : cfg.pwrCal; }
+float& icalOf(int c) { return c ? cfg.iCal1 : cfg.iCal; }
 
 void handlePm() {
 #if HAS_CF1
@@ -879,59 +1193,81 @@ void handlePm() {
 #endif
 #if HAS_PM
   uint32_t now = millis();
-  if (now - lastPmMs < 1000) return;
+  if (now - lastPmMs < (coverMoving() ? 200u : 1000u)) return;   // Rollladen: waehrend der Fahrt 5x/s messen
   float dt = (now - lastPmMs) / 1000.0f;
   lastPmMs = now;
+  float p[NCH];
+  for (int c = 0; c < NCH; c++) p[c] = 0;
 #if PM_STM
-  float p = 0;
   if (stmd.online) {
-    if (relayOn || curBri > 0) p = stmd.pW * cfg.pwrCal;
-    avolt = isnan(stmd.vV) ? NAN : r1(stmd.vV);
-    acurr = isnan(stmd.iA) ? NAN : (p > 0.5f ? roundf(stmd.iA * 1000) / 1000 : 0);
+    if (CH[0].on || curBri > 0) p[0] = stmd.pW * cfg.pwrCal;
+    CH[0].avolt = isnan(stmd.vV) ? NAN : r1(stmd.vV);
+    CH[0].acurr = isnan(stmd.iA) ? NAN : (p[0] > 0.5f ? roundf(stmd.iA * 1000) / 1000 : 0);
   }
-  if (p < 0) p = 0;
+#elif PM_ADE
+  ade::Val v[2];
+  if (millis() > 2000 && ade::sample(v)) {
+    for (int c = 0; c < NCH; c++) {
+      p[c] = v[c].w * pcalOf(c);
+      CH[c].avolt = r1(v[c].v * cfg.vCal);
+      CH[c].acurr = roundf(v[c].a * icalOf(c) * 1000) / 1000;
+      float va = v[c].va * pcalOf(c);
+      CH[c].pf = (va > 1 && p[c] > 0.5f) ? roundf(fminf(p[c] / va, 1) * 100) / 100 : NAN;
+      CH[c].freq = isnan(v[c].hz) ? NAN : roundf(v[c].hz * 10) / 10;
+    }
+  }
 #else
   noInterrupts();
   uint32_t sum = cfSumUs, cnt = cfCnt, last = cfLastUs;
   cfSumUs = 0; cfCnt = 0;
   interrupts();
-  float p = 0;
-  if (relayOn) {
-    if (cnt > 0 && sum > 0) p = cfg.pwrCal * (cnt * 1e6f / sum);
+  if (CH[0].on) {
+    if (cnt > 0 && sum > 0) p[0] = cfg.pwrCal * (cnt * 1e6f / sum);
     else if (last) {
       uint32_t since = micros() - last;
-      if (since < 10000000UL) { float ub = cfg.pwrCal * 1e6f / since; p = apower < ub ? apower : ub; }
+      if (since < 10000000UL) { float ub = cfg.pwrCal * 1e6f / since; p[0] = CH[0].apower < ub ? CH[0].apower : ub; }
     }
   }
 #endif
-  apower = p;
-  double wh = p * dt / 3600.0;
-  energyWh += wh; minuteAccWh += wh;
-  if (now - minuteStartMs >= 60000) {
-    byMinute[2] = byMinute[1]; byMinute[1] = byMinute[0]; byMinute[0] = minuteAccWh * 1000.0;
-    minuteAccWh = 0; minuteStartMs = now;
-    minuteTs = validTime() ? (time(nullptr) / 60) * 60 : 0;
+  bool minute = now - minuteStartMs >= 60000;
+  for (int c = 0; c < NCH; c++) {
+    Chan& k = CH[c];
+    k.apower = p[c] < 0 ? 0 : p[c];
+    double wh = k.apower * dt / 3600.0;
+    k.energyWh += wh; k.minuteAccWh += wh;
+    if (minute) {
+      k.byMinute[2] = k.byMinute[1]; k.byMinute[1] = k.byMinute[0]; k.byMinute[0] = k.minuteAccWh * 1000.0;
+      k.minuteAccWh = 0;
+    }
+#if !IS_COVER
+    if (cfg.ch[c].powerLimit > 0 && k.on && k.apower > cfg.ch[c].powerLimit) {
+      setRelayC(c, false, "overpower", 0);
+      k.overpower = true;
+      setTrip(true);
+      fireEvent(EV_OVERPOWER, c);
+    }
+#endif
   }
-  if (cfg.powerLimit > 0 && relayOn && apower > cfg.powerLimit) {
-    setRelay(false, "overpower", 0);
-    overpower = true;
-    setTrip(true);
-    fireEvent(EV_OVERPOWER);
-  }
+  if (minute) { minuteStartMs = now; minuteTs = validTime() ? (time(nullptr) / 60) * 60 : 0; }
   for (auto& h : cfg.hooks) {
     if (!h.enable || !h.hasThr) continue;
+    float ap = CH[(h.cid >= 0 && h.cid < NCH) ? h.cid : 0].apower;
+#if IS_COVER
+    ap = CH[0].apower + CH[1].apower;
+#endif
     if (h.event == EV_PABOVE) {
-      if (h.armed && apower > h.thr) { h.armed = false; fireHook(h, h.event); }
-      else if (apower < h.thr * 0.95f) h.armed = true;
+      if (h.armed && ap > h.thr) { h.armed = false; fireHook(h, h.event); }
+      else if (ap < h.thr * 0.95f) h.armed = true;
     } else if (h.event == EV_PBELOW) {
-      if (h.armed && apower < h.thr) { h.armed = false; fireHook(h, h.event); }
-      else if (apower > h.thr * 1.05f + 0.5f) h.armed = true;
+      if (h.armed && ap < h.thr) { h.armed = false; fireHook(h, h.event); }
+      else if (ap > h.thr * 1.05f + 0.5f) h.armed = true;
     }
   }
-  if (now - lastEnergySaveMs > 900000UL && energyWh - energySavedWh > 0.01) saveEnergy();
+  bool dirty = false;
+  for (int c = 0; c < NCH; c++) if (CH[c].energyWh - CH[c].energySavedWh > 0.01) dirty = true;
+  if (now - lastEnergySaveMs > 900000UL && dirty) saveEnergy();
 #endif
 }
-
 void handleTemp() {
 #if HAS_TEMP
   if (millis() - lastTempMs < 2000) return;
@@ -943,7 +1279,11 @@ void handleTemp() {
   double t = 1.0 / (1.0 / 298.15 + log(rt / 10000.0) / 3350.0) - 273.15;
   tempC = isnan(tempC) ? t : tempC * 0.7f + t * 0.3f;
   if (!overtemp && tempC > cfg.tempLimit) {
-    setRelay(false, "overtemp", 0);
+#if IS_COVER
+    coverStop("overtemp");
+#else
+    for (int c = 0; c < NCH; c++) setRelayC(c, false, "overtemp", 0);
+#endif
     overtemp = true;
     setTrip(true);
     fireEvent(EV_OVERTEMP);
@@ -1160,7 +1500,7 @@ bool updCheck() {
 #define UPD_RELAY_BLOCKS 0
 
 String updInstall(const String& url, const String& sha) {
-  if (UPD_RELAY_BLOCKS && relayOn) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
+  if (UPD_RELAY_BLOCKS && CH[0].on) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
   updState = "downloading";
   HTTPClient http; std::unique_ptr<WiFiClient> cl;
   if (!updOpen(http, cl, url)) { updState = "idle"; return "URL ungültig"; }
@@ -1233,29 +1573,31 @@ void deviceInfo(JsonObject o) {
   o["type"] = GEN1_TYPE;   // fuer Gen1-Clients
 }
 
-void switchStatus(JsonObject o) {
-  o["id"] = 0; o["source"] = relaySrc; o["output"] = relayOn;
+void switchStatus(JsonObject o, int c = 0) {
+  Chan& k = CH[c];
+  o["id"] = c; o["source"] = k.src; o["output"] = k.on;
 #if IS_METER
   o["meter_only"] = true;
-  o["tripped"] = !relayOn;
+  o["tripped"] = !k.on;
 #endif
-  if (timerActive) {
-    o["timer_started_at"] = (long)timerStartedAt;
-    o["timer_duration"] = timerDurMs / 1000.0;
+  if (k.tAct) {
+    o["timer_started_at"] = (long)k.tStartedAt;
+    o["timer_duration"] = k.tDurMs / 1000.0;
   }
 #if HAS_PM
-  o["apower"] = r1(apower);
-#if HAS_CF1
-  if (!isnan(avolt)) o["voltage"] = avolt;
-  if (!isnan(acurr)) o["current"] = acurr;
-  if (!isnan(avolt) && !isnan(acurr) && avolt * acurr > 1) {
-    float pf = apower / (avolt * acurr); o["pf"] = roundf((pf > 1 ? 1 : pf) * 100) / 100;
+  o["apower"] = r1(k.apower);
+#if HAS_CF1 || PM_ADE
+  if (!isnan(k.avolt)) o["voltage"] = k.avolt;
+  if (!isnan(k.acurr)) o["current"] = k.acurr;
+  if (!isnan(k.avolt) && !isnan(k.acurr) && k.avolt * k.acurr > 1) {
+    float pf = isnan(k.pf) ? k.apower / (k.avolt * k.acurr) : k.pf; o["pf"] = roundf((pf > 1 ? 1 : pf) * 100) / 100;
   }
+  if (!isnan(k.freq)) o["freq"] = k.freq;
 #endif
   JsonObject e = o["aenergy"].to<JsonObject>();
-  e["total"] = r3(energyWh);
+  e["total"] = r3(k.energyWh);
   JsonArray bm = e["by_minute"].to<JsonArray>();
-  for (int i = 0; i < 3; i++) bm.add(r3(byMinute[i]));
+  for (int i = 0; i < 3; i++) bm.add(r3(k.byMinute[i]));
   e["minute_ts"] = (long)minuteTs;
 #endif
 #if HAS_TEMP
@@ -1264,28 +1606,30 @@ void switchStatus(JsonObject o) {
     t["tC"] = r1(tempC); t["tF"] = r1(tempC * 1.8f + 32);
   }
 #endif
-  if (overtemp || overpower) {
+  if (overtemp || k.overpower || (PM_ADE && !pmOk())) {
     JsonArray er = o["errors"].to<JsonArray>();
     if (overtemp) er.add("overtemp");
-    if (overpower) er.add("overpower");
+    if (k.overpower) er.add("overpower");
+    if (PM_ADE && !pmOk()) er.add("pm_no_response");
   }
 }
 
-void switchConfig(JsonObject o) {
-  o["id"] = 0;
-  if (cfg.swName.length()) o["name"] = cfg.swName; else o["name"] = nullptr;
-  o["in_mode"] = cfg.inMode; o["initial_state"] = cfg.initialState;
+void switchConfig(JsonObject o, int c = 0) {
+  ChCfg& kc = cfg.ch[c];
+  o["id"] = c;
+  if (kc.name.length()) o["name"] = kc.name; else o["name"] = nullptr;
+  o["in_mode"] = kc.inMode; o["initial_state"] = kc.initial;
 #if IS_METER
   o["meter_only"] = true;
 #endif
-  o["auto_on"] = cfg.autoOn; o["auto_on_delay"] = cfg.autoOnDelay;
-  o["auto_off"] = cfg.autoOff; o["auto_off_delay"] = cfg.autoOffDelay;
+  o["auto_on"] = kc.autoOn; o["auto_on_delay"] = kc.autoOnDelay;
+  o["auto_off"] = kc.autoOff; o["auto_off_delay"] = kc.autoOffDelay;
 #if HAS_PM
-  o["power_limit"] = cfg.powerLimit;
+  o["power_limit"] = kc.powerLimit;
   JsonObject pc = o["pm_calibration"].to<JsonObject>();
-  pc["factor"] = cfg.pwrCal; pc["source"] = cfg.calSrc; pc["default"] = PWR_CAL_DEFAULT;
-#if HAS_CF1
-  pc["voltage_factor"] = cfg.vCal; pc["current_factor"] = cfg.iCal;
+  pc["factor"] = pcalOf(c); pc["source"] = cfg.calSrc; pc["default"] = PWR_CAL_DEFAULT;
+#if HAS_CF1 || PM_ADE
+  pc["voltage_factor"] = cfg.vCal; pc["current_factor"] = icalOf(c);
 #endif
 #endif
 #if HAS_TEMP
@@ -1295,16 +1639,16 @@ void switchConfig(JsonObject o) {
 
 #if HAS_LIGHT
 void cctStatus(JsonObject o) {
-  o["id"] = 0; o["source"] = relaySrc; o["output"] = relayOn;
+  o["id"] = 0; o["source"] = CH[0].src; o["output"] = CH[0].on;
   o["brightness"] = lBri; o["ct"] = lCt;
-  if (timerActive) { o["timer_started_at"] = (long)timerStartedAt; o["timer_duration"] = timerDurMs / 1000.0; }
+  if (CH[0].tAct) { o["timer_started_at"] = (long)CH[0].tStartedAt; o["timer_duration"] = CH[0].tDurMs / 1000.0; }
 }
 void cctConfig(JsonObject o) {
   o["id"] = 0;
-  if (cfg.swName.length()) o["name"] = cfg.swName; else o["name"] = nullptr;
-  o["initial_state"] = cfg.initialState;
-  o["auto_on"] = cfg.autoOn; o["auto_on_delay"] = cfg.autoOnDelay;
-  o["auto_off"] = cfg.autoOff; o["auto_off_delay"] = cfg.autoOffDelay;
+  if (cfg.ch[0].name.length()) o["name"] = cfg.ch[0].name; else o["name"] = nullptr;
+  o["initial_state"] = cfg.ch[0].initial;
+  o["auto_on"] = cfg.ch[0].autoOn; o["auto_on_delay"] = cfg.ch[0].autoOnDelay;
+  o["auto_off"] = cfg.ch[0].autoOff; o["auto_off_delay"] = cfg.ch[0].autoOffDelay;
   o["transition_duration"] = cfg.transition;
   JsonObject r = o["ct_range"].to<JsonObject>(); r["min"] = 2700; r["max"] = 6500;
   o["ct_invert"] = cfg.ctInvert;
@@ -1312,37 +1656,37 @@ void cctConfig(JsonObject o) {
 #endif
 #if HAS_DIM
 void lightStatus(JsonObject o) {
-  o["id"] = 0; o["source"] = relaySrc; o["output"] = relayOn;
+  o["id"] = 0; o["source"] = CH[0].src; o["output"] = CH[0].on;
   o["brightness"] = lBri;
-  if (timerActive) { o["timer_started_at"] = (long)timerStartedAt; o["timer_duration"] = timerDurMs / 1000.0; }
-  if (fadeMs || rampDir) o["transition"]["target"]["brightness"] = relayOn ? lBri : 0;
-  o["apower"] = r1(apower);
-  if (!isnan(avolt)) o["voltage"] = avolt;
-  if (!isnan(acurr)) o["current"] = acurr;
+  if (CH[0].tAct) { o["timer_started_at"] = (long)CH[0].tStartedAt; o["timer_duration"] = CH[0].tDurMs / 1000.0; }
+  if (fadeMs || rampDir) o["transition"]["target"]["brightness"] = CH[0].on ? lBri : 0;
+  o["apower"] = r1(CH[0].apower);
+  if (!isnan(CH[0].avolt)) o["voltage"] = CH[0].avolt;
+  if (!isnan(CH[0].acurr)) o["current"] = CH[0].acurr;
   JsonObject e = o["aenergy"].to<JsonObject>();
-  e["total"] = r3(energyWh);
+  e["total"] = r3(CH[0].energyWh);
   JsonArray bm = e["by_minute"].to<JsonArray>();
-  for (int i = 0; i < 3; i++) bm.add(r3(byMinute[i]));
+  for (int i = 0; i < 3; i++) bm.add(r3(CH[0].byMinute[i]));
   e["minute_ts"] = (long)minuteTs;
   if (!isnan(tempC)) { JsonObject t = o["temperature"].to<JsonObject>(); t["tC"] = r1(tempC); t["tF"] = r1(tempC * 1.8f + 32); }
-  if (overtemp || overpower || !stmd.online) {
+  if (overtemp || CH[0].overpower || !stmd.online) {
     JsonArray er = o["errors"].to<JsonArray>();
     if (overtemp) er.add("overtemp");
-    if (overpower) er.add("overpower");
+    if (CH[0].overpower) er.add("overpower");
     if (!stmd.online) er.add("stm_no_response");
   }
 }
 void lightConfig(JsonObject o) {
   o["id"] = 0;
-  if (cfg.swName.length()) o["name"] = cfg.swName; else o["name"] = nullptr;
-  o["in_mode"] = cfg.inMode; o["initial_state"] = cfg.initialState;
-  o["auto_on"] = cfg.autoOn; o["auto_on_delay"] = cfg.autoOnDelay;
-  o["auto_off"] = cfg.autoOff; o["auto_off_delay"] = cfg.autoOffDelay;
+  if (cfg.ch[0].name.length()) o["name"] = cfg.ch[0].name; else o["name"] = nullptr;
+  o["in_mode"] = cfg.ch[0].inMode; o["initial_state"] = cfg.ch[0].initial;
+  o["auto_on"] = cfg.ch[0].autoOn; o["auto_on_delay"] = cfg.ch[0].autoOnDelay;
+  o["auto_off"] = cfg.ch[0].autoOff; o["auto_off_delay"] = cfg.ch[0].autoOffDelay;
   o["transition_duration"] = cfg.transition;
   JsonArray rm = o["range_map"].to<JsonArray>(); rm.add(cfg.dimMin); rm.add(cfg.dimMax);
   o["leading_edge"] = cfg.leadEdge;
   o["fade_rate"] = cfg.stmFade; o["button_fade_rate"] = cfg.btnFade;
-  o["power_limit"] = cfg.powerLimit; o["temp_limit"] = cfg.tempLimit;
+  o["power_limit"] = cfg.ch[0].powerLimit; o["temp_limit"] = cfg.tempLimit;
   JsonObject pc = o["pm_calibration"].to<JsonObject>();
   pc["factor"] = cfg.pwrCal; pc["source"] = cfg.calSrc; pc["default"] = PWR_CAL_DEFAULT;
 }
@@ -1356,6 +1700,63 @@ void stmInfo(JsonObject o) {
   hex.trim();
   o["state_raw"] = hex;
   o["frames"] = stmd.frames; o["bad_frames"] = stmd.badFrames;
+}
+#endif
+#if IS_COVER
+void coverStatus(JsonObject o) {
+  o["id"] = 0; o["source"] = cvSrc; o["state"] = CV_NAMES[cvState];
+  o["apower"] = r1(coverPower());
+  if (!isnan(CH[0].avolt)) o["voltage"] = CH[0].avolt;
+  float cur = (isnan(CH[0].acurr) ? 0 : CH[0].acurr) + (isnan(CH[1].acurr) ? 0 : CH[1].acurr);
+  o["current"] = roundf(cur * 1000) / 1000;
+  float pf = !isnan(CH[0].pf) ? CH[0].pf : CH[1].pf;
+  if (!isnan(pf) && coverMoving()) o["pf"] = pf;
+  if (!isnan(CH[0].freq)) o["freq"] = CH[0].freq;
+  JsonObject e = o["aenergy"].to<JsonObject>();
+  e["total"] = r3(CH[0].energyWh + CH[1].energyWh);
+  JsonArray bm = e["by_minute"].to<JsonArray>();
+  for (int i = 0; i < 3; i++) bm.add(r3(CH[0].byMinute[i] + CH[1].byMinute[i]));
+  e["minute_ts"] = (long)minuteTs;
+  if (!isnan(tempC)) { JsonObject t = o["temperature"].to<JsonObject>(); t["tC"] = r1(tempC); t["tF"] = r1(tempC * 1.8f + 32); }
+  o["pos_control"] = cvPosControl();
+  if (cvPosControl()) {
+    float p = cvLivePos();
+    if (isnan(p)) o["current_pos"] = nullptr; else o["current_pos"] = (int)lroundf(p);
+    if (!isnan(cvTarget)) o["target_pos"] = (int)lroundf(cvTarget);
+  }
+  if (coverMoving()) {
+    o["move_timeout"] = cvMaxMs / 1000.0;
+    o["move_started_at"] = (long)cvStartedAt;
+  }
+  o["last_direction"] = cvLastDir > 0 ? "open" : (cvLastDir < 0 ? "close" : (const char*)nullptr);
+  if (overtemp || cvOverpower || cvObstructed || !pmOk()) {
+    JsonArray er = o["errors"].to<JsonArray>();
+    if (overtemp) er.add("overtemp");
+    if (cvOverpower) er.add("overpower");
+    if (cvObstructed) er.add("obstruction");
+    if (!pmOk()) er.add("pm_no_response");
+  }
+}
+void coverConfig(JsonObject o) {
+  o["id"] = 0;
+  if (cfg.ch[0].name.length()) o["name"] = cfg.ch[0].name; else o["name"] = nullptr;
+  o["in_mode"] = cfg.ch[0].inMode; o["initial_state"] = cfg.ch[0].initial;
+  o["power_limit"] = cfg.ch[0].powerLimit;
+  o["maxtime_open"] = cfg.cvMaxOpen; o["maxtime_close"] = cfg.cvMaxClose;
+  o["swap_inputs"] = cfg.cvSwapIn; o["invert_directions"] = cfg.cvInvert;
+  JsonObject m = o["motor"].to<JsonObject>();
+  m["idle_power_thr"] = cfg.cvIdleThr; m["idle_confirm_period"] = cfg.cvIdleConf;
+  JsonObject ob = o["obstruction_detection"].to<JsonObject>();
+  ob["enable"] = cfg.cvObst; ob["direction"] = "both"; ob["action"] = cfg.cvObstAction;
+  ob["power_thr"] = cfg.cvObstThr; ob["holdoff"] = cfg.cvObstHold;
+  JsonObject pc = o["pos_calibration"].to<JsonObject>();
+  pc["open_time"] = cfg.cvTOpen; pc["close_time"] = cfg.cvTClose;
+  o["temp_limit"] = cfg.tempLimit;
+  JsonArray cal = o["pm_calibration"].to<JsonArray>();
+  for (int c = 0; c < 2; c++) {
+    JsonObject k = cal.add<JsonObject>();
+    k["factor"] = pcalOf(c); k["current_factor"] = icalOf(c);
+  }
 }
 #endif
 void inputStatus(JsonObject o) { o["id"] = 0; o["state"] = inState; }
@@ -1460,7 +1861,7 @@ String applyHook(Hook& h, JsonVariantConst p) {
   if (h.event.startsWith("input.")) {
     if (h.cid != 0 && !(HAS_ADDON && h.cid == 100) && !(HAS_IN2 && h.cid == 1))
       return HAS_ADDON ? "cid: 0 (SW) oder 100 (Add-on)" : HAS_IN2 ? "cid: 0 (SW1) oder 1 (SW2)" : "cid muss 0 sein";
-  } else h.cid = 0;
+  } else if (h.cid < 0 || h.cid >= NCH || h.event.startsWith("sys.")) h.cid = 0;   // Schalter-Ereignisse: Kanal
   if (p["enable"].is<bool>()) h.enable = p["enable"];
   if (p["name"].is<const char*>()) h.name = p["name"].as<const char*>();
   if (p["urls"].is<JsonArrayConst>()) {
@@ -1525,8 +1926,10 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     cctStatus(o["cct:0"].to<JsonObject>());
 #elif HAS_DIM
     lightStatus(o["light:0"].to<JsonObject>());
+#elif IS_COVER
+    coverStatus(o["cover:0"].to<JsonObject>());
 #else
-    switchStatus(o["switch:0"].to<JsonObject>());
+    for (int c = 0; c < NCH; c++) switchStatus(o[String("switch:") + c].to<JsonObject>(), c);
 #endif
 #if HAS_INPUT
     inputStatus(o["input:0"].to<JsonObject>());
@@ -1568,8 +1971,10 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     cctConfig(o["cct:0"].to<JsonObject>());
 #elif HAS_DIM
     lightConfig(o["light:0"].to<JsonObject>());
+#elif IS_COVER
+    coverConfig(o["cover:0"].to<JsonObject>());
 #else
-    switchConfig(o["switch:0"].to<JsonObject>());
+    for (int c = 0; c < NCH; c++) switchConfig(o[String("switch:") + c].to<JsonObject>(), c);
 #endif
 #if HAS_INPUT
     inputConfig(o["input:0"].to<JsonObject>());
@@ -1672,7 +2077,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
   if (m == "shelly.update") {
     // {"stage":"stable"} oder {"url":"http(s)://…/hermit-1pm.bin"}
-    if (UPD_RELAY_BLOCKS && relayOn) ERR(-114, "Relais ist an – Update nur bei ausgeschaltetem Relais");
+    if (UPD_RELAY_BLOCKS && CH[0].on) ERR(-114, "Relais ist an – Update nur bei ausgeschaltetem Relais");
     if (p["url"].is<const char*>()) updManualUrl = p["url"].as<const char*>();
     else {
       if (!updAvailVer.length() && !updCheck()) ERR(-114, updLastErr);
@@ -1690,7 +2095,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
   if (m == "shelly.factoryreset") {
     LittleFS.remove("/config.json"); LittleFS.remove("/energy"); LittleFS.remove("/relay");
-    LittleFS.remove("/light"); LittleFS.remove("/dim");
+    LittleFS.remove("/light"); LittleFS.remove("/dim"); LittleFS.remove("/cover");
     { File nf = LittleFS.open("/noimport", "w"); if (nf) nf.close(); }   // kein WLAN-Import nach Werksreset
     ESP.eraseConfig();
     rebootAt = millis() + 500;
@@ -1709,7 +2114,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
 
   // ---- Switch / Input: nur id 0 ----
   int pid = p["id"] | 0;
-  if (m.startsWith("switch.") && pid != 0) ERR(-103, "Ungültige id – Schalter hat nur id 0");
+  if (m.startsWith("switch.") && (pid < 0 || pid >= NCH)) ERR(-103, NCH > 1 ? "Ungültige id – Schalter: 0 oder 1" : "Ungültige id – Schalter hat nur id 0");
   if (!HAS_INPUT && m.startsWith("input.")) ERR(404, "Gerät hat keinen Eingang");
   if (m.startsWith("input.") && pid != 0 && !(HAS_ADDON && pid == 100) && !(HAS_IN2 && pid == 1))
     ERR(-103, HAS_ADDON ? "Ungültige id – Eingänge: 0 (SW), 100 (Add-on)" : HAS_IN2 ? "Ungültige id – Eingänge: 0 (SW1), 1 (SW2)" : "Ungültige id – Eingang hat nur id 0");
@@ -1729,24 +2134,103 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     out.set(nullptr);
     return 0;
   }
-  if (m == "cct.toggle") { setRelay(!relayOn, src); out.set(nullptr); return 0; }
+  if (m == "cct.toggle") { setRelay(!CH[0].on, src); out.set(nullptr); return 0; }
   if (m == "cct.getstatus") { cctStatus(out.to<JsonObject>()); return 0; }
   if (m == "cct.getconfig") { cctConfig(out.to<JsonObject>()); return 0; }
   if (m == "cct.setconfig") {
     JsonVariantConst c = p["config"];
     if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
-    if (c["name"].is<const char*>()) cfg.swName = c["name"].as<const char*>();
+    if (c["name"].is<const char*>()) cfg.ch[0].name = c["name"].as<const char*>();
     if (c["initial_state"].is<const char*>()) {
       String v = c["initial_state"].as<const char*>();
       if (v != "off" && v != "on" && v != "restore_last") ERR(-103, "initial_state: off|on|restore_last");
-      cfg.initialState = v;
+      cfg.ch[0].initial = v;
     }
-    if (c["auto_on"].is<bool>()) cfg.autoOn = c["auto_on"];
-    if (c["auto_on_delay"].is<float>()) cfg.autoOnDelay = c["auto_on_delay"];
-    if (c["auto_off"].is<bool>()) cfg.autoOff = c["auto_off"];
-    if (c["auto_off_delay"].is<float>()) cfg.autoOffDelay = c["auto_off_delay"];
+    if (c["auto_on"].is<bool>()) cfg.ch[0].autoOn = c["auto_on"];
+    if (c["auto_on_delay"].is<float>()) cfg.ch[0].autoOnDelay = c["auto_on_delay"];
+    if (c["auto_off"].is<bool>()) cfg.ch[0].autoOff = c["auto_off"];
+    if (c["auto_off_delay"].is<float>()) cfg.ch[0].autoOffDelay = c["auto_off_delay"];
     if (c["transition_duration"].is<float>()) cfg.transition = c["transition_duration"];
     if (c["ct_invert"].is<bool>()) { cfg.ctInvert = c["ct_invert"]; lightWrite(); }
+    saveCfg();
+    out["restart_required"] = false;
+    return 0;
+  }
+#endif
+#if IS_COVER
+  if (m.startsWith("cover.") && pid != 0) ERR(-103, "Ungültige id – Rollladen hat nur cover:0");
+  if (m.startsWith("switch.") && m != "switch.calibrate" && m != "switch.resetcounters")
+    ERR(404, "Rollladen-Firmware: Cover.* verwenden (wie Shelly Plus 2PM)");
+  if (m == "cover.open" || m == "cover.close") {
+    float dur = p["duration"].is<float>() ? p["duration"].as<float>() : 0;
+    if (overtemp) ERR(-114, "Übertemperatur – Fahrt gesperrt");
+    coverMove(m == "cover.open" ? 1 : -1, src, NAN, dur);
+    out.set(nullptr); return 0;
+  }
+  if (m == "cover.stop") { coverStop(src); out.set(nullptr); return 0; }
+  if (m == "cover.gotoposition") {
+    if (!cvPosControl()) ERR(-114, "Nicht kalibriert – erst Cover.Calibrate");
+    if (isnan(cvPos)) ERR(-114, "Position unbekannt – einmal ganz auf oder zu fahren");
+    float pos;
+    if (p["pos"].is<float>()) pos = p["pos"];
+    else if (p["rel"].is<float>()) pos = cvLivePos() + p["rel"].as<float>();
+    else ERR(-103, "pos (0–100) oder rel angeben");
+    if (overtemp) ERR(-114, "Übertemperatur – Fahrt gesperrt");
+    coverGoTo(pos, src);
+    out.set(nullptr); return 0;
+  }
+  if (m == "cover.calibrate") {
+    if (overtemp) ERR(-114, "Übertemperatur – Fahrt gesperrt");
+    coverCalibrate(src); out.set(nullptr); return 0;
+  }
+  if (m == "cover.getstatus") { coverStatus(out.to<JsonObject>()); return 0; }
+  if (m == "cover.getconfig") { coverConfig(out.to<JsonObject>()); return 0; }
+  if (m == "cover.resetcounters") {
+    for (int c = 0; c < NCH; c++) { CH[c].energyWh = 0; CH[c].minuteAccWh = 0; CH[c].byMinute[0] = CH[c].byMinute[1] = CH[c].byMinute[2] = 0; }
+    saveEnergy();
+    out["aenergy"]["total"] = 0;
+    return 0;
+  }
+  if (m == "cover.setconfig") {
+    JsonVariantConst c = p["config"];
+    if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
+    if (c["name"].is<const char*>()) cfg.ch[0].name = c["name"].as<const char*>();
+    if (c["in_mode"].is<const char*>()) {
+      String v = c["in_mode"].as<const char*>();
+      if (v != "dual" && v != "single" && v != "detached") ERR(-103, "in_mode: dual|single|detached");
+      cfg.ch[0].inMode = v;
+    }
+    if (c["initial_state"].is<const char*>()) {
+      String v = c["initial_state"].as<const char*>();
+      if (v != "stopped" && v != "open" && v != "closed") ERR(-103, "initial_state: stopped|open|closed");
+      cfg.ch[0].initial = v;
+    }
+    if (c["power_limit"].is<float>()) cfg.ch[0].powerLimit = c["power_limit"];
+    if (c["maxtime_open"].is<float>()) cfg.cvMaxOpen = constrain(c["maxtime_open"].as<float>(), 1.0f, 600.0f);
+    if (c["maxtime_close"].is<float>()) cfg.cvMaxClose = constrain(c["maxtime_close"].as<float>(), 1.0f, 600.0f);
+    if (c["swap_inputs"].is<bool>()) cfg.cvSwapIn = c["swap_inputs"];
+    if (c["invert_directions"].is<bool>()) { if (coverMoving()) coverStop(src); cfg.cvInvert = c["invert_directions"]; }
+    JsonVariantConst mo = c["motor"];
+    if (mo["idle_power_thr"].is<float>()) cfg.cvIdleThr = constrain(mo["idle_power_thr"].as<float>(), 1.0f, 200.0f);
+    if (mo["idle_confirm_period"].is<float>()) cfg.cvIdleConf = constrain(mo["idle_confirm_period"].as<float>(), 0.2f, 10.0f);
+    JsonVariantConst ob = c["obstruction_detection"];
+    if (ob["enable"].is<bool>()) cfg.cvObst = ob["enable"];
+    if (ob["action"].is<const char*>()) {
+      String v = ob["action"].as<const char*>();
+      if (v != "stop" && v != "reverse") ERR(-103, "obstruction_detection.action: stop|reverse");
+      cfg.cvObstAction = v;
+    }
+    if (ob["power_thr"].is<float>()) cfg.cvObstThr = ob["power_thr"];
+    if (ob["holdoff"].is<float>()) cfg.cvObstHold = constrain(ob["holdoff"].as<float>(), 0.5f, 30.0f);
+    JsonVariantConst pc = c["pos_calibration"];         // Fahrzeiten von Hand (0 = keine Positionssteuerung)
+    if (pc["open_time"].is<float>() || pc["close_time"].is<float>()) {
+      float to = pc["open_time"] | cfg.cvTOpen, tc = pc["close_time"] | cfg.cvTClose;
+      if ((to != 0 && (to < 1 || to > 600)) || (tc != 0 && (tc < 1 || tc > 600))) ERR(-103, "Fahrzeiten 1–600 s oder 0");
+      cfg.cvTOpen = to; cfg.cvTClose = tc;
+      if (!cvPosControl()) cvPos = NAN;
+      cvSave();
+    }
+    if (c["temp_limit"].is<float>()) cfg.tempLimit = c["temp_limit"];
     saveCfg();
     out["restart_required"] = false;
     return 0;
@@ -1774,14 +2258,14 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     return 0;
   }
   if (m == "light.toggle") {
-    if (!relayOn && overtemp) ERR(-114, "Übertemperatur – Einschalten gesperrt");
-    setRelay(!relayOn, src); out.set(nullptr); return 0;
+    if (!CH[0].on && overtemp) ERR(-114, "Übertemperatur – Einschalten gesperrt");
+    setRelay(!CH[0].on, src); out.set(nullptr); return 0;
   }
   if (m == "light.dimup" || m == "light.dimdown") {
     int fr = p["fade_rate"] | cfg.btnFade; fr = fr < 1 ? 1 : (fr > 5 ? 5 : fr);
     static const float R[6] = {25, 10, 16, 25, 40, 60};
     bool up = m == "light.dimup";
-    if (!relayOn) {
+    if (!CH[0].on) {
       if (!up) { out.set(nullptr); return 0; }
       if (overtemp) ERR(-114, "Übertemperatur – Einschalten gesperrt");
       lBri = 1; nextTransition = 0;
@@ -1797,22 +2281,22 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   if (m == "light.setconfig") {
     JsonVariantConst c = p["config"];
     if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
-    if (c["name"].is<const char*>()) cfg.swName = c["name"].as<const char*>();
+    if (c["name"].is<const char*>()) cfg.ch[0].name = c["name"].as<const char*>();
     if (c["in_mode"].is<const char*>()) {
       String v = c["in_mode"].as<const char*>();
       if (v != "dim" && v != "dual_dim" && v != "follow" && v != "flip" && v != "momentary" && v != "detached")
         ERR(-103, "in_mode: dim|dual_dim|follow|flip|momentary|detached");
-      cfg.inMode = v;
+      cfg.ch[0].inMode = v;
     }
     if (c["initial_state"].is<const char*>()) {
       String v = c["initial_state"].as<const char*>();
       if (v != "off" && v != "on" && v != "restore_last") ERR(-103, "initial_state: off|on|restore_last");
-      cfg.initialState = v;
+      cfg.ch[0].initial = v;
     }
-    if (c["auto_on"].is<bool>()) cfg.autoOn = c["auto_on"];
-    if (c["auto_on_delay"].is<float>()) cfg.autoOnDelay = c["auto_on_delay"];
-    if (c["auto_off"].is<bool>()) cfg.autoOff = c["auto_off"];
-    if (c["auto_off_delay"].is<float>()) cfg.autoOffDelay = c["auto_off_delay"];
+    if (c["auto_on"].is<bool>()) cfg.ch[0].autoOn = c["auto_on"];
+    if (c["auto_on_delay"].is<float>()) cfg.ch[0].autoOnDelay = c["auto_on_delay"];
+    if (c["auto_off"].is<bool>()) cfg.ch[0].autoOff = c["auto_off"];
+    if (c["auto_off_delay"].is<float>()) cfg.ch[0].autoOffDelay = c["auto_off_delay"];
     if (c["transition_duration"].is<float>()) cfg.transition = constrain(c["transition_duration"].as<float>(), 0.0f, 30.0f);
     if (c["range_map"].is<JsonArrayConst>()) {
       int a = c["range_map"][0] | cfg.dimMin, b = c["range_map"][1] | cfg.dimMax;
@@ -1823,7 +2307,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     if (c["leading_edge"].is<bool>()) { cfg.leadEdge = c["leading_edge"]; stmChg = true; }
     if (c["fade_rate"].is<int>()) { cfg.stmFade = constrain(c["fade_rate"].as<int>(), 1, 5); stmChg = true; }
     if (c["button_fade_rate"].is<int>()) cfg.btnFade = constrain(c["button_fade_rate"].as<int>(), 1, 5);
-    if (c["power_limit"].is<float>()) cfg.powerLimit = c["power_limit"];
+    if (c["power_limit"].is<float>()) cfg.ch[0].powerLimit = c["power_limit"];
     if (c["temp_limit"].is<float>()) cfg.tempLimit = c["temp_limit"];
     saveCfg();
     stmd.leading = cfg.leadEdge; stmd.fadeRate = cfg.stmFade;
@@ -1844,39 +2328,39 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     bool on = p["on"];
     float ta = p["toggle_after"].is<float>() ? p["toggle_after"].as<float>() : -1;
     if (on && overtemp) ERR(-114, "Übertemperatur – Einschalten gesperrt");
-    bool was = relayOn;
-    setRelay(on, src, ta);
+    bool was = CH[pid].on;
+    setRelayC(pid, on, src, ta);
     out["was_on"] = was;
     return 0;
   }
   if (m == "switch.toggle") {
-    if (!relayOn && overtemp) ERR(-114, "Übertemperatur – Einschalten gesperrt");
-    bool was = relayOn;
-    setRelay(!relayOn, src);
+    if (!CH[pid].on && overtemp) ERR(-114, "Übertemperatur – Einschalten gesperrt");
+    bool was = CH[pid].on;
+    setRelayC(pid, !CH[pid].on, src);
     out["was_on"] = was;
     return 0;
   }
-  if (m == "switch.getstatus") { switchStatus(out.to<JsonObject>()); return 0; }
-  if (m == "switch.getconfig") { switchConfig(out.to<JsonObject>()); return 0; }
+  if (m == "switch.getstatus") { switchStatus(out.to<JsonObject>(), pid); return 0; }
+  if (m == "switch.getconfig") { switchConfig(out.to<JsonObject>(), pid); return 0; }
   if (m == "switch.setconfig") {
     JsonVariantConst c = p["config"];
     if (!c.is<JsonObjectConst>()) ERR(-103, "config fehlt");
-    if (c["name"].is<const char*>()) cfg.swName = c["name"].as<const char*>();
+    if (c["name"].is<const char*>()) cfg.ch[pid].name = c["name"].as<const char*>();
     if (c["in_mode"].is<const char*>()) {
       String v = c["in_mode"].as<const char*>();
       if (v != "follow" && v != "flip" && v != "momentary" && v != "detached") ERR(-103, "in_mode: follow|flip|momentary|detached");
-      cfg.inMode = v;
+      cfg.ch[pid].inMode = v;
     }
     if (c["initial_state"].is<const char*>()) {
       String v = c["initial_state"].as<const char*>();
       if (v != "off" && v != "on" && v != "restore_last" && v != "match_input") ERR(-103, "initial_state: off|on|restore_last|match_input");
-      cfg.initialState = v;
+      cfg.ch[pid].initial = v;
     }
-    if (c["auto_on"].is<bool>()) cfg.autoOn = c["auto_on"];
-    if (c["auto_on_delay"].is<float>()) cfg.autoOnDelay = c["auto_on_delay"];
-    if (c["auto_off"].is<bool>()) cfg.autoOff = c["auto_off"];
-    if (c["auto_off_delay"].is<float>()) cfg.autoOffDelay = c["auto_off_delay"];
-    if (c["power_limit"].is<float>()) cfg.powerLimit = c["power_limit"];
+    if (c["auto_on"].is<bool>()) cfg.ch[pid].autoOn = c["auto_on"];
+    if (c["auto_on_delay"].is<float>()) cfg.ch[pid].autoOnDelay = c["auto_on_delay"];
+    if (c["auto_off"].is<bool>()) cfg.ch[pid].autoOff = c["auto_off"];
+    if (c["auto_off_delay"].is<float>()) cfg.ch[pid].autoOffDelay = c["auto_off_delay"];
+    if (c["power_limit"].is<float>()) cfg.ch[pid].powerLimit = c["power_limit"];
     if (c["temp_limit"].is<float>()) cfg.tempLimit = c["temp_limit"];
     saveCfg();
     out["restart_required"] = false;
@@ -1884,7 +2368,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
   }
 #if HAS_PM
   if (m == "switch.resetcounters") {
-    energyWh = 0; minuteAccWh = 0; byMinute[0] = byMinute[1] = byMinute[2] = 0;
+    CH[pid].energyWh = 0; CH[pid].minuteAccWh = 0; CH[pid].byMinute[0] = CH[pid].byMinute[1] = CH[pid].byMinute[2] = 0;
     saveEnergy();
     out["aenergy"]["total"] = 0;
     return 0;
@@ -1895,45 +2379,45 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     //   {"tasmota_powercal": 12530} Wert von Tasmota "PowerCal" (BL0937 bzw. HLW8012 beim Plug) uebernehmen
     //   {"factor": 1.7066}          Faktor in W/Hz direkt setzen
     //   {"reset": true}             zurueck auf Standard
-#if HAS_CF1
+#if HAS_CF1 || PM_ADE
     //   {"voltage": 231.5} / {"current": 4.35}   Spannung bzw. Strom mit Messgeraet (Plug S)
     if (p["voltage"].is<float>() || p["current"].is<float>()) {
       if (p["voltage"].is<float>()) {
         float ref = p["voltage"];
-        if (isnan(avolt) || avolt < 10 || ref < 50) ERR(-114, "Keine Spannung gemessen");
-        cfg.vCal = cfg.vCal * ref / avolt; avolt = ref;
+        if (isnan(CH[pid].avolt) || CH[pid].avolt < 10 || ref < 50) ERR(-114, "Keine Spannung gemessen");
+        cfg.vCal = cfg.vCal * ref / CH[pid].avolt; CH[pid].avolt = ref;
       }
       if (p["current"].is<float>()) {
         float ref = p["current"];
-        if (isnan(acurr) || acurr < 0.02f || ref <= 0) ERR(-114, "Kein Strom gemessen – Last anschließen, Relais an");
-        cfg.iCal = cfg.iCal * ref / acurr; acurr = ref;
+        if (isnan(CH[pid].acurr) || CH[pid].acurr < 0.02f || ref <= 0) ERR(-114, "Kein Strom gemessen – Last anschließen, Relais an");
+        icalOf(pid) = icalOf(pid) * ref / CH[pid].acurr; CH[pid].acurr = ref;
       }
       saveCal();
-      out["voltage_factor"] = cfg.vCal; out["current_factor"] = cfg.iCal;
+      out["voltage_factor"] = cfg.vCal; out["current_factor"] = icalOf(pid);
       return 0;
     }
 #endif
     if (p["reset"].is<bool>() && p["reset"].as<bool>()) {
-      cfg.pwrCal = PWR_CAL_DEFAULT; cfg.calSrc = "default";
-      cfg.vCal = V_CAL_DEFAULT; cfg.iCal = I_CAL_DEFAULT;
+      pcalOf(pid) = PWR_CAL_DEFAULT; cfg.calSrc = "default";
+      cfg.vCal = V_CAL_DEFAULT; icalOf(pid) = I_CAL_DEFAULT;
     } else if (p["tasmota_powercal"].is<float>()) {
-      if (PM_STM) ERR(-103, "Dimmer: Messung kommt vom STM32 – apower (Referenz) oder factor verwenden");
+      if (PM_STM || PM_ADE) ERR(-103, "Hier nicht möglich – apower (Referenzlast) oder factor verwenden");
       float pc = p["tasmota_powercal"];
       if (pc < 1000 || pc > 100000) ERR(-103, "tasmota_powercal unplausibel (typ. 8000–20000)");
-      cfg.pwrCal = PWR_TASMOTA_PREF * pc / 1e7f; cfg.calSrc = "tasmota";
+      pcalOf(pid) = PWR_TASMOTA_PREF * pc / 1e7f; cfg.calSrc = "tasmota";
     } else if (p["factor"].is<float>()) {
       float f = p["factor"];
       if (f < 0.05f || f > 100) ERR(-103, "factor unplausibel");
-      cfg.pwrCal = f; cfg.calSrc = "manual";
+      pcalOf(pid) = f; cfg.calSrc = "manual";
     } else if (p["apower"].is<float>()) {
       float ref = p["apower"];
-      if (ref <= 0 || apower < 1) ERR(-114, "Keine Leistung gemessen – Relais an und Last angeschlossen?");
-      float nf = cfg.pwrCal * ref / apower;
+      if (ref <= 0 || CH[pid].apower < 1) ERR(-114, "Keine Leistung gemessen – Relais an und Last angeschlossen?");
+      float nf = pcalOf(pid) * ref / CH[pid].apower;
       if (nf < 0.05f || nf > 100) ERR(-103, "Ergebnis unplausibel – Referenzwert prüfen");
-      cfg.pwrCal = nf; cfg.calSrc = "reference";
+      pcalOf(pid) = nf; cfg.calSrc = "reference";
     } else ERR(-103, "apower, tasmota_powercal, factor oder reset angeben");
     saveCal();
-    out["factor"] = cfg.pwrCal;
+    out["factor"] = pcalOf(pid);
     out["source"] = cfg.calSrc;
     out["default"] = PWR_CAL_DEFAULT;
     return 0;
@@ -2245,20 +2729,21 @@ void handleRpcGet(const String& method) {
 }
 
 // ---- Gen1-Kompatibilitaet ----
-void gen1Relay() {
+void gen1Relay(int c = 0) {
   if (!checkAuth()) return;
+  Chan& k = CH[c];
   if (server.hasArg("turn")) {
     String t = server.arg("turn");
     float timer = server.hasArg("timer") ? server.arg("timer").toFloat() : -1;
-    bool on = t == "on" ? true : t == "off" ? false : !relayOn;
-    setRelay(on, "http", timer);   // Messfirmware: wird in setRelay ignoriert
+    bool on = t == "on" ? true : t == "off" ? false : !k.on;
+    setRelayC(c, on, "http", timer);   // Messfirmware: wird in setRelay ignoriert
   }
   JsonDocument d;
-  d["ison"] = relayOn; d["has_timer"] = timerActive;
-  d["timer_started"] = timerActive ? (long)timerStartedAt : 0;
-  d["timer_duration"] = timerActive ? timerDurMs / 1000 : 0;
-  d["timer_remaining"] = timerActive ? (timerDurMs - (millis() - timerStartMs)) / 1000 : 0;
-  d["overpower"] = overpower; d["source"] = relaySrc;
+  d["ison"] = k.on; d["has_timer"] = k.tAct;
+  d["timer_started"] = k.tAct ? (long)k.tStartedAt : 0;
+  d["timer_duration"] = k.tAct ? k.tDurMs / 1000 : 0;
+  d["timer_remaining"] = k.tAct ? (k.tDurMs - (millis() - k.tStartMs)) / 1000 : 0;
+  d["overpower"] = k.overpower; d["source"] = k.src;
   sendJson(200, d);
 }
 
@@ -2270,15 +2755,29 @@ void gen1Status() {
   w["ip"] = WiFi.localIP().toString(); w["rssi"] = WiFi.RSSI();
 #if HAS_DIM
   JsonObject r = d["lights"].to<JsonArray>().add<JsonObject>();
-  r["ison"] = relayOn; r["brightness"] = lBri; r["has_timer"] = timerActive; r["source"] = relaySrc;
+  r["ison"] = CH[0].on; r["brightness"] = lBri; r["has_timer"] = CH[0].tAct; r["source"] = CH[0].src;
   d["overtemperature"] = overtemp; d["loaderror"] = !stmd.online;
+#elif IS_COVER
+  JsonObject ro = d["rollers"].to<JsonArray>().add<JsonObject>();
+  ro["state"] = cvDir > 0 ? "open" : (cvDir < 0 ? "close" : "stop");
+  ro["power"] = r1(coverPower()); ro["is_valid"] = pmOk(); ro["safety_switch"] = false; ro["overtemperature"] = overtemp;
+  ro["stop_reason"] = cvObstructed ? "obstacle" : (cvOverpower ? "overpower" : "normal");
+  ro["last_direction"] = cvLastDir > 0 ? "open" : "close";
+  ro["current_pos"] = (cvPosControl() && !isnan(cvPos)) ? (int)lroundf(cvLivePos()) : 101;
+  ro["calibrating"] = cvCal != 0; ro["positioning"] = cvPosControl();
 #else
-  JsonObject r = d["relays"].to<JsonArray>().add<JsonObject>();
-  r["ison"] = relayOn; r["has_timer"] = timerActive; r["overpower"] = overpower; r["source"] = relaySrc;
+  JsonArray ra = d["relays"].to<JsonArray>();
+  for (int c = 0; c < NCH; c++) {
+    JsonObject r = ra.add<JsonObject>();
+    r["ison"] = CH[c].on; r["has_timer"] = CH[c].tAct; r["overpower"] = CH[c].overpower; r["source"] = CH[c].src;
+  }
 #endif
 #if HAS_PM
-  JsonObject mt = d["meters"].to<JsonArray>().add<JsonObject>();
-  mt["power"] = r1(apower); mt["is_valid"] = true; mt["total"] = (long)(energyWh * 60);  // Watt-Minuten wie Gen1
+  JsonArray ma = d["meters"].to<JsonArray>();
+  for (int c = 0; c < NCH; c++) {
+    JsonObject mt = ma.add<JsonObject>();
+    mt["power"] = r1(CH[c].apower); mt["is_valid"] = true; mt["total"] = (long)(CH[c].energyWh * 60);  // Watt-Minuten wie Gen1
+  }
 #endif
 #if HAS_TEMP
   if (!isnan(tempC)) { d["temperature"] = r1(tempC); d["overtemperature"] = overtemp; }
@@ -2301,7 +2800,31 @@ void gen1Status() {
 void handleNotFound() {
   String uri = server.uri();
   if (uri.startsWith("/rpc/")) { handleRpcGet(uri.substring(5)); return; }
-  if (uri == "/relay/0" || uri == "/relay") { gen1Relay(); return; }
+#if IS_COVER
+  if (uri == "/roller/0" || uri == "/roller") {
+    // Gen1: go=open|close|stop|to_pos (roller_pos=0..100), duration=s
+    if (!checkAuth()) return;
+    String go = server.arg("go");
+    float dur = server.hasArg("duration") ? server.arg("duration").toFloat() : 0;
+    if (go == "open") coverMove(1, "http", NAN, dur);
+    else if (go == "close") coverMove(-1, "http", NAN, dur);
+    else if (go == "stop") coverStop("http");
+    else if (go == "to_pos" && server.hasArg("roller_pos")) coverGoTo(server.arg("roller_pos").toFloat(), "http");
+    else if (server.hasArg("roller_pos")) coverGoTo(server.arg("roller_pos").toFloat(), "http");
+    JsonDocument d;
+    d["state"] = cvDir > 0 ? "open" : (cvDir < 0 ? "close" : "stop");
+    d["power"] = r1(coverPower()); d["last_direction"] = cvLastDir > 0 ? "open" : "close";
+    d["current_pos"] = (cvPosControl() && !isnan(cvPos)) ? (int)lroundf(cvLivePos()) : 101;
+    d["positioning"] = cvPosControl(); d["calibrating"] = cvCal != 0;
+    sendJson(200, d);
+    return;
+  }
+#else
+  if (uri == "/relay/0" || uri == "/relay") { gen1Relay(0); return; }
+#if NCH > 1
+  if (uri == "/relay/1") { gen1Relay(1); return; }
+#endif
+#endif
 #if HAS_LIGHT
   if (uri == "/light/0" || uri == "/light") {
     if (!checkAuth()) return;
@@ -2312,10 +2835,10 @@ void handleNotFound() {
     float timer = server.hasArg("timer") ? server.arg("timer").toFloat() : -1;
     if (server.hasArg("turn")) {
       String t = server.arg("turn");
-      setRelay(t == "on" ? true : t == "off" ? false : !relayOn, "http", timer);
+      setRelay(t == "on" ? true : t == "off" ? false : !CH[0].on, "http", timer);
     } else if (b >= 0 || c >= 0) lightUpdate();
     JsonDocument d;
-    d["ison"] = relayOn; d["source"] = relaySrc; d["has_timer"] = timerActive;
+    d["ison"] = CH[0].on; d["source"] = CH[0].src; d["has_timer"] = CH[0].tAct;
     d["mode"] = "white"; d["brightness"] = lBri; d["white"] = 0; d["temp"] = lCt;
     d["transition"] = (int)(cfg.transition * 1000);
     sendJson(200, d);
@@ -2331,19 +2854,20 @@ void handleNotFound() {
     float timer = server.hasArg("timer") ? server.arg("timer").toFloat() : -1;
     if (server.hasArg("turn")) {
       String t = server.arg("turn");
-      setRelay(t == "on" ? true : t == "off" ? false : !relayOn, "http", timer);
+      setRelay(t == "on" ? true : t == "off" ? false : !CH[0].on, "http", timer);
     } else if (b > 0) lightUpdate();
     JsonDocument d;
-    d["ison"] = relayOn; d["source"] = relaySrc; d["has_timer"] = timerActive;
+    d["ison"] = CH[0].on; d["source"] = CH[0].src; d["has_timer"] = CH[0].tAct;
     d["mode"] = "white"; d["brightness"] = lBri;
     d["transition"] = (int)(cfg.transition * 1000);
     sendJson(200, d);
     return;
   }
 #endif
-  if (uri == "/meter/0") {
+  if (uri == "/meter/0" || (NCH > 1 && uri == "/meter/1")) {
     if (!checkAuth()) return;
-    JsonDocument d; d["power"] = r1(apower); d["total"] = (long)(energyWh * 60);
+    int c = uri.endsWith("1") ? 1 : 0;
+    JsonDocument d; d["power"] = r1(CH[c].apower); d["total"] = (long)(CH[c].energyWh * 60);
     sendJson(200, d);
     return;
   }
@@ -2405,10 +2929,13 @@ extern "C" void resetPins() {
 // Der Arduino-Core setzt sie in initPins() aber alle auf INPUT -> Relais faellt ab. Die Original-
 // Firmware macht das nicht; deshalb wird der Relais-Pin hier ausgelassen.
 extern "C" void resetPins() {
-  for (int i = 0; i <= 16; ++i)
-    if (!isFlashInterfacePin(i) && i != PIN_RELAY) pinMode(i, INPUT);
+  for (int i = 0; i <= 16; ++i) {
+    bool rel = false;
+    for (int c = 0; c < NCH; c++) if (i == RELAY_PIN[c]) rel = true;
+    if (!isFlashInterfacePin(i) && !rel) pinMode(i, INPUT);
+  }
 }
-bool relayLatched = false;   // Relais war vor dem Neustart an
+bool relayLatched[NCH];      // Relais war vor dem Neustart an
 #endif
 
 void setup() {
@@ -2421,11 +2948,15 @@ void setup() {
   digitalWrite(PIN_STM_NRST, HIGH);  pinMode(PIN_STM_NRST, OUTPUT);    // kein kurzer Reset-Impuls
 #endif
 #if HAS_RELAY
-  {
-    relayLatched = softReset && (GPE & (1UL << PIN_RELAY)) && (GPO & (1UL << PIN_RELAY));
+  for (int c = 0; c < NCH; c++) {
+    uint8_t pin = RELAY_PIN[c];
+    relayLatched[c] = softReset && (GPE & (1UL << pin)) && (GPO & (1UL << pin));
+#if IS_COVER
+    relayLatched[c] = false;                 // Rollladen: nach Neustart steht der Motor (Position waere unbekannt)
+#endif
+    digitalWrite(pin, relayLatched[c] ? HIGH : LOW);
+    pinMode(pin, OUTPUT);
   }
-  pinMode(PIN_RELAY, OUTPUT);
-  digitalWrite(PIN_RELAY, relayLatched ? HIGH : LOW);
 #endif
 #if HAS_LIGHT
   analogWriteRange(1023); analogWriteFreq(1000);
@@ -2517,6 +3048,12 @@ void setup() {
     }
   }
   loadEnergy();
+#if PM_ADE
+  ade::init(PIN_SDA, PIN_SCL);
+#endif
+#ifdef PIN_BTN
+  pinMode(PIN_BTN, INPUT_PULLUP);
+#endif
 
 #if HAS_ADDON
   pinMode(PIN_ADDON_OUT, OUTPUT);
@@ -2567,12 +3104,28 @@ void setup() {
 #endif
 
   // Startzustand Relais
+#if IS_COVER
+  cvLoad();
+  cvRelays(0);
+  if (cvPosControl() && !isnan(cvPos)) cvState = cvPos >= 100 ? CV_OPEN : (cvPos <= 0 ? CV_CLOSED : CV_STOPPED);
+  if (!softReset) {                          // nach Stromausfall
+    if (cfg.ch[0].initial == "open") coverMove(1, "init");
+    else if (cfg.ch[0].initial == "closed") coverMove(-1, "init");
+  }
+#endif
+#if !IS_COVER
+  for (int c = NCH - 1; c >= 0; c--) {      // Kanal 0 zuletzt (setRelay unten)
   bool start = false;
-  if (cfg.initialState == "on") start = true;
-  else if (cfg.initialState == "restore_last") start = loadRelayState();
-  else if (cfg.initialState == "match_input") start = inState;
+  const String& ini = cfg.ch[c].initial;
+  if (ini == "on") start = true;
+  else if (ini == "restore_last") start = loadRelayState(c);
+#if HAS_IN2
+  else if (ini == "match_input") start = c == 0 ? inState : in2State;
+#else
+  else if (ini == "match_input") start = inState;
+#endif
 #if HAS_RELAY
-  if (softReset) start = relayLatched;      // Neustart ohne Stromausfall: Zustand unveraendert lassen
+  if (softReset) start = relayLatched[c];   // Neustart ohne Stromausfall: Zustand unveraendert lassen
 #endif
 #if HAS_DIM
   if (stmAdopt) start = stmOn;
@@ -2583,13 +3136,15 @@ void setup() {
     File f = LittleFS.open("/trip", "r");
     String r = f ? f.readString() : "";
     if (f) f.close();
-    if (r == "overtemp") overtemp = true; else overpower = true;
+    if (r == "overtemp") overtemp = true; else CH[0].overpower = true;
     start = false;
   }
 #endif
-  setRelay(start, "init");
+  setRelayC(c, start, "init");
+  }
+#endif
 
-#if HAS_PM && !PM_STM
+#if HAS_PM && !PM_STM && !PM_ADE
   pinMode(PIN_CF, INPUT);
   attachInterrupt(digitalPinToInterrupt(PIN_CF), cfIsr, RISING);
 #if HAS_CF1
@@ -2625,8 +3180,10 @@ void mqStatusComp(const String& comp) {
   else if (comp == "cct:0") cctStatus(o);
 #elif HAS_DIM
   else if (comp == "light:0") lightStatus(o);
+#elif IS_COVER
+  else if (comp == "cover:0") coverStatus(o);
 #else
-  else if (comp == "switch:0") switchStatus(o);
+  else if (comp.startsWith("switch:") && comp.substring(7).toInt() < NCH) switchStatus(o, comp.substring(7).toInt());
 #endif
 #if HAS_INPUT
   else if (comp == "input:0") inputStatus(o);
@@ -2647,8 +3204,13 @@ void mqStatusAll() {
     "cct:0",
 #elif HAS_DIM
     "light:0",
+#elif IS_COVER
+    "cover:0",
 #else
     "switch:0",
+#if NCH > 1
+    "switch:1",
+#endif
 #endif
 #if HAS_INPUT
     "input:0",
@@ -2670,8 +3232,10 @@ void mqStatusAll() {
     cctStatus(p["cct:0"].to<JsonObject>());
 #elif HAS_DIM
     lightStatus(p["light:0"].to<JsonObject>());
+#elif IS_COVER
+    coverStatus(p["cover:0"].to<JsonObject>());
 #else
-    switchStatus(p["switch:0"].to<JsonObject>());
+    for (int c = 0; c < NCH; c++) switchStatus(p[String("switch:") + c].to<JsonObject>(), c);
 #endif
     mqPub(mqPre() + "/events/rpc", d);
   }
@@ -2770,6 +3334,7 @@ void loop() {
   handleWifi();
   handleInput();
   handleInput2();
+  handleBoardBtn();
   handleLight();
 #if HAS_LIGHT
   if (pcycleClearAt && millis() > pcycleClearAt) { pcycleClearAt = 0; LittleFS.remove("/pcycle"); }
@@ -2777,6 +3342,7 @@ void loop() {
   handleAddon();
   handleTimer();
   handlePm();
+  handleCover();
   handleTemp();
   handleLed();
   processQueue();

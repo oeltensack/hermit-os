@@ -54,8 +54,9 @@ welchem AP (BSSID) und Kanal das Gerät verbunden ist.
 
 | Gerät | Vorgehen |
 |---|---|
-| Shelly 1 / 1PM / Plug S / Dimmer 2 | innerhalb der ersten 60 s nach dem Einschalten den Eingang bzw. Taster (beim Dimmer SW1) 5× ein und aus (10 Flanken) |
+| Shelly 1 / 1PM / 2.5 / Plug S / Dimmer 2 | innerhalb der ersten 60 s nach dem Einschalten den Eingang bzw. Taster (beim Dimmer SW1) 5× ein und aus (10 Flanken) |
 | Duo | Lampe 5× kurz hintereinander aus- und einschalten, jeweils unter 6 s an. Es zählen nur echte Stromunterbrechungen, keine Neustarts nach Updates |
+| Shelly 2.5 | zusätzlich: Taster auf der Platine 10 s gedrückt halten |
 | alle | Weboberfläche → System → Werkseinstellungen |
 
 Danach öffnet das Gerät den Zugangspunkt `hermit-<modell>-<mac>` auf 192.168.33.1. Nach einem Reset
@@ -183,6 +184,40 @@ War vorher Tasmota oder ESPHome drauf (quelloffene STM32-Firmware v51.x), wird d
   beides wird ausgewertet. Mit `Light.Calibrate` (Referenzlast) lässt sich der Wert korrigieren.
   Ohne Neutralleiter misst der Dimmer ungenau.
 - **Diagnose:** `Hermit.Stm` zeigt Protokoll, STM32-Version, Rohwerte und Rahmenzähler
+
+---
+
+## Shelly 2.5
+
+| | Schalter (`hermit-25`) | Rollladen (`hermit-25-cover`) |
+|---|---|---|
+| Gen1-Typ / Modell | `SHSW-25` / `HERMIT-25` | `SHSW-25` / `HERMIT-25-COVER` |
+| Gen2-Komponenten | `switch:0`, `switch:1`, `input:0`, `input:1` | `cover:0`, `input:0`, `input:1` |
+| Relais | GPIO4 (Kanal 1), GPIO15 (Kanal 2) | GPIO4 auf, GPIO15 zu (tauschbar) |
+| Eingänge | SW1 GPIO13 → Kanal 1, SW2 GPIO5 → Kanal 2 | SW1 auf, SW2 zu |
+| Messung | ADE7953 an I2C (SDA GPIO12, SCL GPIO14), je Kanal Leistung, Spannung, Strom, cos φ, Frequenz | Summe beider Kanäle |
+| Sonstiges | LED GPIO0 (invertiert), Taster GPIO2, NTC am ADC | wie links |
+
+Die Messwerte rechnet Hermit OS wie Tasmota um; mit „Leistung kalibrieren“ (je Kanal, Referenzlast,
+Spannung oder Strom) lassen sie sich korrigieren. Abschaltung über 2300 W je Kanal bzw. 95 °C.
+
+Die Original-Firmware im Rollladenbetrieb erkennt der Flasher und spielt dann `hermit-25-cover` auf,
+sonst `hermit-25` (umstellbar mit `--cover` bzw. `--switch` oder in der Auswahl der Oberfläche).
+
+### Rollladen
+
+- **Bedienung** wie Shelly Plus 2PM: `Cover.Open`, `Cover.Close`, `Cover.Stop`, `Cover.GoToPosition`, `Cover.Calibrate`
+- **Nie beide Relais zugleich**; beim Richtungswechsel hält der Motor 0,5 s an
+- **Endlagen** erkennt Hermit OS am Abschalten des Motors: Die Leistung fällt unter 5 W (einstellbar) für 0,5 s.
+  Ohne messbaren Motorstrom gilt die Höchstfahrzeit (Standard 60 s) als Endlage
+- **Kalibrierung:** fährt ganz zu, ganz auf, wieder zu und misst die Fahrzeiten. Danach Positionen 0–100 %
+  (0 = zu). Die Fahrzeiten lassen sich auch von Hand eintragen
+- **Eingänge:** zwei (SW1 auf, SW2 zu) oder einer (auf → stopp → zu → stopp), jeweils als Schalter
+  (an = fahren, aus = stopp) oder Taster (drücken = fahren bzw. stoppen); tauschbar
+- **Hinderniserkennung** (aus ab Werk): Leistung über Schwelle nach der Anlaufzeit → anhalten oder kurz zurückfahren
+- **Nach Stromausfall:** stehen bleiben (Standard), öffnen oder schließen. Nach einem Neustart des ESP (z. B. Update)
+  steht der Motor; die Position bleibt gespeichert
+- Gen1: `/roller/0?go=open|close|stop|to_pos&roller_pos=50`
 
 ---
 

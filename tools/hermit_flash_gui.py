@@ -14,7 +14,7 @@ from tkinter import ttk, filedialog, messagebox
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import hermit_flash as hf  # noqa: E402
 
-VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2",
+VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover",
             "hermit-1pm-meter", "hermit-plugs-meter", "hermit-plug-meter"]
 KIND_NAMES = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
 
@@ -39,7 +39,7 @@ class App:
         main = ttk.Frame(root, padding=12)
         main.pack(fill="both", expand=True)
         ttk.Label(main, text="\U0001F41A  Hermit OS Flasher", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(main, text="Shelly 1 · 1PM · Plug · Plug S · Duo · Dimmer 2 (Gen1) – von Original-Firmware, Tasmota oder Hermit",
+        ttk.Label(main, text="Shelly 1 · 1PM · 2.5 · Plug · Plug S · Duo · Dimmer 2 (Gen1) – von Original-Firmware, Tasmota oder Hermit",
                   foreground="#666").pack(anchor="w", pady=(0, 10))
 
         # --- Geraet
