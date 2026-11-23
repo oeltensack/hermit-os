@@ -1,6 +1,6 @@
 # API
 
-Hermit OS spricht die **RPC-API von Shelly Gen2/Gen3** über HTTP. Alle Methoden sind unabhängig von
+Pagurus OS spricht die **RPC-API von Shelly Gen2/Gen3** über HTTP. Alle Methoden sind unabhängig von
 Groß-/Kleinschreibung. `/rpc/Shelly.ListMethods` liefert die Liste des jeweiligen Geräts.
 
 ## Aufruf
@@ -220,7 +220,7 @@ Format wie Shelly Gen2/Gen3. Eingeschaltet über die Oberfläche (*System → Cl
 | `<src>/rpc` | Gerät → | Antwort mit `id`, `src`, `dst`, `result` / `error` |
 | `<präfix>/events/rpc` | Gerät → | `NotifyEvent` (jedes Ereignis aus der Webhook-Liste) und `NotifyStatus` |
 | `<präfix>/status/<komponente>` | Gerät → | Status je Komponente (retained): `switch:0`/`cct:0`, `input:0`, `input:100`, `sys`, `wifi` |
-| `<präfix>/info` | Gerät → | `Shelly.GetDeviceInfo` + `ip` (retained, Hermit-Erweiterung) |
+| `<präfix>/info` | Gerät → | `Shelly.GetDeviceInfo` + `ip` (retained, Pagurus-Erweiterung) |
 
 Präfix und Client-ID sind standardmäßig die Geräte-ID (`hermit-1pm-a1b2c3`). Status wird bei jeder Änderung
 und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für das eigene Netz oder über WireGuard.
@@ -242,18 +242,18 @@ und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für 
 
 | Methode | Zweck |
 |---|---|
-| `Hermit.TestImport` | Führt die WLAN-Übernahme erneut aus, ohne etwas zu ändern: `mgos` (Original-Firmware), `tasmota`, `sdk` (Loader) mit SSID, Passwortlänge und fester IP; `raw_ssid_hits` zeigt Fundstellen bis zum Ende des SSID-Werts. Passwörter werden nie ausgegeben. |
-| `Hermit.Gpio` | `{"pin":5,"value":512}` PWM 0–1023 ausgeben, `{"pin":5}` Pegel lesen, `{"scan":true}` alle freien Pins lesen. Nur zur Analyse unbekannter Hardware – ändert Pins bis zum nächsten Schaltvorgang bzw. Neustart. |
+| `Pagurus.TestImport` | Führt die WLAN-Übernahme erneut aus, ohne etwas zu ändern: `mgos` (Original-Firmware), `tasmota`, `sdk` (Loader) mit SSID, Passwortlänge und fester IP; `raw_ssid_hits` zeigt Fundstellen bis zum Ende des SSID-Werts. Passwörter werden nie ausgegeben. |
+| `Pagurus.Gpio` | `{"pin":5,"value":512}` PWM 0–1023 ausgeben, `{"pin":5}` Pegel lesen, `{"scan":true}` alle freien Pins lesen. Nur zur Analyse unbekannter Hardware – ändert Pins bis zum nächsten Schaltvorgang bzw. Neustart. |
 | `Input.Diag` | Rohsignal des Eingangs (`id:1` = SW2 beim Dimmer) |
-| `Hermit.Stm` | Dimmer 2: Protokoll (`stock`/`open`), STM32-Version, Rohwerte des letzten Zustands, Rahmenzähler |
+| `Pagurus.Stm` | Dimmer 2: Protokoll (`stock`/`open`), STM32-Version, Rohwerte des letzten Zustands, Rahmenzähler |
 | `Sys.GetStatus` → `reset_reason` | Grund des letzten Neustarts |
 
 ---
 
 ## Unterschiede zu Gen2
 
-- Kein WebSocket-RPC und keine Shelly-Cloud; MQTT ohne TLS, eigene Cloud: [Hermit Cloud](../cloud/)
+- Kein WebSocket-RPC und keine Shelly-Cloud; MQTT ohne TLS, eigene Cloud: [Pagurus Cloud](../cloud/)
 - `Shelly.SetAuth` mit `pass` statt `ha1`
 - Webhook-Bedingung als Zahl (`threshold`) statt JS-Ausdruck; ein numerisches `condition` wird ebenfalls angenommen
-- Eigene Methoden: `Switch.Calibrate`, `Input.Diag`, `Hermit.TestImport`, `Hermit.Gpio`
+- Eigene Methoden: `Switch.Calibrate`, `Input.Diag`, `Pagurus.TestImport`, `Pagurus.Gpio`
 - Keine Scripte, Zeitpläne (Schedules) oder KVS auf dem Gerät – das übernimmt ein Gen2/Gen3-Gerät

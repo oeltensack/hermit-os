@@ -1,9 +1,9 @@
 <!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Hermit Cloud</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Pagurus Cloud</title>
 <link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#1a2129">
 <link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Hermit">
+<meta name="apple-mobile-web-app-title" content="Pagurus">
 <style>
 :root{--bg:#0f1419;--c:#1a2129;--c2:#222b34;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--w:#d29922;--b:#2a333c}
 *{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg);padding-bottom:env(safe-area-inset-bottom)}
@@ -68,7 +68,7 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 .ro .admin-only{display:none!important}.vo .user-only{display:none!important}
 @media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
-<header><h1><img src="/icon-192.png" alt="">Hermit Cloud</h1>
+<header><h1><img src="/icon-192.png" alt="">Pagurus Cloud</h1>
 <nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
@@ -137,7 +137,7 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 </div><p class="l">Standort nur für Zeitpläne mit Sonnenauf-/untergang. Kosten werden mit dem aktuellen Preis berechnet.</p><button class="bt" onclick="saveBase()">Speichern</button></div>
 
 <div class="card admin-only"><h2>Shelly Gen2+ mit Original-Firmware anbinden</h2>
-<p class="l">Gen2/Gen3/Gen4 können Shelly Cloud und MQTT gleichzeitig: Die Hermit Cloud trägt sich am Gerät als MQTT-Server ein, App und Shelly Cloud laufen weiter. Danach startet das Gerät kurz neu (Relais bleiben in ihrem Zustand). Ein Gerät kann nur einen MQTT-Server haben.</p>
+<p class="l">Gen2/Gen3/Gen4 können Shelly Cloud und MQTT gleichzeitig: Die Pagurus Cloud trägt sich am Gerät als MQTT-Server ein, App und Shelly Cloud laufen weiter. Danach startet das Gerät kurz neu (Relais bleiben in ihrem Zustand). Ein Gerät kann nur einen MQTT-Server haben.</p>
 <p class="l">Gen1-Fühler (Door/Window 2, H&amp;T) mit Original-Firmware: vorher den Taster am Gerät kurz drücken, damit er wach ist und gefunden wird. Übernommen werden Temperatur, Helligkeit bzw. Feuchte und Batterie. Bei Gen1 schaltet MQTT die Shelly Cloud ab.</p>
 <div class="f"><label>Netz durchsuchen</label><div class="row"><input id="g2_net" placeholder="192.168.0.0/24 oder 192.168.0.10-80" style="flex:1"><button class="bt g" onclick="g2Scan()">Suchen</button></div>
 <label>Passwort der Geräte</label><input id="g2_pw" type="password" placeholder="nur wenn gesetzt (Benutzer admin)">
@@ -520,7 +520,7 @@ function savePush(){const p={ntfy_url:$('p_ntfy').value,tg_chat:$('p_tchat').val
 run(async()=>{await api('settings',{method:'POST',body:{push:p,push_kinds:[...document.querySelectorAll('#p_kinds input:checked')].map(c=>c.value)}});$('p_ntok').value='';$('p_ttok').value='';await loadSet()},'Gespeichert')}
 function testPush(){run(async()=>{await api('push/test',{method:'POST'})},'Testnachricht gesendet')}
 async function loadFw(){const f=await api('firmware');window._FW=f;const upd=f.devices.filter(d=>d.fw_new&&d.online);
-$('fw_s').textContent=(f.hermit_latest?'Aktuelle Hermit-OS-Version: '+f.hermit_latest:'Hermit-OS-Version noch nicht geprüft')+(f.checked?' · geprüft '+dt(f.checked):'');
+$('fw_s').textContent=(f.hermit_latest?'Aktuelle Pagurus-OS-Version: '+f.hermit_latest:'Pagurus-OS-Version noch nicht geprüft')+(f.checked?' · geprüft '+dt(f.checked):'');
 $('fw_all').disabled=!upd.length;$('fw_all').textContent=upd.length?`Alle aktualisieren (${upd.length})`:'Alle aktuell';
 $('fwtab').innerHTML=f.devices.length?'<tr><th>Gerät</th><th>Modell</th><th>Version</th><th></th></tr>'+f.devices.map(d=>`<tr><td>${esc(d.name||d.id)}</td><td>${esc(d.model)}</td><td>${esc(d.ver||'–')}${d.fw_new?` → <b>${esc(d.fw_new)}</b>`:''}</td><td class="n">${d.fw_new&&d.online?`<button class="bt s" onclick="fwUpd(['${esc(d.id)}'])">Aktualisieren</button>`:d.online?'<span class="l">aktuell</span>':'<span class="l">offline</span>'}</td></tr>`).join(''):'<tr><td class="empty">Keine Geräte.</td></tr>'}
 function fwCheck(){run(async()=>{await api('firmware/check',{method:'POST'});await loadFw()},'Geprüft')}
@@ -588,7 +588,7 @@ return `<tr class="${r.enabled?'':'ack'}"><td><b>${esc(r.name)}</b><div class="l
 <td>${esc(r.temp_label)} ≥ ${num(c.temp_on,1)} °C<div class="l">aus unter ${num(c.temp_off,1)} °C${c.in_src?' · innen ≥ '+num(c.in_on,1)+' °C':''}${c.fc_on!=null?' · Höchstwert ≥ '+num(c.fc_on,0)+' °C':''}${c.rad_min>0?' · ≥ '+num(c.rad_min,0)+' W/m²':''}${c.from&&c.to?' · '+c.from+'–'+c.to:''}</div></td>
 <td>${r.active?'<span class="tag y">beschattet</span>':'<span class="tag">offen</span>'}${r.paused?' <span class="tag">pausiert</span>':''}${r.pending?` <span class="l">wechselt in ${dur(Math.max(0,(r.active?c.delay_off:c.delay_on)*60-(Date.now()/1000-r.pending)))}</span>`:''}<div class="l">${r.why.length?esc(r.why.join(' · ')):(r.active?'alle Bedingungen erfüllt':'')}</div></td>
 <td class="n" style="white-space:nowrap"><a class="lk user-only" onclick="shPause(${r.id},${!r.paused})">${r.paused?'Fortsetzen':'Heute pausieren'}</a><span class="admin-only"> · <a class="lk" onclick="shDlg(${r.id})">Bearbeiten</a></span></td></tr>`}).join(''):'<tr><td class="empty">Noch keine Regel.</td></tr>';
-$('shcv').innerHTML=SH.covers.length?'<tr><th>Rollladen</th><th>Zustand</th><th class="user-only"></th></tr>'+SH.covers.map(c=>`<tr class="${c.online?'':'ack'}"><td>${esc(c.name)}</td><td>${CVS[c.state]||c.state||'–'}${c.pos!=null?' · '+c.pos+' %':''}${c.pos_control?'':' <span class="l">(ohne Position)</span>'}</td><td class="n user-only" style="white-space:nowrap"><a class="lk" onclick="cvAct('${esc(c.id)}','open');setTimeout(loadShade,1500)">Auf</a> · <a class="lk" onclick="cvAct('${esc(c.id)}','stop');setTimeout(loadShade,1500)">Stopp</a> · <a class="lk" onclick="cvAct('${esc(c.id)}','close');setTimeout(loadShade,1500)">Zu</a></td></tr>`).join(''):'<tr><td class="empty">Keine Rollläden verbunden (Hermit OS 2.5 Rollladen oder Shelly Gen2+ im Rollladenbetrieb).</td></tr>';
+$('shcv').innerHTML=SH.covers.length?'<tr><th>Rollladen</th><th>Zustand</th><th class="user-only"></th></tr>'+SH.covers.map(c=>`<tr class="${c.online?'':'ack'}"><td>${esc(c.name)}</td><td>${CVS[c.state]||c.state||'–'}${c.pos!=null?' · '+c.pos+' %':''}${c.pos_control?'':' <span class="l">(ohne Position)</span>'}</td><td class="n user-only" style="white-space:nowrap"><a class="lk" onclick="cvAct('${esc(c.id)}','open');setTimeout(loadShade,1500)">Auf</a> · <a class="lk" onclick="cvAct('${esc(c.id)}','stop');setTimeout(loadShade,1500)">Stopp</a> · <a class="lk" onclick="cvAct('${esc(c.id)}','close');setTimeout(loadShade,1500)">Zu</a></td></tr>`).join(''):'<tr><td class="empty">Keine Rollläden verbunden (Pagurus OS 2.5 Rollladen oder Shelly Gen2+ im Rollladenbetrieb).</td></tr>';
 $('shse').innerHTML=SH.sensors.length?'<tr><th>Fühler</th><th>Wert</th><th>zuletzt</th></tr>'+SH.sensors.map(x=>`<tr><td>${esc(x.label)}</td><td>${num(x.value,1)} ${esc(x.unit)}</td><td>${dur(x.age)}</td></tr>`).join(''):'<tr><td class="empty">Noch keine Fühler gemeldet.</td></tr>';
 $('sh_wx').checked=SH.weather_on;$('sh_fr').value=SH.frost_c!=null?num(SH.frost_c,1):''}
 function shCheck(){run(async()=>{SH=await api('shade/check',{method:'POST',body:{}});await loadShade()})}
@@ -621,7 +621,7 @@ function shDel(id){if(!confirm('Beschattungsregel löschen?'))return;run(async()
 // ---------- Gen2+ anbinden ----------
 let G2=[];
 function g2Scan(){run(async()=>{$('g2tab').innerHTML='<tr><td class="l">Suche …</td></tr>';G2=await api('gen2/scan',{method:'POST',body:{net:$('g2_net').value}});
-$('g2tab').innerHTML=G2.length?'<tr><th>Gerät</th><th>IP</th><th></th></tr>'+G2.map((d,i)=>`<tr><td><b>${esc(d.name||d.id||d.model)}</b><div class="l">${esc(d.model||'')} · Gen${d.gen}${d.sensor?' · Batteriefühler ('+esc(d.app||'')+')':''}${d.auth?' · Passwort':''}${d.hermit?' · Hermit OS':''}</div></td><td>${esc(d.ip)}</td><td class="n">${d.hermit?'<span class="l">unter System → Cloud / MQTT einstellen</span>':d.known?'<span class="tag g">verbunden</span> <a class="lk" onclick="g2Con('+i+')">erneut</a>':'<button class="bt s" onclick="g2Con('+i+')">Verbinden</button>'}</td></tr>`).join(''):'<tr><td class="empty">Keine passenden Shelly-Geräte gefunden.</td></tr>'})}
+$('g2tab').innerHTML=G2.length?'<tr><th>Gerät</th><th>IP</th><th></th></tr>'+G2.map((d,i)=>`<tr><td><b>${esc(d.name||d.id||d.model)}</b><div class="l">${esc(d.model||'')} · Gen${d.gen}${d.sensor?' · Batteriefühler ('+esc(d.app||'')+')':''}${d.auth?' · Passwort':''}${d.hermit?' · Pagurus OS':''}</div></td><td>${esc(d.ip)}</td><td class="n">${d.hermit?'<span class="l">unter System → Cloud / MQTT einstellen</span>':d.known?'<span class="tag g">verbunden</span> <a class="lk" onclick="g2Con('+i+')">erneut</a>':'<button class="bt s" onclick="g2Con('+i+')">Verbinden</button>'}</td></tr>`).join(''):'<tr><td class="empty">Keine passenden Shelly-Geräte gefunden.</td></tr>'})}
 function g2Con(i,force){const d=G2[i];run(async()=>{try{const r=await api('gen2/connect',{method:'POST',body:{ip:d.ip,password:$('g2_pw').value,broker:$('g2_br').value,force:!!force}});d.known=true;toast(`${d.name||d.id} verbunden${r.restarted?' – startet neu':''}`);
 setTimeout(()=>{g2Scan();loadDevs()},8000)}catch(e){if(/schon auf/.test(e.message)&&confirm(e.message+'\n\nTrotzdem umstellen?'))return g2Con(i,true);throw e}})}
 </script></body></html>

@@ -8,7 +8,7 @@
 | Add-on-Variante | `hermit-1-addon` | `hermit-1pm-addon` | – | – | – | – |
 | Messfirmware | – | `hermit-1pm-meter` | `hermit-plugs-meter` | `hermit-plug-meter` | – | – |
 | Gen1-Typ | `SHSW-1` | `SHSW-PM` | `SHPLG-S` | `SHPLG-1` / `SHPLG2-1` | `SHBDUO-1` | `SHDM-2` |
-| Hermit-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-PLUG` | `HERMIT-DUO` | `HERMIT-DIMMER2` |
+| Pagurus-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-PLUG` | `HERMIT-DUO` | `HERMIT-DIMMER2` |
 | Gen2-Komponente | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `cct:0` | `light:0`, `input:0`, `input:1` |
 | Relais | GPIO4 | GPIO15 | GPIO15 | GPIO4 | – | – (STM32, Reset GPIO5, BOOT0 GPIO4) |
 | Eingang | SW, GPIO5 | SW, GPIO4 | Taster, GPIO13 (Pull-up) | Taster, GPIO12 (gedrückt = HIGH) | – | SW1 GPIO14, SW2 GPIO12 |
@@ -27,7 +27,7 @@ Status → Flash die echte Chipgröße.
 ## WLAN mit mehreren Access Points
 
 Bei mehreren APs mit gleichem Namen (Mesh, Omada, UniFi …) verbindet sich der ESP8266 von sich aus mit dem
-ersten gefundenen und bleibt dort, auch wenn ein näherer AP da ist. Hermit OS wählt deshalb vor dem Verbinden
+ersten gefundenen und bleibt dort, auch wenn ein näherer AP da ist. Pagurus OS wählt deshalb vor dem Verbinden
 den stärksten AP. Fällt der Empfang unter −70 dBm, sucht es alle 5 Minuten nach einem mindestens 8 dB
 besseren AP und wechselt (kurze Unterbrechung von 1–3 s). Einstellbar unter **WLAN**; dort steht auch, mit
 welchem AP (BSSID) und Kanal das Gerät verbunden ist.
@@ -85,7 +85,7 @@ HLW8012, nur Wirkleistung (CF) – keine Spannung, kein Strom, keine Temperatur.
 für HLW8012: **12,53 W/Hz** (10000 × 12530 / 10 / Pulsdauer in µs). Der Wert ist nicht am Gerät
 nachgemessen – einmal mit Referenzlast kalibrieren. Ein `PowerCal` aus Tasmota wird mit der
 HLW8012-Konstante umgerechnet. Die LED-Belegung (rot/blau/grün) stammt aus Tasmota/ESPHome; falls die
-Farben vertauscht sind, mit `Hermit.Gpio` prüfen.
+Farben vertauscht sind, mit `Pagurus.Gpio` prüfen.
 
 ### Kalibrieren
 
@@ -152,7 +152,7 @@ Sensoren (DS18B20, DHT22) werden nicht unterstützt.
 ## Shelly Duo
 
 Weiße Duo (E27 und GU10, `SHBDUO-1`) mit **zwei Weißkanälen**: Kaltweiß an GPIO5, Warmweiß an GPIO4
-(PWM 1 kHz). Hermit OS verteilt Helligkeit und Farbtemperatur so auf beide Kanäle, dass die Gesamthelligkeit
+(PWM 1 kHz). Pagurus OS verteilt Helligkeit und Farbtemperatur so auf beide Kanäle, dass die Gesamthelligkeit
 gleich bleibt – 2700 K nur warm, 6500 K nur kalt, dazwischen gemischt. Gamma 2,2, weiches Überblenden
 (Standard 0,5 s).
 
@@ -168,7 +168,7 @@ gleich bleibt – 2700 K nur warm, 6500 K nur kalt, dazwischen gemischt. Gamma 2
 ## Shelly Dimmer 2
 
 Der Dimmer 2 (`SHDM-2`) hat neben dem ESP8266 einen **STM32**, der den Phasenan- bzw. -abschnitt und die
-Leistungsmessung macht. Hermit OS spricht mit ihm über UART (GPIO1/3, 115200 Baud) und spielt **keine**
+Leistungsmessung macht. Pagurus OS spricht mit ihm über UART (GPIO1/3, 115200 Baud) und spielt **keine**
 STM32-Firmware auf – die Original-STM32-Firmware bleibt, der Weg zurück zur Shelly-Firmware bleibt offen.
 War vorher Tasmota oder ESPHome drauf (quelloffene STM32-Firmware v51.x), wird das erkannt und ebenfalls bedient.
 
@@ -184,7 +184,7 @@ War vorher Tasmota oder ESPHome drauf (quelloffene STM32-Firmware v51.x), wird d
 - **Leistung:** kommt vom STM32. Ab STM32-Firmware 2.63 meldet er Watt, ältere Stände eine Periodendauer –
   beides wird ausgewertet. Mit `Light.Calibrate` (Referenzlast) lässt sich der Wert korrigieren.
   Ohne Neutralleiter misst der Dimmer ungenau.
-- **Diagnose:** `Hermit.Stm` zeigt Protokoll, STM32-Version, Rohwerte und Rahmenzähler
+- **Diagnose:** `Pagurus.Stm` zeigt Protokoll, STM32-Version, Rohwerte und Rahmenzähler
 
 ---
 
@@ -199,7 +199,7 @@ War vorher Tasmota oder ESPHome drauf (quelloffene STM32-Firmware v51.x), wird d
 | Messung | ADE7953 an I2C (SDA GPIO12, SCL GPIO14), je Kanal Leistung, Spannung, Strom, cos φ, Frequenz | Summe beider Kanäle |
 | Sonstiges | LED GPIO0 (invertiert), Taster GPIO2, NTC am ADC | wie links |
 
-Die Messwerte rechnet Hermit OS wie Tasmota um; mit „Leistung kalibrieren“ (je Kanal, Referenzlast,
+Die Messwerte rechnet Pagurus OS wie Tasmota um; mit „Leistung kalibrieren“ (je Kanal, Referenzlast,
 Spannung oder Strom) lassen sie sich korrigieren. Abschaltung über 2300 W je Kanal bzw. 95 °C.
 
 Die Original-Firmware im Rollladenbetrieb erkennt der Flasher und spielt dann `hermit-25-cover` auf,
@@ -209,7 +209,7 @@ sonst `hermit-25` (umstellbar mit `--cover` bzw. `--switch` oder in der Auswahl 
 
 - **Bedienung** wie Shelly Plus 2PM: `Cover.Open`, `Cover.Close`, `Cover.Stop`, `Cover.GoToPosition`, `Cover.Calibrate`
 - **Nie beide Relais zugleich**; beim Richtungswechsel hält der Motor 0,5 s an
-- **Endlagen** erkennt Hermit OS am Abschalten des Motors: Die Leistung fällt unter 5 W (einstellbar) für 0,5 s.
+- **Endlagen** erkennt Pagurus OS am Abschalten des Motors: Die Leistung fällt unter 5 W (einstellbar) für 0,5 s.
   Ohne messbaren Motorstrom gilt die Höchstfahrzeit (Standard 60 s) als Endlage
 - **Kalibrierung:** fährt ganz zu, ganz auf, wieder zu und misst die Fahrzeiten. Danach Positionen 0–100 %
   (0 = zu). Die Fahrzeiten lassen sich auch von Hand eintragen
@@ -233,8 +233,8 @@ sonst `hermit-25` (umstellbar mit `--cover` bzw. `--switch` oder in der Auswahl 
 | Taster | GPIO0 (10 s halten = WLAN zurücksetzen) |
 | Gen2-Komponenten | `rf` (Empfang, gespeicherte Codes), `switch:<n>` je gespeicherter Funksteckdose |
 
-Nur die Hardware mit EFM8BB1 (R2 bis v1.0). Die R2 **v2.2** hat keinen EFM8 mehr – dafür ist Hermit OS nicht gedacht.
-Am Funkchip wird nichts geflasht; Hermit OS spricht beide Firmwares.
+Nur die Hardware mit EFM8BB1 (R2 bis v1.0). Die R2 **v2.2** hat keinen EFM8 mehr – dafür ist Pagurus OS nicht gedacht.
+Am Funkchip wird nichts geflasht; Pagurus OS spricht beide Firmwares.
 
 **Empfangsmodus** (Reiter „Funk“):
 
@@ -250,14 +250,14 @@ Am Funkchip wird nichts geflasht; Hermit OS spricht beide Firmwares.
 - **Taste** – ein Code; Ereignis `rf.button` (Klingel, Fernbedienungstaste, Bewegungsmelder)
 - **Kontakt** – Code „offen“ und optional „geschlossen“; Ereignisse `rf.open` / `rf.closed`, Zustand wird gehalten
 - **Schalter** – Code „an“ und „aus“ (Funksteckdose); erscheint als `switch:<n>` wie bei einem Shelly und lässt sich
-  per `Switch.Set`, Zeitplan, Regel und Hermit Cloud schalten. Drückt jemand die Original-Fernbedienung, zieht der
+  per `Switch.Set`, Zeitplan, Regel und Pagurus Cloud schalten. Drückt jemand die Original-Fernbedienung, zieht der
   Zustand mit
 
 Bis zu 40 Einträge, Nummer `id` 0–63. Wiederholungen derselben Taste innerhalb von 0,7 s zählen einmal.
 Unbekannte Codes lösen `rf.unknown` aus. Gesendet wird mit 8 Wiederholungen (einstellbar 1–40).
 
-**Flash:** In 1 MB passt Hermit OS nicht zweimal. Updates laufen deshalb in zwei Schritten über den
-**Hermit Loader 1 MB** (`hermit-loader-1m.bin.gz`): Hermit OS installiert den Loader, startet neu, der Loader lädt
+**Flash:** In 1 MB passt Pagurus OS nicht zweimal. Updates laufen deshalb in zwei Schritten über den
+**Pagurus Loader 1 MB** (`hermit-loader-1m.bin.gz`): Pagurus OS installiert den Loader, startet neu, der Loader lädt
 die neue Firmware (SHA-256-geprüft) und startet sie. Einstellungen und gespeicherte Codes bleiben erhalten.
 Schlägt es fehl, bleibt der Loader mit seiner Seite zum Hochladen (`hermit-rfbridge.bin.gz`) erreichbar.
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 // Script fuer Shelly Gen2/Gen3: empfaengt Ereignisse vom Altgeraet.
 //
 // Im Altgeraet unter "Aktionen" z. B. anlegen:

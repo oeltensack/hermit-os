@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.17.0 / Pagurus Cloud 1.8.0
+- **Neuer Name: Pagurus OS** (vorher Hermit OS – der Name gehört schon dem Rust-Unikernel HermitOS).
+  Pagurus ist der Einsiedlerkrebs. Umbenannt sind Oberfläche, Doku, Flasher (`Pagurus-Flasher`, `pagurus-flash`),
+  Scanner (`Pagurus-Scanner`), Loader-Seite, Cloud und das GitHub-Repo (`oeltensack/pagurus-os`)
+- Unverändert für die Verträglichkeit: Gerätekennungen (`hermit-duo-…`), Varianten (`hermit-1pm`, Dateien in `bin/`),
+  `fw_id` (`hermit-os/…`), MQTT-Topics, Zugangspunkt `hermit-…`. Vorhandene Geräte updaten weiter und bleiben in der Cloud
+- Flasher erkennt den Loader unter altem und neuem Namen
+
 ## 1.16.1
 - Update-Fehler behoben: Ein einmal gefundenes Update wurde nie neu geprüft. Kam danach eine neuere Version,
   passte die SHA-256 nicht mehr zur Datei in `bin/` und das Update wurde jedes Mal verworfen (z. B. Duo blieb

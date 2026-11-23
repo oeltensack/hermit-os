@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """Baut alle Varianten, kopiert sie nach bin/ und schreibt update.json fuer das Auto-Update.
 
 Aufruf im Projektverzeichnis:  python3 tools/make_release.py
@@ -47,7 +47,7 @@ for env, name in VARIANTS.items():
         g.write(data)
     files[name] = {"url": f"bin/{name}.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
 
-# Hermit Loader – fuer den Wechsel von Tasmota; der 1-MB-Loader zusaetzlich als Zwischenstufe beim Update
+# Pagurus Loader – fuer den Wechsel von Tasmota; der 1-MB-Loader zusaetzlich als Zwischenstufe beim Update
 for env, name in (("loader", "hermit-loader"), ("loader_1m", "hermit-loader-1m")):
     shutil.copy(ROOT / ".pio" / "build" / env / "firmware.bin", bindir / f"{name}.bin")
     with gzip.open(bindir / f"{name}.bin.gz", "wb", compresslevel=9) as g:
@@ -87,7 +87,7 @@ dist.mkdir(exist_ok=True)
 for f in dist.glob("*.zip"):
     f.unlink()
 for model, names in MODELS.items():
-    top = f"Hermit-OS-{version}-{model}"
+    top = f"Pagurus-OS-{version}-{model}"
     out = dist / f"{top}.zip"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for n in names:
@@ -95,11 +95,11 @@ for model, names in MODELS.items():
             z.write(bindir / f"{n}.bin.gz", f"{top}/bin/{n}.bin.gz")
         ld = "hermit-loader-1m" if set(names) & ONE_MB else "hermit-loader"
         z.write(bindir / f"{ld}.bin.gz", f"{top}/bin/{ld}.bin.gz")
-        z.write(ROOT / "tools" / "hermit_flash.py", f"{top}/tools/hermit_flash.py")
-        z.write(ROOT / "tools" / "hermit_flash_gui.py", f"{top}/tools/hermit_flash_gui.py")
-        z.write(ROOT / "Hermit-Flasher.pyw", f"{top}/Hermit-Flasher.pyw")
-        z.write(ROOT / "tools" / "hermit_scanner.py", f"{top}/tools/hermit_scanner.py")
-        z.write(ROOT / "Hermit-Scanner.pyw", f"{top}/Hermit-Scanner.pyw")
+        z.write(ROOT / "tools" / "pagurus_flash.py", f"{top}/tools/pagurus_flash.py")
+        z.write(ROOT / "tools" / "pagurus_flash_gui.py", f"{top}/tools/pagurus_flash_gui.py")
+        z.write(ROOT / "Pagurus-Flasher.pyw", f"{top}/Pagurus-Flasher.pyw")
+        z.write(ROOT / "tools" / "pagurus_scanner.py", f"{top}/tools/pagurus_scanner.py")
+        z.write(ROOT / "Pagurus-Scanner.pyw", f"{top}/Pagurus-Scanner.pyw")
         z.write(ROOT / "tools" / "build_exe.bat", f"{top}/tools/build_exe.bat")
         z.write(ROOT / "README.md", f"{top}/README.md")
         z.write(ROOT / "CHANGELOG.md", f"{top}/CHANGELOG.md")

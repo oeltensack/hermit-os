@@ -1,4 +1,4 @@
-# Hermit Cloud – Heim-Cloud fuer Hermit OS und Shelly Gen2+
+# Pagurus Cloud – Heim-Cloud fuer Pagurus OS und Shelly Gen2+
 # Start (im Ordner cloud/):  cp .env.example .env  (Werte anpassen)  &&  docker compose up -d
 services:
   mosquitto:

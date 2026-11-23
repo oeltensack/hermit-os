@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """
-hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 (Gen1) schreiben.
+pagurus_flash.py – Pagurus OS ueber WLAN auf einen Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 (Gen1) schreiben.
 
 Erkennt automatisch, was auf dem Geraet laeuft:
-  * Original-Shelly-Firmware (Mongoose OS)  -> mg2hermit: angepasstes mg2tasmota laedt Hermit OS
-  * Tasmota                                  -> Hermit Loader -> Hermit OS
-  * Hermit Loader                            -> Hermit OS
-  * Hermit OS                                -> Firmware-Update
+  * Original-Shelly-Firmware (Mongoose OS)  -> mg2hermit: angepasstes mg2tasmota laedt Pagurus OS
+  * Tasmota                                  -> Pagurus Loader -> Pagurus OS
+  * Pagurus Loader                            -> Pagurus OS
+  * Pagurus OS                                -> Firmware-Update
 
 Der PC stellt die Dateien ueber einen eigenen kleinen Webserver bereit – es wird kein Internet
 und kein oeffentliches Repo gebraucht (ausser einmalig fuer das mg2tasmota-Paket, siehe --mg2x-zip).
 
 Aufruf:
-  python3 tools/hermit_flash.py 192.168.5.153
-  python3 tools/hermit_flash.py 192.168.5.153 --addon
-  python3 tools/hermit_flash.py 192.168.5.153 --user admin --password geheim
+  python3 tools/pagurus_flash.py 192.168.5.153
+  python3 tools/pagurus_flash.py 192.168.5.153 --addon
+  python3 tools/pagurus_flash.py 192.168.5.153 --user admin --password geheim
 
 Nur Python 3.8+ Standardbibliothek. Der PC muss im selben Netz wie der Shelly sein;
 die Windows-Firewall muss eingehende Verbindungen auf dem Port (Standard 8266) erlauben.
@@ -42,6 +42,11 @@ GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "herm
 ONE_MB = {"hermit-rfbridge"}                 # 1 MB Flash: Firmware als .bin.gz, Umweg ueber hermit-loader-1m
 TASMOTA_MINIMAL = "http://ota.tasmota.com/tasmota/release/tasmota-minimal.bin.gz"
 
+
+
+def is_loader(body):
+    """Loader-Seite – neuer Name oder noch der alte (vor der Umbenennung installiert)."""
+    return b"Pagurus Loader" in body or b"Hermit Loader" in body
 
 def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
@@ -122,7 +127,7 @@ def detect(dev):
         if info.get("type") in GEN1_MODELS and "gen" not in info:
             return "stock", info
     st, body = dev.get("/")
-    if st == 200 and b"Hermit Loader" in body:
+    if st == 200 and is_loader(body):
         return "loader", {}
     status = jget(dev, "/cm?cmnd=Status%200")
     if status and "Status" in status:
@@ -329,7 +334,7 @@ def device_mac(dev, kind, info):
 
 
 def find_by_mac(mac, near_ip):
-    """Sucht im /24-Netz nach Hermit OS mit dieser MAC (falls das Geraet eine neue IP bekommen hat)."""
+    """Sucht im /24-Netz nach Pagurus OS mit dieser MAC (falls das Geraet eine neue IP bekommen hat)."""
     net = ipaddress.ip_network(near_ip + "/24", strict=False)
     log(f"Suche das Gerät per MAC {mac} in {net} …")
 
@@ -351,7 +356,7 @@ def find_by_mac(mac, near_ip):
 
 def wait_hermit(dev, seconds=240, mac=""):
     info = wait_for(lambda: (jget(dev, "/shelly") or {}).get("fw_id", "").startswith("hermit-os") and jget(dev, "/shelly"),
-                    seconds, "Hermit OS")
+                    seconds, "Pagurus OS")
     if info:
         log(f"FERTIG: {info.get('id')} läuft mit {info.get('fw_id')} unter {dev.base}")
         return info
@@ -362,7 +367,7 @@ def wait_hermit(dev, seconds=240, mac=""):
                 log(f"FERTIG: {r[1].get('id')} läuft mit {r[1].get('fw_id')} unter der NEUEN Adresse http://{r[0]}")
                 return r[1]
             time.sleep(20)
-    log("Hermit OS meldet sich nicht im Netz. Vermutlich wurde kein WLAN übernommen –")
+    log("Pagurus OS meldet sich nicht im Netz. Vermutlich wurde kein WLAN übernommen –")
     log("dann im WLAN nach 'hermit-…' suchen und http://192.168.33.1 öffnen.")
     return None
 
@@ -403,9 +408,9 @@ def flash_stock(dev, args, info, variant, fw):
         if not wait_for(zip_loaded, 120, "Download von mg2hermit"):
             die("Gerät hat mg2hermit nicht geladen. Gerät kurz vom Strom trennen und erneut versuchen; "
                 "sonst Firewall/Port prüfen (eingehend TCP " + str(srv.port) + " für Python).")
-        log("mg2hermit installiert, Gerät startet 1–2× neu und lädt dann Hermit OS …")
-        if not wait_for(lambda: srv.served.get("h.bin"), 360, "Download von Hermit OS"):
-            die("Hermit OS wurde nicht geladen. Gerät aus-/einschalten – mg2hermit versucht es erneut, solange dieses Tool läuft.")
+        log("mg2hermit installiert, Gerät startet 1–2× neu und lädt dann Pagurus OS …")
+        if not wait_for(lambda: srv.served.get("h.bin"), 360, "Download von Pagurus OS"):
+            die("Pagurus OS wurde nicht geladen. Gerät aus-/einschalten – mg2hermit versucht es erneut, solange dieses Tool läuft.")
         time.sleep(10)
         wait_hermit(dev, 180, getattr(args, "mac", ""))
     finally:
@@ -436,7 +441,7 @@ def tasmota_upload(dev, name, data):
 
 def flash_tasmota(dev, args, variant, fw):
     name, data = loader_file(variant)
-    log("Tasmota erkannt – spiele Hermit Loader auf …")
+    log("Tasmota erkannt – spiele Pagurus Loader auf …")
     body = tasmota_upload(dev, name, data)
     if variant in ONE_MB and (b"space" in body.lower() or b"failed" in body.lower()):
         # 1 MB: im vollen Tasmota ist zu wenig Platz – erst tasmota-minimal (Tasmota laedt es selbst)
@@ -448,13 +453,13 @@ def flash_tasmota(dev, args, variant, fw):
                         240, "tasmota-minimal"):
             die("tasmota-minimal meldet sich nicht – Gerät prüfen und erneut starten")
         body = tasmota_upload(dev, name, data)
-    if not wait_for(lambda: b"Hermit Loader" in dev.get("/")[1], 180, "Hermit Loader"):
+    if not wait_for(lambda: is_loader(dev.get("/")[1]), 180, "Pagurus Loader"):
         die("Loader meldet sich nicht unter der alten IP – evtl. AP 'hermit-loader-…' (kein WLAN gefunden)")
     flash_loader(dev, args, variant, fw)
 
 
 def flash_loader(dev, args, variant, fw):
-    log("Hermit Loader erkannt – lade Hermit OS hoch …")
+    log("Pagurus Loader erkannt – lade Pagurus OS hoch …")
     try:
         dev.upload("/upload", "f", f"{variant}.bin" + (".gz" if variant in ONE_MB else ""), fw)
     except urllib.error.HTTPError as e:
@@ -468,18 +473,18 @@ def flash_loader(dev, args, variant, fw):
 
 def flash_hermit(dev, args, variant, fw):
     if variant in ONE_MB:
-        # 1 MB: Hermit OS passt nicht zweimal hinein – erst den Loader, dann die Firmware
+        # 1 MB: Pagurus OS passt nicht zweimal hinein – erst den Loader, dann die Firmware
         name, data = loader_file(variant)
-        log("Hermit OS (1 MB) erkannt – spiele zuerst den Hermit Loader auf …")
+        log("Pagurus OS (1 MB) erkannt – spiele zuerst den Pagurus Loader auf …")
         try:
             dev.upload("/update", "firmware", name, data)
         except Exception as e:
             log(f"(Antwort nach Upload: {e})")
-        if not wait_for(lambda: b"Hermit Loader" in dev.get("/")[1], 120, "Hermit Loader"):
+        if not wait_for(lambda: is_loader(dev.get("/")[1]), 120, "Pagurus Loader"):
             die("Loader meldet sich nicht")
         flash_loader(dev, args, variant, fw)
         return
-    log("Hermit OS erkannt – Firmware-Update …")
+    log("Pagurus OS erkannt – Firmware-Update …")
     try:
         dev.upload("/update", "firmware", f"{variant}.bin", fw)
     except urllib.error.HTTPError as e:
@@ -492,7 +497,7 @@ def flash_hermit(dev, args, variant, fw):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 / 2.5 (Gen1) und Sonoff RF Bridge schreiben")
+    ap = argparse.ArgumentParser(description="Pagurus OS auf Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 / 2.5 (Gen1) und Sonoff RF Bridge schreiben")
     ap.add_argument("ip", help="IP-Adresse des Shelly")
     ap.add_argument("--addon", action="store_true", help="Variante mit Add-on-Taster installieren")
     ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S / Plug): nur Energiemessung, Reset nur am Taster/SW")
@@ -511,8 +516,8 @@ def main():
     dev = Dev(args.ip, args.user, args.password)
     kind, info = detect(dev)
     if not kind:
-        die(f"Unter {args.ip} kein unterstützter Shelly (Original, Tasmota, Loader oder Hermit) gefunden")
-    names = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
+        die(f"Unter {args.ip} kein unterstützter Shelly (Original, Tasmota, Loader oder Pagurus) gefunden")
+    names = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Pagurus Loader", "hermit": "Pagurus OS"}
     variant = args.variant or variant_from(dev, kind, info, args.addon, args.meter, args.cover)
     if not variant:
         die("Modell nicht erkannt – bitte --variant angeben")

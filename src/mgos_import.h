@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 #pragma once
-// WLAN-Zugangsdaten aus der Original-Shelly-Firmware (Mongoose OS) lesen, nachdem Hermit OS ueber
-// tools/hermit_flash.py (mg2hermit) aufgespielt wurde. Die Konfiguration (conf9.json) liegt im
+// WLAN-Zugangsdaten aus der Original-Shelly-Firmware (Mongoose OS) lesen, nachdem Pagurus OS ueber
+// tools/pagurus_flash.py (mg2hermit) aufgespielt wurde. Die Konfiguration (conf9.json) liegt im
 // SPIFFS-Dateisystem der Original-Firmware: fs1 ab 0x1BB000 (von mg2x dorthin kopiert) bzw. fs0 ab
-// 0xBB000, je 256 KB. Hermit OS beschreibt fs0 nie; fs1 wird erst beim ersten Formatieren des
+// 0xBB000, je 256 KB. Pagurus OS beschreibt fs0 nie; fs1 wird erst beim ersten Formatieren des
 // eigenen LittleFS ueberschrieben – deshalb vor LittleFS.begin() aufrufen.
 // SPIFFS: Seiten zu 256 Byte, Kopf 5 Byte (obj_id 2, span 2, flags 1), Daten 251 Byte.
 #include <Arduino.h>

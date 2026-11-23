@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 #pragma once
 // WLAN-Zugangsdaten aus den zurueckgelassenen Tasmota-Einstellungen lesen (ESP8266, 2 MB Flash).
 // Tasmota speichert TSettings (4 KB, CRC32 am Ende) im "Core EEPROM"-Sektor (0x1FB, vor OTA immer
-// aktuell) und rotierend in 0xF7..0xFD. Hermit OS und der Loader beschreiben diese Sektoren nicht.
+// aktuell) und rotierend in 0xF7..0xFD. Pagurus OS und der Loader beschreiben diese Sektoren nicht.
 // Text-Pool ab Offset 0x017 (699 Byte), nullterminierte Eintraege:
 //   0 OTAURL, 1-3 MQTTPREFIX, 4 STASSID1, 5 STASSID2, 6 STAPWD1, 7 STAPWD2
 #include <Arduino.h>

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """Kuehlgeraete: Kompressor-Zyklen aus der Leistung erkennen, auswerten und bei Auffaelligkeiten warnen.
 
 Ohne Temperaturfuehler bleibt das Laufverhalten: Ein gesundes Kuehlgeraet laeuft in Zyklen (z. B. 15 min an,

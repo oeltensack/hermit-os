@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """Original-Shelly Gen2/Gen3/Gen4 neben der Shelly Cloud anbinden.
 
-Gen2+ kann Shelly Cloud und MQTT gleichzeitig. Die Hermit Cloud traegt sich per lokaler RPC
+Gen2+ kann Shelly Cloud und MQTT gleichzeitig. Die Pagurus Cloud traegt sich per lokaler RPC
 (HTTP, bei Passwort Digest SHA-256) als MQTT-Server ein. App, Szenen und Cloud von Shelly laufen weiter.
 
 Dazu Gen1-Batteriefuehler mit Original-Firmware (Door/Window 1/2, H&T): MQTT wird ueber /settings
@@ -143,7 +143,7 @@ def _broker(broker):
 
 
 def connect_gen1(ip, password="", broker="", force=False):
-    """Gen1-Batteriefuehler: MQTT auf die Hermit Cloud stellen (Shelly Cloud geht dabei aus)."""
+    """Gen1-Batteriefuehler: MQTT auf die Pagurus Cloud stellen (Shelly Cloud geht dabei aus)."""
     st = gen1_get(ip, "/settings", password)
     dev = st.get("device") or {}
     if dev.get("type") not in GEN1_SENSORS:
@@ -170,7 +170,7 @@ def connect_gen1(ip, password="", broker="", force=False):
 
 
 def connect(ip, password="", broker="", force=False):
-    """MQTT am Geraet auf die Hermit Cloud stellen und neu starten. Liefert Info-Dict."""
+    """MQTT am Geraet auf die Pagurus Cloud stellen und neu starten. Liefert Info-Dict."""
     try:
         with urllib.request.urlopen(f"http://{ip}/shelly", timeout=4) as r:
             sh = json.loads(r.read())

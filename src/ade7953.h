@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 #pragma once
 // ADE7953 (Shelly 2.5) ueber I2C, Adresse 0x38. Umrechnung und Startwerte wie Tasmota (xnrg_07_ade7953):
 //   Leistung  W = AENERGY (Lesen setzt zurueck) / 6,577 / Sekunden   (1540 / 10 / 23,41494)

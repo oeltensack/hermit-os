@@ -1,11 +1,11 @@
-# Hermit OS 🐚
+# Pagurus OS 🐚
 
 *Wie ein Einsiedlerkrebs, der in ein altes Schneckenhaus zieht: neues Leben für alte Shelly-Gehäuse.*
 
-Hermit OS ist eine freie Firmware für **Shelly-Geräte der ersten Generation** (ESP8266, 2 MB Flash). Sie gibt
+Pagurus OS ist eine freie Firmware für **Shelly-Geräte der ersten Generation** (ESP8266, 2 MB Flash). Sie gibt
 den alten Geräten die **RPC-API von Shelly Gen2/Gen3**: Scripte auf Plus-, Pro- und Gen3-Geräten sprechen ein
 altes Shelly 1 genauso an wie ein neues – und die alten Geräte melden Ereignisse per Webhook zurück.
-Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Hermit Cloud](cloud/)** für zu Hause.
+Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Pagurus Cloud](cloud/)** für zu Hause.
 
 | Gerät | Firmware | Verhält sich wie | Besonderheiten |
 |---|---|---|---|
@@ -19,7 +19,7 @@ Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Hermit Clou
 | **Shelly Dimmer 2** (`SHDM-2`) | `hermit-dimmer2` | Shelly Dimmer Gen3 (`light:0`) | Dimmen per Taster (1 oder 2), Leistung, Energie, Temperatur, Licht bleibt beim Update an |
 | **Sonoff RF Bridge 433** (R2 mit EFM8, 1 MB) | `hermit-rfbridge` | eigene Komponente `rf`, Funksteckdosen als `switch:<n>` | Codes empfangen, speichern (Taste, Kontakt, Schalter), senden; Aktionen je Code; Standard- und Portisch-Firmware |
 
-> Shelly ist eine Marke der Shelly Group. Hermit OS ist ein unabhängiges Projekt ohne Verbindung zum
+> Shelly ist eine Marke der Shelly Group. Pagurus OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.
 
 Varianten: `-addon` (Shelly-Temperatur-Add-on als externer Taster) und `-meter` (**Messfirmware**: nur
@@ -35,31 +35,31 @@ Energiemessung, Relais bleibt an, Reset nach Überlast nur am Gerät).
 - **Aktionen (Webhooks)** bei Schalten, Tastendruck, Leistungsschwellen, Überlast, Übertemperatur und Start –
   mit Platzhaltern wie `${apower}` in der URL
 - **Weboberfläche auf Deutsch:** Status, Schalter/Licht, Aktionen, WLAN, System, RPC-Konsole
-- **MQTT im Gen2-Format** (optional) – für die **[Hermit Cloud](cloud/)**, Home Assistant oder Node-RED
+- **MQTT im Gen2-Format** (optional) – für die **[Pagurus Cloud](cloud/)**, Home Assistant oder Node-RED
 - **Auto-Update** aus diesem Repo (`update.json`), SHA-256-geprüft, Relais bleibt beim Neustart im Zustand
-- **WLAN und feste IP werden übernommen** – aus der Original-Firmware, aus Tasmota oder vom Hermit Loader
+- **WLAN und feste IP werden übernommen** – aus der Original-Firmware, aus Tasmota oder vom Pagurus Loader
 - **Gen1-kompatibel:** `/relay/0`, `/light/0`, `/status`, `/meter/0`, `/shelly`
 - **Zugangspunkt** `hermit-…` auf **192.168.33.1** mit Captive-Portal, falls kein WLAN erreichbar ist
 - **mDNS** `hermit-<modell>-<mac>.local`, Dienst `_shelly._tcp`
 - **Passwortschutz** optional (Benutzer `admin`, Digest oder Basic)
 - **Kalibrierung pro Gerät**, bleibt auch bei Werkseinstellungen erhalten
-- **MQTT im Gen2-Format** (optional) – für die Hermit Cloud, Home Assistant oder Node-RED
+- **MQTT im Gen2-Format** (optional) – für die Pagurus Cloud, Home Assistant oder Node-RED
 
 ## Download
 
-- **Fertige Pakete** je Modell (Firmware, Flasher, Anleitung): **[Releases](https://github.com/oeltensack/hermit-os/releases)**
+- **Fertige Pakete** je Modell (Firmware, Flasher, Anleitung): **[Releases](https://github.com/oeltensack/pagurus-os/releases)**
 - **Einzelne Firmware-Dateien:** Ordner **[bin/](bin/)** – immer die aktuelle Version
-- **Hermit Cloud:** Ordner **[cloud/](cloud/)**
+- **Pagurus Cloud:** Ordner **[cloud/](cloud/)**
 
 ## Schnellstart
 
-1. Paket für dein Modell nehmen: `Hermit-OS-<version>-Shelly-<Modell>.zip`
-2. Entpacken, Doppelklick auf **`Hermit-Flasher.pyw`** (Python 3 für Windows nötig – oder einmal
-   `tools\build_exe.bat` ausführen und danach `Hermit-Flasher.exe` nutzen)
-3. **Netz durchsuchen** → Gerät wählen → **Hermit OS installieren**
+1. Paket für dein Modell nehmen: `Pagurus-OS-<version>-Shelly-<Modell>.zip`
+2. Entpacken, Doppelklick auf **`Pagurus-Flasher.pyw`** (Python 3 für Windows nötig – oder einmal
+   `tools\build_exe.bat` ausführen und danach `Pagurus-Flasher.exe` nutzen)
+3. **Netz durchsuchen** → Gerät wählen → **Pagurus OS installieren**
 
-Der Flasher erkennt selbst, ob auf dem Gerät die Original-Firmware, Tasmota, der Hermit Loader oder schon
-Hermit OS läuft, und wählt den passenden Weg. Alles Weitere: **[docs/FLASHEN.md](docs/FLASHEN.md)**
+Der Flasher erkennt selbst, ob auf dem Gerät die Original-Firmware, Tasmota, der Pagurus Loader oder schon
+Pagurus OS läuft, und wählt den passenden Weg. Alles Weitere: **[docs/FLASHEN.md](docs/FLASHEN.md)**
 
 Danach ist das Gerät unter `http://<ip>/` erreichbar (deutsche Oberfläche) und aktualisiert sich auf Wunsch
 selbst aus diesem Repo.
@@ -83,7 +83,7 @@ Shelly.call("HTTP.GET", { url: "http://192.168.0.70/rpc/CCT.Set?id=0&on=true&bri
 `http://<gen2-ip>/rpc/Switch.Set?id=0&on=true`, oder an einen Script-Endpunkt
 `http://<gen2-ip>/script/1/alt?ev=${event}&p=${apower}`. Fertige Scripte: **[examples/](examples/)**
 
-## Hermit Cloud (optional)
+## Pagurus Cloud (optional)
 
 Eine kleine Heim-Cloud als Docker-Paket (Mosquitto + Weboberfläche), z. B. auf Proxmox, einem Raspberry Pi
 oder NAS: Geräte nach Räumen, **Wäsche** (Waschmaschine/Trockner mit Fertig-Meldung und Restzeit), **Kühlgeräte**
@@ -93,7 +93,7 @@ Firmware-Updates für alle Geräte, Sicherung der Geräte-Einstellungen, Benutze
 auf dem Handy. Die Geräte verbinden sich per **MQTT im
 Gen2-Format** – damit klappen auch Home Assistant und Node-RED. Shelly Plus/Pro werden ebenfalls angezeigt.
 
-![Hermit Cloud](docs/img/cloud.png)
+![Pagurus Cloud](docs/img/cloud.png)
 
 Einrichtung: **[cloud/README.md](cloud/README.md)**
 
@@ -101,11 +101,11 @@ Einrichtung: **[cloud/README.md](cloud/README.md)**
 
 | Dokument | Inhalt |
 |---|---|
-| **[docs/FLASHEN.md](docs/FLASHEN.md)** | Flasher (grafisch, Konsole, EXE), Wege von Original-Firmware und Tasmota, Hermit Loader, serielles Flashen, Updates, Fehlersuche |
+| **[docs/FLASHEN.md](docs/FLASHEN.md)** | Flasher (grafisch, Konsole, EXE), Wege von Original-Firmware und Tasmota, Pagurus Loader, serielles Flashen, Updates, Fehlersuche |
 | **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo, Dimmer 2, Shelly 2.5, RF Bridge |
 | **[docs/API.md](docs/API.md)** | Alle RPC-Methoden, Statusfelder, Aktionen und Platzhalter, Gen1-Endpunkte, Diagnose, Unterschiede zu Gen2 |
-| **[docs/SCANNER.md](docs/SCANNER.md)** | Hermit Scanner: findet Shelly Gen1/Gen2+, Tasmota und Hermit OS im Netz (Windows) |
-| **[cloud/](cloud/README.md)** | Hermit Cloud: Heim-Cloud mit Übersicht, Schalten, Energieverlauf und Meldungen (Docker) |
+| **[docs/SCANNER.md](docs/SCANNER.md)** | Pagurus Scanner: findet Shelly Gen1/Gen2+, Tasmota und Pagurus OS im Netz (Windows) |
+| **[cloud/](cloud/README.md)** | Pagurus Cloud: Heim-Cloud mit Übersicht, Schalten, Energieverlauf und Meldungen (Docker) |
 | **[CHANGELOG.md](CHANGELOG.md)** | Versionsverlauf |
 | **[examples/](examples/)** | Gen2-Scripte, u. a. Heizlüfter-Stufe 2 am 1PM mit Watchdog |
 
@@ -113,14 +113,14 @@ Einrichtung: **[cloud/README.md](cloud/README.md)**
 
 ```
 src/                 Firmware: main.cpp, webui.h, device.h, tasmota_import.h, mgos_import.h, loader.cpp
-bin/                 fertige Firmware (.bin, .bin.gz) und Hermit Loader
-tools/               hermit_flash.py (Konsole), hermit_flash_gui.py (Oberfläche), build_exe.bat, make_release.py
+bin/                 fertige Firmware (.bin, .bin.gz) und Pagurus Loader
+tools/               pagurus_flash.py (Konsole), pagurus_flash_gui.py (Oberfläche), build_exe.bat, make_release.py
 examples/            Gen2/Gen3-Scripte
-cloud/               Hermit Cloud (Docker: Mosquitto + Weboberfläche)
+cloud/               Pagurus Cloud (Docker: Mosquitto + Weboberfläche)
 docs/                Dokumentation
 update.json          Versionsliste für das Auto-Update
-Hermit-Flasher.pyw   Startdatei für den grafischen Flasher
-Hermit-Scanner.pyw   Startdatei für den Netz-Scanner
+Pagurus-Flasher.pyw   Startdatei für den grafischen Flasher
+Pagurus-Scanner.pyw   Startdatei für den Netz-Scanner
 ```
 
 ## Selbst bauen
@@ -149,35 +149,35 @@ committen und pushen. Die Geräte finden die neue Version über `update.json`.
 
 Copyright (C) 2026 D.Koch
 
-Hermit OS ist freie Software: Du kannst es unter den Bedingungen der **GNU General Public License**, wie von
+Pagurus OS ist freie Software: Du kannst es unter den Bedingungen der **GNU General Public License**, wie von
 der Free Software Foundation veröffentlicht, weitergeben und/oder verändern – entweder gemäß **Version 3**
 der Lizenz oder (nach deiner Wahl) jeder späteren Version (`GPL-3.0-or-later`).
 
-Hermit OS wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede Gewährleistung** – sogar
+Pagurus OS wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede Gewährleistung** – sogar
 ohne die implizite Gewährleistung der Marktfähigkeit oder der Eignung für einen bestimmten Zweck.
 Den vollständigen Lizenztext enthält [LICENSE](LICENSE).
 
 Verwendete Bibliotheken: ESP8266-Arduino-Core (LGPL-2.1), ArduinoJson (MIT), PubSubClient (MIT).
-Hermit Cloud: FastAPI (MIT), Uvicorn (BSD), paho-mqtt (EPL-2.0/EDL-1.0), Eclipse Mosquitto (EPL-2.0/EDL-1.0).
+Pagurus Cloud: FastAPI (MIT), Uvicorn (BSD), paho-mqtt (EPL-2.0/EDL-1.0), Eclipse Mosquitto (EPL-2.0/EDL-1.0).
 
 ## Mitmachen
 
 Fehler, Wünsche und Erfahrungen mit weiteren Gen1-Modellen gern als
-**[Issue](https://github.com/oeltensack/hermit-os/issues)**. Hilfreich ist dabei die Ausgabe von
+**[Issue](https://github.com/oeltensack/pagurus-os/issues)**. Hilfreich ist dabei die Ausgabe von
 `http://<ip>/rpc/Shelly.GetDeviceInfo` und `http://<ip>/rpc/Shelly.GetStatus`.
 Pull Requests sind willkommen – bitte mit `pio run` bauen und am Gerät testen.
 
 ## English summary
 
-Hermit OS is a free replacement firmware for first-generation **Shelly devices** (Shelly 1, 1PM, Plug,
+Pagurus OS is a free replacement firmware for first-generation **Shelly devices** (Shelly 1, 1PM, Plug,
 Plug S, Duo – ESP8266, 2 MB). It exposes the **Shelly Gen2/Gen3 RPC API** (`/rpc/Switch.Set`, `Switch.GetStatus`,
 webhooks, Gen2-style MQTT), so Gen2/Gen3 scripts can control old devices like new ones. It can be flashed
 over the air from the stock firmware or Tasmota with the included flasher, updates itself from this
-repository, and comes with an optional self-hosted **Hermit Cloud** (Docker). UI and docs are in German.
+repository, and comes with an optional self-hosted **Pagurus Cloud** (Docker). UI and docs are in German.
 
 ## Danke
 
 - **Tasmota** – Pinbelegungen, BL0937-Formeln und das Einstellungsformat, auf dem der WLAN-Import beruht
 - **mgos-to-tasmota** (Mark Dornbach, GPL-3.0) – der Flasher lädt es und ändert nur die Download-Adresse
-  („mg2hermit“), um von der Original-Firmware direkt zu Hermit OS zu wechseln
+  („mg2hermit“), um von der Original-Firmware direkt zu Pagurus OS zu wechseln
 - **ESPHome**-Gerätedatenbank – Pinbelegung der Duo

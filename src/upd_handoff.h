@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 #pragma once
-// Uebergabe Hermit OS -> Hermit Loader im RTC-Speicher (ueberlebt den Neustart, nicht den Stromausfall).
-// Fuer Geraete mit 1 MB Flash: Hermit OS passt dort nicht zweimal hinein. Hermit installiert deshalb erst
+// Uebergabe Pagurus OS -> Pagurus Loader im RTC-Speicher (ueberlebt den Neustart, nicht den Stromausfall).
+// Fuer Geraete mit 1 MB Flash: Pagurus OS passt dort nicht zweimal hinein. Pagurus installiert deshalb erst
 // den kleinen Loader und hinterlegt hier, welche Datei der Loader danach laden soll.
 // RTC-Bloecke 0..31 belegt eboot (OTA-Befehl), 96..97 der Absturzzaehler.
 #include <Arduino.h>

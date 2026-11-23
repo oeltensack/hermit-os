@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
-"""Hermit Cloud – kleine Heim-Cloud fuer Hermit-OS- und Shelly-Gen2+-Geraete.
+# Copyright (C) 2026 D.Koch – Pagurus OS
+"""Pagurus Cloud – kleine Heim-Cloud fuer Pagurus-OS- und Shelly-Gen2+-Geraete.
 
 Die Geraete verbinden sich per MQTT (Gen2-Format) mit dem Broker. Diese App liest mit, speichert Status,
 Leistung und Energie in SQLite und bietet die Weboberflaeche: Geraete und Raeume, Waesche & Co. mit
@@ -35,11 +35,11 @@ from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, pr
 
 VERSION = json.loads((Path(__file__).parent / "version.json").read_text())["version"]
 UPDATE_URL = os.environ.get("UPDATE_URL",
-                            "https://raw.githubusercontent.com/oeltensack/hermit-os/main/cloud/app/version.json")
+                            "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/cloud/app/version.json")
 PASSWORD = os.environ.get("CLOUD_PASSWORD", "")
 STATIC = Path(__file__).parent / "static"
 
-app = FastAPI(title="Hermit Cloud", version=VERSION)
+app = FastAPI(title="Pagurus Cloud", version=VERSION)
 
 
 # ======================= Benutzer =======================

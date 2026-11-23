@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """Gemeinsame Grundlagen: Konfiguration, Datenbank, Einstellungen, Meldungen, Push."""
 import json
 import os
@@ -159,7 +159,7 @@ _pushq = queue.Queue()
 def alert(dev, kind, text, push=True, title=None, prio=None):
     q("INSERT INTO alerts(ts, dev, kind, text) VALUES(?,?,?,?)", (time.time(), dev, kind, text))
     if push and kind in (setting("push_kinds", DEFAULT_PUSH) or []):
-        notify(title or PUSH_KINDS.get(kind, "Hermit Cloud"), text, prio or
+        notify(title or PUSH_KINDS.get(kind, "Pagurus Cloud"), text, prio or
                (5 if kind in ("overpower", "overtemp", "fridge") else 4 if kind in ("finished", "offline") else 3))
 
 
@@ -200,7 +200,7 @@ def push_test():
     cfg = push_cfg()
     if not cfg.get("ntfy_url") and not (cfg.get("tg_token") and cfg.get("tg_chat")):
         return ["Kein Push-Dienst eingetragen"]
-    return _send(cfg, "Hermit Cloud", "Testnachricht – Push funktioniert.", 3)
+    return _send(cfg, "Pagurus Cloud", "Testnachricht – Push funktioniert.", 3)
 
 
 def _push_worker():

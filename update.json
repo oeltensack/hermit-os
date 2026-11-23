@@ -1,77 +1,77 @@
 {
-  "version": "1.16.1",
+  "version": "1.17.0",
   "files": {
     "hermit-1": {
       "url": "bin/hermit-1.bin",
-      "sha256": "a5c175361b3a3e5786018177436257a3cb27e73aa6746ac0d04e5a7fe0d9eadc",
+      "sha256": "7f394755df54c9e46488d19c853299fb6af92b8e195f23e24f1759c8b9ecc39b",
       "size": 617152
     },
     "hermit-1pm": {
       "url": "bin/hermit-1pm.bin",
-      "sha256": "652d8feb190b4941b606b382d785c0e99413544956cc2d6feba1af747087a048",
+      "sha256": "f9411974a5b29c711fdfa32e78db46a09cb58b6d8c132b872300104e0fff70ef",
       "size": 622752
     },
     "hermit-1-addon": {
       "url": "bin/hermit-1-addon.bin",
-      "sha256": "37bcaebe571ca4a143cb09c995f5719e0a7078c96240f227b4d3eac3baed0067",
+      "sha256": "f598ed9b65b13af0da83f64d498e872730834b0ab2865efdb9983da72a11e26f",
       "size": 618592
     },
     "hermit-1pm-addon": {
       "url": "bin/hermit-1pm-addon.bin",
-      "sha256": "cc340d96c9151af9b74284827205c4d5423aa36b6603b6515ebca47cd37a6e85",
-      "size": 624080
+      "sha256": "741553fc57f465e8e5413f8a084762bc5815e5258d442672341019fbd7aa2522",
+      "size": 624096
     },
     "hermit-plugs": {
       "url": "bin/hermit-plugs.bin",
-      "sha256": "f59f603ef51d9f82224b862a64c15bbc72a9a96b77ba1ca7201710b3f4cc249d",
-      "size": 624352
+      "sha256": "4e1c60d2fd54fde0855e594345916ac9b8d214f43c6dcd45bfe94cd47e21997e",
+      "size": 624368
     },
     "hermit-plug": {
       "url": "bin/hermit-plug.bin",
-      "sha256": "40f764f1c3d0fdafce2aca4d7eb3d5d72c59c4e4bb8915b20a6c0bb6e115fd39",
+      "sha256": "cb4d0a79a19ecfd0a41d417f8798fdc4f95bfe650ccd15be00fbcf4772a71e3d",
       "size": 620720
     },
     "hermit-duo": {
       "url": "bin/hermit-duo.bin",
-      "sha256": "9edd1a3d0405fa0d3ccc2b2e1b044b9c639f91ab1ce5c8eccec2f5151f2e3cd4",
+      "sha256": "0b33fc4b4f6aac3632056195d0655b18e7cff6bb6d4adcc2283f7d2751d0788c",
       "size": 622272
     },
     "hermit-dimmer2": {
       "url": "bin/hermit-dimmer2.bin",
-      "sha256": "06370ba6620ff2019e96acae047c1004b21fffc04b7a04f10b2db31183a36af7",
-      "size": 633888
+      "sha256": "f00ea03761fd606b5c3c2ac8096a0016f0ed6369dee63fa5c32f98ae67b38c3b",
+      "size": 633904
     },
     "hermit-25": {
       "url": "bin/hermit-25.bin",
-      "sha256": "ef497d1a4689137db609f7038c9ee8aae91783e2d6b2301c71202135e948ceeb",
+      "sha256": "1f2c6f93bfec5d7fe50de358d9b8b45019de1b68be36d3c323eb2c9a4fbd61f0",
       "size": 631584
     },
     "hermit-25-cover": {
       "url": "bin/hermit-25-cover.bin",
-      "sha256": "51678a1ceabc8819bdacf23a622500c4bc370360565a25d86ba370cbb8d5e98d",
+      "sha256": "f73bda37dc24b163887240f852fcbe4457f6343932c2b8921d987149aa0f7a2b",
       "size": 642784
     },
     "hermit-1pm-meter": {
       "url": "bin/hermit-1pm-meter.bin",
-      "sha256": "bbd67a365f24b94b41cf1d2609b00006499d20478f460b5eef5d8eeec8ebc939",
-      "size": 623040
+      "sha256": "6560ae8ec131f4341dfae85163ee9d45f83bbf586343abce8c0729342bb89fda",
+      "size": 623056
     },
     "hermit-plugs-meter": {
       "url": "bin/hermit-plugs-meter.bin",
-      "sha256": "4e33ba2c0db39dcdff0a51edbaa805f7f7b1a738e530f5eb21e1711905abc316",
+      "sha256": "031361548695778559fa214ea11983cb38c3e2cfe940bab69f1aa86338ab4d37",
       "size": 624736
     },
     "hermit-plug-meter": {
       "url": "bin/hermit-plug-meter.bin",
-      "sha256": "72da7fb08b17d73e7c884e96be1a852d4fba09107a957822c98ff73bcd78df64",
-      "size": 620992
+      "sha256": "d59830a81f398d7bcd34fea743532a2fa5f719698e5baeae21d5ddb0a3828461",
+      "size": 621008
     },
     "hermit-rfbridge": {
       "url": "bin/hermit-rfbridge.bin.gz",
-      "sha256": "81d378c17705f8c82a1d49f7174d8caa6305d70e790d9b1af81e69f4550d6665",
-      "size": 426093,
+      "sha256": "7d8e11a931ded6b4379661d3b593e5f4f9858e33fbcbf782fdfe14972682d857",
+      "size": 426105,
       "loader": "bin/hermit-loader-1m.bin.gz",
-      "loader_sha256": "1624fd929a2bcfda2e909e1a77e5c86592296edfebf3dba7e3649b5dc8813da2"
+      "loader_sha256": "6e5b073e64eec2762b976cdba82a4ed26675efcaf4f9320226ca26e74aed1f93"
     }
   }
 }

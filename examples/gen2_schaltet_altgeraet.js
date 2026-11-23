@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 // Script fuer Shelly Gen2/Gen3:
-// Das eigene Relais (switch:0) wird auf ein altes Shelly 1/1PM mit Hermit OS gespiegelt.
+// Das eigene Relais (switch:0) wird auf ein altes Shelly 1/1PM mit Pagurus OS gespiegelt.
 // Anpassen: IP des Altgeraets.
 
 let ALT = "http://192.168.0.50";

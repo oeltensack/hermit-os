@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """Automatik: Fertig-Erkennung (Waesche & Co.), Zeitplaene, Regeln, Konfig-Sicherung, Firmware."""
 import json
 import math
@@ -451,7 +451,7 @@ def _auto_backups():
 
 
 # ======================= Firmware =======================
-HERMIT_UPDATE_URL = "https://raw.githubusercontent.com/oeltensack/hermit-os/main/update.json"
+HERMIT_UPDATE_URL = "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/update.json"
 FW = {"hermit": None, "checked": 0, "gen2": {}}
 
 

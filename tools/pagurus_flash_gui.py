@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """
-Hermit OS Flasher – grafische Oberflaeche fuer hermit_flash.py
+Pagurus OS Flasher – grafische Oberflaeche fuer pagurus_flash.py
 
-Start (Windows): Doppelklick auf hermit_flash_gui.py  bzw.  pythonw tools\\hermit_flash_gui.py
+Start (Windows): Doppelklick auf pagurus_flash_gui.py  bzw.  pythonw tools\\pagurus_flash_gui.py
 Nur Python-Standardbibliothek (tkinter).
 """
 import argparse, concurrent.futures, ipaddress, json, pathlib, queue, sys, threading, time, urllib.request
@@ -12,11 +12,11 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import hermit_flash as hf  # noqa: E402
+import pagurus_flash as hf  # noqa: E402
 
 VARIANTS = ["automatisch", "hermit-1", "hermit-1-addon", "hermit-1pm", "hermit-1pm-addon", "hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2", "hermit-25", "hermit-25-cover", "hermit-rfbridge",
             "hermit-1pm-meter", "hermit-plugs-meter", "hermit-plug-meter"]
-KIND_NAMES = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
+KIND_NAMES = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Pagurus Loader", "hermit": "Pagurus OS"}
 
 
 class App:
@@ -24,7 +24,7 @@ class App:
         self.root = root
         self.q = queue.Queue()
         self.busy = False
-        root.title("Hermit OS Flasher")
+        root.title("Pagurus OS Flasher")
         root.minsize(720, 560)
         try:
             root.tk.call("tk", "scaling", 1.3)
@@ -38,8 +38,8 @@ class App:
 
         main = ttk.Frame(root, padding=12)
         main.pack(fill="both", expand=True)
-        ttk.Label(main, text="\U0001F41A  Hermit OS Flasher", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(main, text="Shelly 1 · 1PM · 2.5 · Plug · Plug S · Duo · Dimmer 2 (Gen1) – von Original-Firmware, Tasmota oder Hermit",
+        ttk.Label(main, text="\U0001F41A  Pagurus OS Flasher", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(main, text="Shelly 1 · 1PM · 2.5 · Plug · Plug S · Duo · Dimmer 2 (Gen1) – von Original-Firmware, Tasmota oder Pagurus",
                   foreground="#666").pack(anchor="w", pady=(0, 10))
 
         # --- Geraet
@@ -82,7 +82,7 @@ class App:
         # --- Start
         bar = ttk.Frame(main)
         bar.pack(fill="x")
-        self.startbtn = ttk.Button(bar, text="Hermit OS installieren", style="Big.TButton", command=self.start)
+        self.startbtn = ttk.Button(bar, text="Pagurus OS installieren", style="Big.TButton", command=self.start)
         self.startbtn.pack(side="left")
         self.prog = ttk.Progressbar(bar, mode="indeterminate", length=220)
         self.prog.pack(side="left", padx=12)
@@ -101,7 +101,7 @@ class App:
         self.log.tag_configure("err", foreground="#ff6b6b")
         self.log.tag_configure("ok", foreground="#3fb950")
 
-        # Ausgaben von hermit_flash ins Fenster umleiten
+        # Ausgaben von pagurus_flash ins Fenster umleiten
         hf.log = lambda msg: self.q.put(("log", time.strftime("%H:%M:%S") + " " + msg))
         root.after(100, self.pump)
 
@@ -129,7 +129,7 @@ class App:
                     self.set_busy(False, val)
                 elif kind == "ask":
                     msg, ev, box = val
-                    box.append(messagebox.askyesno("Hermit OS Flasher", msg))
+                    box.append(messagebox.askyesno("Pagurus OS Flasher", msg))
                     ev.set()
         except queue.Empty:
             pass
@@ -197,7 +197,7 @@ class App:
                     with urllib.request.urlopen(f"http://{ip}/shelly", timeout=1.2) as r:
                         j = json.loads(r.read())
                     if str(j.get("fw_id", "")).startswith("hermit-os"):
-                        return f"{ip}   Hermit OS · {j.get('model')} · {j.get('name') or j.get('id')}"
+                        return f"{ip}   Pagurus OS · {j.get('model')} · {j.get('name') or j.get('id')}"
                     if j.get("type") in hf.GEN1_MODELS:
                         return f"{ip}   Original · {hf.GEN1_MODELS[j['type']][0]}"
                     if j.get("type") or j.get("gen"):
@@ -214,8 +214,8 @@ class App:
                     pass
                 try:
                     with urllib.request.urlopen(f"http://{ip}/", timeout=1.2) as r:
-                        if b"Hermit Loader" in r.read(4000):
-                            return f"{ip}   Hermit Loader"
+                        if hf.is_loader(r.read(4000)):
+                            return f"{ip}   Pagurus Loader"
                 except Exception:
                     pass
                 return None

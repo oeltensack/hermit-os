@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
+# Copyright (C) 2026 D.Koch – Pagurus OS
 """Verbrauch je Zeitraum (Tag/Woche/Monat/Jahr) mit Vergleich zum Zeitraum davor."""
 import calendar
 from datetime import date, datetime, timedelta

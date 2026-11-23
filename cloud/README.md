@@ -1,6 +1,6 @@
-# Hermit Cloud
+# Pagurus Cloud
 
-Kleine Heim-Cloud für Hermit-OS-Geräte (und Shelly Plus/Pro Gen2/Gen3). Läuft zu Hause als
+Kleine Heim-Cloud für Pagurus-OS-Geräte (und Shelly Plus/Pro Gen2/Gen3). Läuft zu Hause als
 Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die Cloud liest nur mit.
 
 **Funktionen**
@@ -31,7 +31,7 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
 ![Wäsche](../docs/img/cloud-waesche.png)
 
 ```
-Hermit-Geräte ──MQTT (Gen2-Format)──►  Mosquitto :1883  ◄──►  Hermit Cloud :8080  ──► Browser
+Pagurus-Geräte ──MQTT (Gen2-Format)──►  Mosquitto :1883  ◄──►  Pagurus Cloud :8080  ──► Browser
 ```
 
 ## Installation auf Proxmox
@@ -43,8 +43,8 @@ Am einfachsten ein Debian-12-LXC-Container (1 CPU, 512 MB RAM, 4 GB Disk). Für 
 # im Container
 apt update && apt install -y curl git
 curl -fsSL https://get.docker.com | sh        # Docker inkl. „docker compose“
-git clone https://github.com/oeltensack/hermit-os.git
-cd hermit-os/cloud
+git clone https://github.com/oeltensack/pagurus-os.git
+cd pagurus-os/cloud
 cp .env.example .env
 nano .env          # MQTT_USER, MQTT_PASS, CLOUD_PASSWORD, PUBLIC_BROKER (IP des Containers)
 docker compose up -d
@@ -56,7 +56,7 @@ Alternativ geht jeder Rechner mit Docker (VM, Raspberry Pi, NAS).
 
 ## Geräte verbinden
 
-**Hermit OS** (ab 1.12.0): Geräteoberfläche → *System* → *Cloud / MQTT*
+**Pagurus OS** (ab 1.12.0): Geräteoberfläche → *System* → *Cloud / MQTT*
 - Haken „MQTT einschalten“
 - Server: `<IP-des-Containers>:1883`
 - Benutzer/Passwort: `MQTT_USER` / `MQTT_PASS` aus der `.env`
@@ -85,7 +85,7 @@ Damit die Werte regelmäßig kommen, am Door/Window 2 unter *Settings* eine **Au
 (z. B. 30–60 min) – sonst meldet er nur bei Öffnen/Schließen. Die Beschattung nimmt Fühlerwerte bis 6 h
 Alter; längere Abstände gelten als „Fühler-Wert zu alt“. Jede Meldung kostet Batterie.
 
-Mehrkanal-Geräte (Plus 2PM, Pro 4PM, Pro Dual Cover, Shelly 2.5 mit Hermit OS) erscheinen je Kanal als
+Mehrkanal-Geräte (Plus 2PM, Pro 4PM, Pro Dual Cover, Shelly 2.5 mit Pagurus OS) erscheinen je Kanal als
 eigenes Gerät. Temperatur-, Feuchte- und Helligkeitsfühler stehen unter *Beschattung → Fühler*.
 
 Die Geräte erscheinen automatisch, sobald sie verbunden sind.
@@ -131,12 +131,12 @@ etwa eine Minute weg und lädt danach von selbst neu. Das Protokoll steht unter 
 - `docker compose` immer **im Ordner `cloud/`** starten – der Updater merkt sich diesen Pfad.
 - Der Updater braucht Zugriff auf `/var/run/docker.sock` und den Repo-Ordner. Wer das nicht will, nimmt den
   Dienst `updater` aus der `docker-compose.yml` und aktualisiert von Hand:
-  `cd hermit-os && git pull && cd cloud && docker compose up -d --build`
+  `cd pagurus-os && git pull && cd cloud && docker compose up -d --build`
 - Wer die Cloud aus dem ZIP installiert hat: in einem eigenen Ordner entpacken (z. B. `/opt/hermit/cloud`).
 
 **Von einer Version vor 1.2.3** einmal von Hand (danach geht es automatisch):
 ```bash
-cd hermit-os && git pull && cd cloud && docker compose up -d --build
+cd pagurus-os && git pull && cd cloud && docker compose up -d --build
 ```
 
 Die Daten liegen in `cloud/data/cloud.db` (SQLite) und bleiben beim Update erhalten.
@@ -156,7 +156,7 @@ Weitere Werte im Container: `KEEP_POWER_DAYS` (Leistungsverlauf, Standard 31 Tag
 `OFFLINE_AFTER` (s ohne Lebenszeichen bis „offline“, Standard 180), `OFFLINE_ALERT_AFTER` (s offline bis zur
 Meldung, Standard 120).
 
-Ein abgezogenes Gerät meldet der Broker nach etwa 45 s (Hermit OS ab 1.12.2) als offline; spätestens nach
+Ein abgezogenes Gerät meldet der Broker nach etwa 45 s (Pagurus OS ab 1.12.2) als offline; spätestens nach
 `OFFLINE_AFTER` setzt die Cloud es selbst auf offline. Offline-Geräte bleiben mit ihren Werten in der Liste,
 bis du sie mit **Entfernen** löschst.
 

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 #pragma once
 #include <Arduino.h>
 
 const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Hermit OS</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Pagurus OS</title>
 <style>
 :root{--bg:#0f1419;--c:#1a2129;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--b:#2a333c}
 *{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
@@ -34,7 +34,7 @@ input[type=range]{padding:0;height:28px;accent-color:var(--a)}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff}
 code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
-<header><h1 id="t">Hermit OS</h1><span class="l" id="ver"></span></header>
+<header><h1 id="t">Pagurus OS</h1><span class="l" id="ver"></span></header>
 <main>
 <nav><a data-t="st" class="a">Status</a><a data-t="sw" id="swtab">Schalter</a><a data-t="wh">Aktionen</a><a data-t="wf">WLAN</a><a data-t="sy">System</a><a data-t="rp">RPC</a></nav>
 
@@ -136,7 +136,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label class="ck"><input type="checkbox" id="c_ob">Hinderniserkennung</label>
 <div class="row"><div><label>Hindernis über (W)</label><input id="c_ot" type="number"></div><div><label>nach Anlauf (s)</label><input id="c_oh" type="number" step="0.1"></div>
 <div><label>Dann</label><select id="c_oa"><option value="stop">Anhalten</option><option value="reverse">Kurz zurückfahren</option></select></div></div>
-<div class="l" style="margin-top:8px">Kalibrieren: Der Rollladen fährt ganz zu, ganz auf und wieder zu und misst dabei die Fahrzeiten. Danach kann er Positionen anfahren. Die Endlagen erkennt Hermit OS am Abschalten des Motors.</div>
+<div class="l" style="margin-top:8px">Kalibrieren: Der Rollladen fährt ganz zu, ganz auf und wieder zu und misst dabei die Fahrzeiten. Danach kann er Positionen anfahren. Die Endlagen erkennt Pagurus OS am Abschalten des Motors.</div>
 <div class="row"><button class="bt" onclick="saveCv()">Speichern</button><button class="bt g" onclick="if(confirm('Kalibrierfahrt starten? Der Rollladen fährt ganz zu, auf und wieder zu.'))cv('Calibrate')">Kalibrieren</button></div></div>
 <div class="card ao"><h2>Add-on-Taster (input:100)</h2>
 <div class="l">Taster zwischen DATA und GND des Add-ons.</div>
@@ -202,7 +202,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="row"><button class="bt" onclick="saveUpd()">Speichern</button><button class="bt g" onclick="chkUpd()">Jetzt prüfen</button><button class="bt g" id="u_inst" onclick="instUpd()">Jetzt installieren</button></div></div>
 <div class="card"><h2>Cloud / MQTT</h2>
 <div class="v" id="q_st" style="font-size:16px">–</div>
-<label class="ck"><input type="checkbox" id="q_en">MQTT einschalten (Hermit Cloud, Home Assistant, Node-RED)</label>
+<label class="ck"><input type="checkbox" id="q_en">MQTT einschalten (Pagurus Cloud, Home Assistant, Node-RED)</label>
 <div class="row"><div><label>Server (host:port)</label><input id="q_srv" placeholder="192.168.0.50:1883"></div><div><label>Topic-Präfix</label><input id="q_pre"></div></div>
 <div class="row"><div><label>Benutzer</label><input id="q_user"></div><div><label>Passwort</label><input id="q_pass" type="password"></div></div>
 <div class="l">Topics wie Shelly Gen2: &lt;präfix&gt;/rpc, /events/rpc, /status/…, /online. Aus = keine Verbindung, das Gerät arbeitet wie bisher.</div>
@@ -294,11 +294,11 @@ showCal();
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
 const x=c['input:100'];if(x){AO=true;$('x_name').value=x.name||'';$('x_type').value=x.type;$('x_rel').value=x.relay_action;$('x_inv').checked=x.invert;$('x_out').checked=x.addon_out_invert}document.querySelectorAll('.ao').forEach(e=>e.style.display=AO?'block':'none');
 const w=c.wifi.sta;$('w_ssid').value=w.ssid||'';$('w_mode').value=w.ipv4mode;$('w_ip').value=w.ip||'';$('w_nm').value=w.netmask||'';$('w_gw').value=w.gw||'';$('w_dns').value=w.nameserver||'';stat();if(c.wifi.roam){$('w_roam').checked=c.wifi.roam.enable;$('w_rthr').value=c.wifi.roam.rssi_thr}
-const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Hermit OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
+const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver').textContent='Pagurus OS '+d.ver+' · '+d.model+' · '+d.id;document.title=d.name||d.id;
 showUpd(c.sys.updates,d.ver);showMq(c.mqtt);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
-async function stmLine(){try{const t=await rpc('Hermit.Stm');$('stm').textContent='STM32: '+(t.online?(t.proto=='stock'?'Original-Firmware ':'quelloffene Firmware ')+'v'+t.version:'keine Antwort')+' · Rohwert Helligkeit '+t.brightness_raw+'/1000'}catch(e){}}
+async function stmLine(){try{const t=await rpc('Pagurus.Stm');$('stm').textContent='STM32: '+(t.online?(t.proto=='stock'?'Original-Firmware ':'quelloffene Firmware ')+'v'+t.version:'keine Antwort')+' · Rohwert Helligkeit '+t.brightness_raw+'/1000'}catch(e){}}
 function diag(id){run(async()=>{const r=await rpc('Input.Diag',{id:id});$('i_diag').style.display='block';$('i_diag').textContent='HIGH-Anteil: '+r.high_pct+' %\nFlanken in 200 ms: '+r.edges+'  (≈ '+r.approx_hz+' Hz)\nErkannter Zustand: '+(r.state?'AN':'AUS')+'  ·  Filter '+r.filter+(r.invert?' · invertiert':'')})}
 function saveSw(){if(DM)return run(async()=>{const n=i=>+$(i).value;await rpc('Light.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),transition_duration:n('l_tr'),range_map:[n('d_min'),n('d_max')],leading_edge:$('d_edge').value=='1',fade_rate:n('d_fade'),button_fade_rate:n('d_bfade'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
 await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}});await rpc('Input.SetConfig',{id:1,config:{name:$('i2_name').value,type:$('i2_type').value,invert:$('i2_invert').checked}});stmLine()},'Gespeichert');

@@ -1,4 +1,4 @@
-// Hermit Cloud – Service Worker: App-Huelle offline vorhalten, Daten immer frisch vom Server
+// Pagurus Cloud – Service Worker: App-Huelle offline vorhalten, Daten immer frisch vom Server
 const C = 'hermit-cloud-v1';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(SHELL))); self.skipWaiting(); });

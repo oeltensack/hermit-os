@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
-// Hermit Loader – kleine Zwischen-Firmware fuer den Wechsel Tasmota -> Hermit OS.
+// Copyright (C) 2026 D.Koch – Pagurus OS
+// Pagurus Loader – kleine Zwischen-Firmware fuer den Wechsel Tasmota -> Pagurus OS.
 // Tasmota akzeptiert sie wegen ihrer Groesse direkt (aehnlich tasmota-minimal). Danach:
 //   - WLAN: im ESP gespeicherte Daten, dann die aus den Tasmota-Einstellungen, sonst Access-Point
 //     hermit-loader-xxxxxx (192.168.33.1)
-//   - Hermit-OS-.bin im Browser hochladen
-//   - WLAN-Daten bleiben im WLAN-Speicher des ESP; Hermit OS uebernimmt sie beim ersten Start
+//   - Pagurus-OS-.bin im Browser hochladen
+//   - WLAN-Daten bleiben im WLAN-Speicher des ESP; Pagurus OS uebernimmt sie beim ersten Start
 // Die Relais-Pins werden nicht angesteuert (bleiben aus).
 //
-// LOADER_AUTO (1-MB-Geraete, z. B. Sonoff RF Bridge): Hermit OS passt dort nicht zweimal in den Flash.
-//   - Kommt der Loader von Hermit OS (Update), steht im RTC-Speicher, welche Datei er laden soll.
+// LOADER_AUTO (1-MB-Geraete, z. B. Sonoff RF Bridge): Pagurus OS passt dort nicht zweimal in den Flash.
+//   - Kommt der Loader von Pagurus OS (Update), steht im RTC-Speicher, welche Datei er laden soll.
 //   - Kommt er von Tasmota, holt er LOADER_VARIANT aus der update.json im Netz.
 //   Beides automatisch, sobald WLAN steht; schlaegt es fehl, bleibt die Seite zum Hochladen.
 #ifdef HERMIT_LOADER
@@ -27,7 +27,7 @@
 #ifndef LOADER_VARIANT
 #define LOADER_VARIANT "hermit-rfbridge"
 #endif
-#define LOADER_UPD_URL "https://raw.githubusercontent.com/oeltensack/hermit-os/main/update.json"
+#define LOADER_UPD_URL "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/update.json"
 uint32_t autoAt = 0;
 bool autoFromRtc = false, busy = false;
 UpdHandoff ho;
@@ -62,22 +62,22 @@ bool waitSta(uint32_t ms) {
 void page() {
   bool sta = WiFi.status() == WL_CONNECTED;
   String h = F("<!DOCTYPE html><html lang=de><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<title>Hermit Loader</title><style>body{font:15px system-ui;background:#0f1419;color:#e6e9ec;max-width:560px;margin:auto;padding:12px}"
+    "<title>Pagurus Loader</title><style>body{font:15px system-ui;background:#0f1419;color:#e6e9ec;max-width:560px;margin:auto;padding:12px}"
     ".c{background:#1a2129;border-radius:10px;padding:14px;margin:12px 0}input{width:100%;padding:8px;margin:4px 0 10px;box-sizing:border-box;"
     "background:#0f1419;color:#e6e9ec;border:1px solid #2a333c;border-radius:6px}button{padding:9px 14px;border:0;border-radius:6px;background:#2f9be0;"
-    "color:#fff;font:inherit}.m{padding:10px;border-radius:6px;background:#2a333c}small{color:#8a96a3}</style></head><body><h2>&#x1F41A; Hermit Loader</h2>");
+    "color:#fff;font:inherit}.m{padding:10px;border-radius:6px;background:#2a333c}small{color:#8a96a3}</style></head><body><h2>&#x1F41A; Pagurus Loader</h2>");
   if (msg.length()) h += "<div class=m>" + esc(msg) + "</div>";
   h += "<div class=c><b>WLAN:</b> " + (sta ? esc(WiFi.SSID()) + " &middot; " + WiFi.localIP().toString() : String("nicht verbunden")) + "</div>";
   h += F("<form class=c method=post action=/upload enctype=multipart/form-data onsubmit=\"this.querySelector('button').textContent='L&auml;dt &hellip;'\">"
 #ifdef LOADER_AUTO
-    "<b>Hermit OS hochladen</b><br><small>" LOADER_VARIANT ".bin.gz</small>"
+    "<b>Pagurus OS hochladen</b><br><small>" LOADER_VARIANT ".bin.gz</small>"
     "<input type=file name=f accept=.bin,.gz><button>Hochladen &amp; flashen</button></form>");
   if (sta) h += F("<form class=c method=post action=/auto><b>Aus dem Internet</b><br><small>Neueste Version laut update.json</small><br><button>Jetzt installieren</button></form>");
 #else
-    "<b>Hermit OS hochladen</b><br><small>hermit-1.bin, hermit-1pm.bin oder die -addon-Variante (nicht .gz)</small>"
+    "<b>Pagurus OS hochladen</b><br><small>hermit-1.bin, hermit-1pm.bin oder die -addon-Variante (nicht .gz)</small>"
     "<input type=file name=f accept=.bin><button>Hochladen &amp; flashen</button></form>");
 #endif
-  h += F("<form class=c method=post action=/wifi><b>WLAN einrichten</b><br><small>Hermit OS &uuml;bernimmt diese Daten beim ersten Start.</small><br>SSID<input name=s value='");
+  h += F("<form class=c method=post action=/wifi><b>WLAN einrichten</b><br><small>Pagurus OS &uuml;bernimmt diese Daten beim ersten Start.</small><br>SSID<input name=s value='");
   h += esc(wSsid) + F("'>Passwort<input name=p type=password><button>Verbinden</button></form></body></html>");
   server.send(200, "text/html; charset=utf-8", h);
 }
@@ -163,7 +163,7 @@ void autoInstall() {
   busy = false;
   if (e.length()) { msg = "Automatische Installation fehlgeschlagen: " + e + " – Datei unten hochladen."; Serial.println(msg); return; }
   updHandoffClear();
-  msg = "OK: Hermit OS installiert - Neustart ...";
+  msg = "OK: Pagurus OS installiert - Neustart ...";
   rebootAt = millis() + 1000;
 }
 #endif
@@ -188,7 +188,7 @@ void setup() {
     if (busy) { msg = "Automatische Installation läuft bereits"; redirectHome(); return; }
 #endif
     if (Update.hasError()) msg = "Upload fehlgeschlagen (Fehler " + String(Update.getError()) + ")";
-    else { msg = "OK: Hermit OS installiert - Neustart ..."; rebootAt = millis() + 1500; }
+    else { msg = "OK: Pagurus OS installiert - Neustart ..."; rebootAt = millis() + 1500; }
     redirectHome();
   }, []() {
     HTTPUpload& u = server.upload();
@@ -221,7 +221,7 @@ void setup() {
     String ts, tp;
     if (tasimport::readWifi(ts, tp)) {
       wSsid = ts;
-      WiFi.begin(ts, tp);                       // persistent: Hermit OS uebernimmt die Daten spaeter
+      WiFi.begin(ts, tp);                       // persistent: Pagurus OS uebernimmt die Daten spaeter
       if (waitSta(20000)) src = "WLAN aus Tasmota (" + ts + ")";
     }
   }
@@ -230,14 +230,14 @@ void setup() {
         "Kein WLAN - mit " + devId + " verbinden und http://192.168.33.1 oeffnen";
   Serial.println(msg);
 #ifdef LOADER_AUTO
-  // Vom Hermit-Update: Datei aus dem RTC-Speicher (max. 3 Versuche); von Tasmota: einmal update.json
+  // Vom Pagurus-Update: Datei aus dem RTC-Speicher (max. 3 Versuche); von Tasmota: einmal update.json
   autoFromRtc = updHandoffRead(ho);
   if (autoFromRtc && ho.tries >= 3) { updHandoffClear(); autoFromRtc = false; msg += " - automatisches Update dreimal fehlgeschlagen"; }
   else if (src.length()) {
     if (autoFromRtc) { ho.tries++; updHandoffWrite(ho); }
     // vom Update sofort; von Tasmota erst nach 60 s – solange kann das Flash-Tool die eigene Datei hochladen
     autoAt = millis() + (autoFromRtc ? 2000 : 60000);
-    msg += autoFromRtc ? " - installiere Hermit OS automatisch …" : " - installiert Hermit OS in 60 s aus dem Internet (oder Datei hochladen)";
+    msg += autoFromRtc ? " - installiere Pagurus OS automatisch …" : " - installiert Pagurus OS in 60 s aus dem Internet (oder Datei hochladen)";
   }
 #endif
 }

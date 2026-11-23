@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 // =====================================================================
-// Heizlüfter – Stufe 2 über Shelly 1PM (Hermit OS)
+// Heizlüfter – Stufe 2 über Shelly 1PM (Pagurus OS)
 // Läuft als ZUSÄTZLICHES Script auf dem Shelly Plus 2PM, neben dem
 // bestehenden Heizlüfter-Script. Das Logik-Script bleibt unverändert.
 //

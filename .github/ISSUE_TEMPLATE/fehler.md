@@ -7,11 +7,11 @@ labels: fehler
 **Gerät und Variante**
 z. B. Shelly 1PM, `hermit-1pm-meter`
 
-**Hermit-OS-Version**
+**Pagurus-OS-Version**
 (steht oben in der Geräteoberfläche)
 
 **Vorher installierte Firmware**
-Original / Tasmota / Hermit Loader
+Original / Tasmota / Pagurus Loader
 
 **Was passiert – und was hättest du erwartet?**
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
+// Copyright (C) 2026 D.Koch – Pagurus OS
 #pragma once
 // Treiber fuer den STM32-Koprozessor des Shelly Dimmer 2 (UART 115200 8N1).
 //
@@ -12,7 +12,7 @@
 //  OPEN  – quelloffene STM-Firmware (v51.x, von Tasmota/ESPHome aufgespielt)
 //          0x01 Helligkeit, 0x10 Zustand, 0x11 Version, 0x20 Einstellungen (10 Byte)
 // Erkennung: erst 0x11 senden (bei STOCK unbekannt und folgenlos), sonst 0x01 ohne Nutzdaten (STOCK: Version).
-// Hermit spielt keine STM-Firmware auf – der Weg zurueck zur Original-Firmware bleibt offen.
+// Pagurus spielt keine STM-Firmware auf – der Weg zurueck zur Original-Firmware bleibt offen.
 
 #include <stdint.h>
 #include <string.h>

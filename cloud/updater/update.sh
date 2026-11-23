@@ -1,11 +1,11 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Hermit Cloud Updater: wartet auf data/update.request (von der Cloud-App angelegt),
+# Pagurus Cloud Updater: wartet auf data/update.request (von der Cloud-App angelegt),
 # holt den neuen Stand von GitHub und baut die Container neu.
 CLOUD="${HERMIT_CLOUD_DIR:?HERMIT_CLOUD_DIR fehlt}"
 REPO="$(dirname "$CLOUD")"
 DATA="$CLOUD/data"
-SRC_TGZ="https://codeload.github.com/oeltensack/hermit-os/tar.gz/refs/heads/main"
+SRC_TGZ="https://codeload.github.com/oeltensack/pagurus-os/tar.gz/refs/heads/main"
 mkdir -p "$DATA"
 [ -f "$CLOUD/docker-compose.yml" ] || { echo "Falscher Pfad $CLOUD – docker compose im Ordner cloud/ starten"; sleep 3600; exit 1; }
 
@@ -21,7 +21,7 @@ do_update() {
     rm -rf /tmp/hos && mkdir -p /tmp/hos
     wget -qO- "$SRC_TGZ" | tar xz -C /tmp/hos || { echo "Download fehlgeschlagen"; return 1; }
     # .env und data/ liegen nicht im Archiv und bleiben erhalten
-    cp -a /tmp/hos/hermit-os-main/cloud/. "$CLOUD"/ || return 1
+    cp -a /tmp/hos/*-main/cloud/. "$CLOUD"/ || return 1
   fi
   cd "$CLOUD" || return 1
   echo "-- docker compose build"
@@ -32,7 +32,7 @@ do_update() {
   echo "== FERTIG $(date '+%H:%M:%S')"
 }
 
-echo "Hermit Cloud Updater läuft ($CLOUD)"
+echo "Pagurus Cloud Updater läuft ($CLOUD)"
 while true; do
   date +%s > "$DATA/updater.alive"
   if [ -f "$DATA/update.request" ]; then

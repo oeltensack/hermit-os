@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 D.Koch – Hermit OS
-"""Hermit Scanner – findet Shelly (Gen1, Gen2/Gen3), Tasmota und Hermit OS im Netz.
+# Copyright (C) 2026 D.Koch – Pagurus OS
+"""Pagurus Scanner – findet Shelly (Gen1, Gen2/Gen3), Tasmota und Pagurus OS im Netz.
 
-Oberflaeche:   python hermit_scanner.py          (bzw. Hermit-Scanner.exe)
-Konsole:       python hermit_scanner.py --cli 192.168.4.0/24 192.168.5.0/24
-               python hermit_scanner.py --cli --csv geraete.csv
+Oberflaeche:   python pagurus_scanner.py          (bzw. Pagurus-Scanner.exe)
+Konsole:       python pagurus_scanner.py --cli 192.168.4.0/24 192.168.5.0/24
+               python pagurus_scanner.py --cli --csv geraete.csv
 
 Netzbereiche: CIDR (192.168.4.0/24), Bereich (192.168.4.10-192.168.4.80) oder einzelne IP,
 mehrere durch Komma oder Leerzeichen getrennt. Ohne Angabe: die /24-Netze des eigenen Rechners.
@@ -41,7 +41,7 @@ GEN1_NAMES = {
     "SHBTN-1": "Shelly Button1", "SHBTN-2": "Shelly Button1", "SHGS-1": "Shelly Gas", "SHSM-01": "Shelly Smoke",
     "SHSEN-1": "Shelly Sense", "SH2LED-1": "Shelly RGBW2 LED", "SHSPOT-1": "Shelly Spot", "SHSPOT-2": "Shelly Spot 2",
 }
-KINDS = ("Hermit OS", "Shelly Gen1", "Shelly Gen2+", "Tasmota")
+KINDS = ("Pagurus OS", "Shelly Gen1", "Shelly Gen2+", "Tasmota")
 
 
 # ======================= Netzbereiche =======================
@@ -165,7 +165,7 @@ def probe(ip, auth=None):
         d["gen"] = gen
         d["mac"] = fmt_mac(sh.get("mac"))
         if hermit or gen >= 2:
-            d["kind"] = "Hermit OS" if hermit else "Shelly Gen2+"
+            d["kind"] = "Pagurus OS" if hermit else "Shelly Gen2+"
             d["model"] = sh.get("model") or ""
             if not hermit and sh.get("app"):
                 d["model"] = f"{sh['app']} ({sh.get('model', '')})"
@@ -308,7 +308,7 @@ def write_csv(path, rows):
 def cli(args):
     text = " ".join(args.ranges) if args.ranges else ", ".join(default_ranges())
     ips = parse_ranges(text)
-    print(f"Hermit Scanner {VERSION} – durchsuche {len(ips)} Adressen ({text})")
+    print(f"Pagurus Scanner {VERSION} – durchsuche {len(ips)} Adressen ({text})")
     t0 = time.time()
 
     def prog(done, total, r):
@@ -341,7 +341,7 @@ def gui():
         cfg = {}
 
     root = tk.Tk()
-    root.title(f"Hermit Scanner {VERSION} – Shelly · Tasmota · Hermit OS")
+    root.title(f"Pagurus Scanner {VERSION} – Shelly · Tasmota · Pagurus OS")
     sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
     root.geometry(f"{min(1440, sw - 40)}x{min(720, sh - 80)}+10+10")
     root.minsize(760, 400)
@@ -395,7 +395,7 @@ def gui():
     hs_.grid(row=1, column=0, sticky="ew")
     mid.rowconfigure(0, weight=1)
     mid.columnconfigure(0, weight=1)
-    tv.tag_configure("Hermit OS", background="#dbeeff")
+    tv.tag_configure("Pagurus OS", background="#dbeeff")
     tv.tag_configure("Shelly Gen1", background="#f2f2f2")
     tv.tag_configure("Shelly Gen2+", background="#e3f6e8")
     tv.tag_configure("Tasmota", background="#fff4d6")
@@ -455,7 +455,7 @@ def gui():
         try:
             ips = parse_ranges(rng.get())
         except Exception as e:
-            messagebox.showerror("Hermit Scanner", f"Netzbereich nicht verstanden:\n{e}")
+            messagebox.showerror("Pagurus Scanner", f"Netzbereich nicht verstanden:\n{e}")
             return
         if not ips:
             return
@@ -561,7 +561,7 @@ def gui():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Findet Shelly (Gen1/Gen2+), Tasmota und Hermit OS im Netz.")
+    ap = argparse.ArgumentParser(description="Findet Shelly (Gen1/Gen2+), Tasmota und Pagurus OS im Netz.")
     ap.add_argument("--cli", action="store_true", help="ohne Oberfläche, Ausgabe in der Konsole")
     ap.add_argument("--csv", help="Ergebnis als CSV speichern (mit --cli)")
     ap.add_argument("ranges", nargs="*", help="Netze, z. B. 192.168.4.0/24 192.168.5.10-80")

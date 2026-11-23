@@ -1,6 +1,6 @@
 # Beispielscripte für Shelly Gen2/Gen3
 
-Die Scripte laufen auf einem **Plus-, Pro- oder Gen3-Gerät** und arbeiten mit Hermit-OS-Geräten zusammen.
+Die Scripte laufen auf einem **Plus-, Pro- oder Gen3-Gerät** und arbeiten mit Pagurus-OS-Geräten zusammen.
 IP-Adressen oben im Script anpassen, dann in der Weboberfläche des Gen2-Geräts unter *Scripts* anlegen und starten.
 
 | Script | Zweck |
@@ -12,7 +12,7 @@ IP-Adressen oben im Script anpassen, dann in der Weboberfläche des Gen2-Geräts
 
 ## Sicherheit bei Heizgeräten
 
-Wenn ein Hermit-Gerät eine Heizung schaltet, sollte es **nie ohne Ablaufzeit** eingeschaltet werden:
+Wenn ein Pagurus-Gerät eine Heizung schaltet, sollte es **nie ohne Ablaufzeit** eingeschaltet werden:
 `Switch.Set?id=0&on=true&toggle_after=45` und den Befehl regelmäßig erneuern. Fällt das WLAN oder das
 steuernde Script aus, schaltet das Gerät selbst ab. Zusätzlich `auto_off` im Gerät setzen – das wirkt auch,
 wenn jemand über die Weboberfläche einschaltet. Das Heizlüfter-Script macht genau das.

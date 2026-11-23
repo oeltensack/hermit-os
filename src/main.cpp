@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 D.Koch – Hermit OS
-#ifndef HERMIT_LOADER   // Hermit Loader wird separat gebaut (src/loader.cpp)
-// Hermit OS – Shelly-Gen2-kompatible Firmware fuer Shelly 1 / 1PM (ESP8266)
+// Copyright (C) 2026 D.Koch – Pagurus OS
+#ifndef HERMIT_LOADER   // Pagurus Loader wird separat gebaut (src/loader.cpp)
+// Pagurus OS – Shelly-Gen2-kompatible Firmware fuer Shelly 1 / 1PM (ESP8266)
 // RPC-API wie Gen2 (/rpc/Switch.Set, POST /rpc JSON-RPC), Webhooks, Gen1-Kompat-API,
 // WLAN mit AP-Fallback (192.168.33.1), OTA, Energiezaehler, Uebertemperatur/-leistung.
 
@@ -107,11 +107,11 @@ struct Cfg {
   String tz = "CET-1CEST,M3.5.0,M10.5.0/3";
   String sntp = "pool.ntp.org";
   // Auto-Update
-  String updUrl = "https://raw.githubusercontent.com/oeltensack/hermit-os/main/update.json";
+  String updUrl = "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/update.json";
   String updToken;                 // optional: GitHub-Token fuer privates Repo
   String updMode = "check";        // off | check | install
   int updHour = 3;                 // taegliche Pruefung um diese Stunde
-  // MQTT (Gen2-Format) – optional, fuer Hermit Cloud, Home Assistant, Node-RED …
+  // MQTT (Gen2-Format) – optional, fuer Pagurus Cloud, Home Assistant, Node-RED …
   bool mqEnable = false;
   String mqServer;                 // host:port
   String mqUser, mqPass;
@@ -160,7 +160,7 @@ static const char* METHODS[] = {
   "Switch.Set", "Switch.Toggle", "Switch.GetStatus",
 #elif HAS_DIM
   "Light.Set", "Light.Toggle", "Light.GetStatus", "Light.GetConfig", "Light.SetConfig",
-  "Light.DimUp", "Light.DimDown", "Light.DimStop", "Light.ResetCounters", "Light.Calibrate", "Hermit.Stm",
+  "Light.DimUp", "Light.DimDown", "Light.DimStop", "Light.ResetCounters", "Light.Calibrate", "Pagurus.Stm",
 #else
   "Switch.Set", "Switch.Toggle", "Switch.GetStatus", "Switch.GetConfig", "Switch.SetConfig",
 #if HAS_PM
@@ -1690,7 +1690,7 @@ String updFlash(const String& url, const String& sha);
 String updInstall(const String& url, const String& sha) {
   if (UPD_RELAY_BLOCKS && CH[0].on) return "Relais ist an – Update nur bei ausgeschaltetem Relais";
 #if FLASH_1M
-  // 1 MB Flash: neue Firmware passt nicht neben die laufende. Erst den Hermit Loader installieren;
+  // 1 MB Flash: neue Firmware passt nicht neben die laufende. Erst den Pagurus Loader installieren;
   // er laedt nach dem Neustart die eigentliche Datei (Adresse und SHA-256 im RTC-Speicher).
   // Einstellungen (LittleFS) bleiben dabei erhalten.
   if (!updLoaderUrl.length()) updCheck();
@@ -2109,7 +2109,7 @@ String applyHook(Hook& h, JsonVariantConst p) {
 //   <prefix>/rpc                  eingehende JSON-RPC-Anfragen, Antwort an <src>/rpc
 //   <prefix>/events/rpc           NotifyStatus / NotifyEvent
 //   <prefix>/status/<komponente>  Status je Komponente (retained)
-//   <prefix>/info                 Shelly.GetDeviceInfo + IP (retained, Hermit-Erweiterung)
+//   <prefix>/info                 Shelly.GetDeviceInfo + IP (retained, Pagurus-Erweiterung)
 WiFiClient mqNet;
 PubSubClient mq(mqNet);
 uint32_t mqNextTry = 0, mqLastStatus = 0, mqBackoff = 5000;
