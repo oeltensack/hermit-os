@@ -35,7 +35,7 @@ def save(dev, cfg):
         q("UPDATE fridges SET type=?, label=?, on_w=?, max_run_min=?, max_off_min=?, dev_pct=? WHERE dev=?", vals + (dev,))
     else:
         q("""INSERT INTO fridges(dev, type, label, on_w, max_run_min, max_off_min, dev_pct, since)
-             VALUES(?,?,?,?,?,?,?,?)""", vals + (time.time(),))
+             VALUES(?,?,?,?,?,?,?,?)""", (dev,) + vals + (time.time(),))
 
 
 def delete(dev):

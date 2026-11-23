@@ -1,5 +1,8 @@
 # Änderungen
 
+## Hermit Cloud 1.3.1
+- Kühlgerät anlegen ergab „HTTP 500“ (Geräte-ID fehlte beim Speichern)
+
 ## Hermit Cloud 1.3.0
 - Neuer Reiter **Kühlgeräte** (Kühlschrank, Gefrierschrank, Kombi): Kompressor-Zeitleiste der letzten 24 h,
   Laufanteil, Zyklen, Ø Laufzeit/Pause, Energie heute und Ø pro Tag, Kosten pro Jahr
