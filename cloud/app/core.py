@@ -80,6 +80,12 @@ def init_db():
       days INTEGER DEFAULT 127, time TEXT, target TEXT, action TEXT, last_run TEXT);
     CREATE TABLE IF NOT EXISTS rules(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, enabled INTEGER DEFAULT 1,
       trig TEXT, action TEXT, last_fire REAL, active INTEGER DEFAULT 0, token TEXT);
+    CREATE TABLE IF NOT EXISTS fridges(dev TEXT PRIMARY KEY, type TEXT, label TEXT, on_w REAL, max_run_min INTEGER,
+      max_off_min INTEGER, dev_pct INTEGER, state TEXT, since REAL, alarm_run INTEGER DEFAULT 0,
+      alarm_off INTEGER DEFAULT 0, last_dev_check TEXT);
+    CREATE TABLE IF NOT EXISTS fridge_cycles(id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT, start REAL, end REAL,
+      peak_w REAL);
+    CREATE INDEX IF NOT EXISTS fridge_cycles_dev ON fridge_cycles(dev, start);
     CREATE TABLE IF NOT EXISTS backups(id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT, ts REAL, model TEXT,
       ver TEXT, data TEXT);
     CREATE INDEX IF NOT EXISTS backups_dev ON backups(dev, ts);
@@ -143,9 +149,9 @@ def fmt_dur(s):
 PUSH_KINDS = {
     "overpower": "Überlast", "overtemp": "Übertemperatur", "offline": "Gerät offline",
     "online": "Gerät wieder online", "reset": "Reset am Gerät", "finished": "Gerät fertig",
-    "reminder": "Erinnerung", "rule": "Regel", "update": "Updates",
+    "reminder": "Erinnerung", "fridge": "Kühlgerät-Warnung", "rule": "Regel", "update": "Updates",
 }
-DEFAULT_PUSH = ["overpower", "overtemp", "offline", "finished", "reminder", "rule"]
+DEFAULT_PUSH = ["overpower", "overtemp", "offline", "finished", "reminder", "fridge", "rule"]
 _pushq = queue.Queue()
 
 
@@ -153,7 +159,7 @@ def alert(dev, kind, text, push=True, title=None, prio=None):
     q("INSERT INTO alerts(ts, dev, kind, text) VALUES(?,?,?,?)", (time.time(), dev, kind, text))
     if push and kind in (setting("push_kinds", DEFAULT_PUSH) or []):
         notify(title or PUSH_KINDS.get(kind, "Hermit Cloud"), text, prio or
-               (5 if kind in ("overpower", "overtemp") else 4 if kind in ("finished", "offline") else 3))
+               (5 if kind in ("overpower", "overtemp", "fridge") else 4 if kind in ("finished", "offline") else 3))
 
 
 def notify(title, text, prio=3):

@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 import core
 import engine
+import fridge
 from bus import BUS, check_offline, seen
 from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
                   set_setting, setting, today)
@@ -181,6 +182,7 @@ def watchdog():
             q("DELETE FROM power WHERE ts<?", (int(time.time()) - KEEP_POWER_DAYS * 86400,))
             q("DELETE FROM alerts WHERE ts<? AND ack=1", (time.time() - 180 * 86400,))
             q("DELETE FROM sessions WHERE seen<?", (time.time() - 365 * 86400,))
+            fridge.cleanup()
         except Exception as e:
             print("Watchdog:", e, flush=True)
 
@@ -189,6 +191,10 @@ def watchdog():
 def startup():
     core.init_db()
     ensure_admin()
+    pk = setting("push_kinds")                 # neue Push-Art in bestehende Auswahl aufnehmen (einmalig)
+    if pk is not None and "fridge" not in pk and not setting("mig_push_fridge"):
+        set_setting("push_kinds", pk + ["fridge"])
+    set_setting("mig_push_fridge", True)
     core.start_push()
     BUS.start()
     engine.start(BUS)
@@ -241,6 +247,9 @@ def dev_row(r, latest=None):
     a = engine.appliance(r["id"])
     if a:
         out["appliance"] = {"type": a["type"], "label": a["label"], "state": a["state"]}
+    f = fridge.get(r["id"])
+    if f:
+        out["fridge"] = {"label": f["label"], "state": f["state"], "alarm": bool(f["alarm_run"] or f["alarm_off"])}
     return out
 
 
@@ -305,7 +314,7 @@ async def dev_rename(dev: str, request: Request):
 def dev_delete(dev: str, request: Request):
     need(request, "admin")
     get_dev(dev)
-    for t in ("power", "energy", "appliances", "runs", "backups"):
+    for t in ("power", "energy", "appliances", "runs", "backups", "fridges", "fridge_cycles"):
         q(f"DELETE FROM {t} WHERE dev=?", (dev,))
     q("DELETE FROM devices WHERE id=?", (dev,))
     return {"ok": True}
@@ -504,6 +513,30 @@ def runs(dev: str = "", limit: int = 50):
 def run_delete(rid: int, request: Request):
     need(request, "admin")
     q("DELETE FROM runs WHERE id=? AND end IS NOT NULL", (rid,))
+    return {"ok": True}
+
+
+# ======================= Kuehlgeraete =======================
+@app.get("/api/fridges")
+def fridges():
+    return {"types": fridge.TYPES, "items": [fridge.view(f) for f in q("SELECT * FROM fridges ORDER BY label, dev")]}
+
+
+@app.post("/api/fridges/{dev}")
+async def fridge_save(dev: str, request: Request):
+    need(request, "admin")
+    get_dev(dev)
+    try:
+        fridge.save(dev, await request.json())
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/fridges/{dev}")
+def fridge_delete(dev: str, request: Request):
+    need(request, "admin")
+    fridge.delete(dev)
     return {"ok": True}
 
 

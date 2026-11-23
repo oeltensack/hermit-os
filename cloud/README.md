@@ -8,6 +8,8 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
 - **Wäsche:** Waschmaschine und Trockner mit Fertig-Erkennung – läuft/fertig, Restzeit aus früheren Läufen,
   Energie und Kosten je Lauf, Push „fertig“ und Erinnerung, wenn nicht ausgeräumt wird. Dazu Spülmaschine
   und beliebige Geräte (z. B. Akkuladegerät) mit Fertig-Meldung
+- **Kühlgeräte:** Kompressor-Zyklen, Laufanteil, Kosten pro Jahr; Warnung bei Dauerlauf (Tür offen?),
+  Stillstand und auffälligem Verbrauch
 - **Energie:** Leistungsverlauf 6 h bis 30 Tage mit Spitzenwerten und Zoom, Energie pro Tag/Monat mit Kosten,
   Verbrauch je Gerät, **Grundlast/Standby** mit Kosten pro Jahr, **CSV-Export** für Excel
 - **Automatik:** Zeitpläne (Uhrzeit oder Sonnenauf-/untergang ± Minuten, Wochentage, Gerät oder Raum) und
@@ -111,7 +113,8 @@ bis du sie mit **Entfernen** löschst.
    Adresse der Cloud (z. B. `http://192.168.0.50:8080`, für URL-Auslöser).
 2. **Einstellungen → Push:** ntfy oder Telegram eintragen, **Testnachricht** senden.
 3. **Geräte → Bearbeiten:** Name und Raum vergeben.
-4. **Wäsche → Gerät hinzufügen:** die Messsteckdose der Waschmaschine bzw. des Trockners zuordnen.
+4. **Kühlgeräte → Gerät hinzufügen:** die Messsteckdose von Kühlschrank bzw. Gefriergerät zuordnen.
+5. **Wäsche → Gerät hinzufügen:** die Messsteckdose der Waschmaschine bzw. des Trockners zuordnen.
    Die Vorgaben passen für die meisten Geräte; nach ein paar Läufen zeigt die Cloud auch die Restzeit.
 
 **Push über ntfy:** App „ntfy“ installieren, ein langes, zufälliges Thema abonnieren (z. B.

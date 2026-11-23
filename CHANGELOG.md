@@ -1,5 +1,11 @@
 # Änderungen
 
+## Hermit Cloud 1.3.0
+- Neuer Reiter **Kühlgeräte** (Kühlschrank, Gefrierschrank, Kombi): Kompressor-Zeitleiste der letzten 24 h,
+  Laufanteil, Zyklen, Ø Laufzeit/Pause, Energie heute und Ø pro Tag, Kosten pro Jahr
+- Warnungen per Push: Kompressor läuft ohne Pause (Tür offen?), läuft nicht mehr an (kühlt es noch?),
+  Tagesverbrauch deutlich über dem Schnitt der letzten 14 Tage (Vereisung, Dichtung)
+
 ## 1.13.0
 - **Mehrere Access Points mit gleichem Namen:** Hermit OS sucht vor dem Verbinden den stärksten AP und verbindet
   sich gezielt mit ihm. Liegt der Empfang unter −70 dBm (einstellbar), sucht es alle 5 min nach einem AP, der

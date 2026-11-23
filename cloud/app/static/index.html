@@ -39,7 +39,7 @@ tr.ack{color:var(--m)}.scroll{overflow-x:auto}
 .chart{position:relative;user-select:none}.chart svg{display:block;width:100%;height:auto}
 .tt{position:absolute;pointer-events:none;background:#0b0f13;border:1px solid var(--b);border-radius:6px;padding:5px 8px;font-size:12px;display:none;white-space:nowrap;z-index:2}
 .kind{font-size:11px;padding:1px 6px;border-radius:4px;background:#3a444f}
-.kind.overpower,.kind.overtemp,.kind.offline{background:#5a1d1d}.kind.online,.kind.reset,.kind.finished{background:#1d4a2a}.kind.reminder{background:#4d3b10}
+.kind.overpower,.kind.overtemp,.kind.offline,.kind.fridge{background:#5a1d1d}.kind.online,.kind.reset,.kind.finished{background:#1d4a2a}.kind.reminder{background:#4d3b10}
 #login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:20}
 #login .card{width:320px}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff;background:var(--e);z-index:30;max-width:90vw}
@@ -62,11 +62,14 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 .bar{height:10px;background:var(--c2);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--a);border-radius:0 5px 5px 0}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rng a{padding:4px 9px;border-radius:5px;background:var(--bg);font-size:12px;cursor:pointer;color:var(--fg)}.rng a.a{background:var(--a)}
+.app.cool{border-color:#2f9be044}.app.alarm{border-color:var(--e);box-shadow:0 0 18px #f8514922}.app.alarm .st{color:var(--e)}.app.cool .st{color:var(--a)}
+.app.cool .ai svg .drum{animation:spin 14s linear infinite;transform-box:fill-box;transform-origin:center}.tl{position:relative}.tl svg{display:block;width:100%;height:auto}
+.stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:600px){.stats4{grid-template-columns:repeat(2,1fr)}}
 .ro .admin-only{display:none!important}.vo .user-only{display:none!important}
 @media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
 <header><h1><img src="/icon-192.png" alt="">Hermit Cloud</h1>
-<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="en">Energie</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
+<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="en">Energie</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
 <section class="tab a" id="dv"><div id="devs"></div></section>
@@ -76,6 +79,14 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 <div class="apps" id="wapps"></div>
 <div id="oapps-w"><h3>Weitere Geräte mit Fertig-Meldung</h3><div class="apps" id="oapps"></div></div>
 <div class="card"><h2>Letzte Läufe</h2><div class="scroll"><table id="rtab"></table></div></div>
+</section>
+
+<section class="tab" id="kg">
+<div class="row sp"><h3 style="margin:8px 0">Kühlschrank &amp; Gefriergeräte</h3><button class="bt admin-only" onclick="frDlg()">Gerät hinzufügen</button></div>
+<div class="apps" id="fridges"></div>
+<p class="l">Ohne Temperaturfühler wertet die Cloud das Laufverhalten des Kompressors aus. Üblich sind 25–50 % Laufanteil
+und Zyklen von 10–40 min. Dauerlauf deutet auf eine offene Tür oder einen Defekt hin, fehlende Zyklen auf Stromausfall oder
+einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine undichte Tür.</p>
 </section>
 
 <section class="tab" id="en">
@@ -189,7 +200,7 @@ const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
 <div class="dm"><span class="dot ${d.online?'on':''}"></span>${d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
-<div class="row" style="gap:4px">${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
+<div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
 <div class="dv"><button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canSw()||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>
 <div class="kv">${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute · ${eur(d.today_cost)}</div></div>`:''}
@@ -211,7 +222,7 @@ function devDlg(id){const d=DEVS.find(x=>x.id==id),rooms=[...new Set(DEVS.map(x=
 dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="dd_n" value="${esc(d.name)}">
 <label>Raum</label><input id="dd_r" value="${esc(d.room)}" list="dd_rl" placeholder="z. B. Bad, Keller"><datalist id="dd_rl">${rooms.map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
-<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button>`:''}</div>
+<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
 function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:{name:$('dd_n').value,room:$('dd_r').value}});closeDlg();await loadDevs()},'Gespeichert')}
 function delDev(id){if(!confirm('Gerät mit allen gespeicherten Werten, Läufen und Sicherungen entfernen? Verbindet es sich wieder, erscheint es neu.'))return;run(async()=>{await api('devices/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadDevs()})}
@@ -258,6 +269,48 @@ dlg(`<h2>Fertig-Erkennung</h2><div class="f">
 $('ap_t').onchange=()=>{const v=T[$('ap_t').value];$('ap_l').value=v.label;$('ap_sw').value=v.start_w;$('ap_ss').value=v.start_s;$('ap_ew').value=v.end_w;$('ap_es').value=Math.round(v.end_s/60);$('ap_r').value=v.remind_min}}
 function appSave(){run(async()=>{await api('appliances/'+encodeURIComponent($('ap_d').value),{method:'POST',body:{type:$('ap_t').value,label:$('ap_l').value,start_w:nIn($('ap_sw').value),start_s:nIn($('ap_ss').value),end_w:nIn($('ap_ew').value),end_s:Math.round(nIn($('ap_es').value)*60),remind_min:nIn($('ap_r').value)}});closeDlg();await loadApps();await loadDevs()},'Gespeichert')}
 function appDel(id){if(!confirm('Fertig-Erkennung für dieses Gerät entfernen? Bisherige Läufe bleiben erhalten.'))return;run(async()=>{await api('appliances/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadApps()})}
+
+// ---------- Kuehlgeraete ----------
+const SNOW='<svg viewBox="0 0 40 40" fill="none" stroke="#2f9be0" stroke-width="2.2" stroke-linecap="round"><g class="drum"><path d="M20 5v30M7 12.5l26 15M7 27.5l26-15"/><path d="M16 7l4 4 4-4M16 33l4-4 4 4M7.5 17.5l5.2-1.4-1.4-5.2M32.5 22.5l-5.2 1.4 1.4 5.2M7.5 22.5l5.2 1.4-1.4 5.2M32.5 17.5l-5.2-1.4 1.4-5.2"/></g></svg>';
+function timeline(f){const W2=400,H=42,t1=Date.now()/1000,t0=t1-86400,X=t=>(Math.max(t,t0)-t0)/86400*W2;
+let g=`<rect x="0" y="4" width="${W2}" height="20" rx="4" fill="#222b34"/>`;
+f.timeline.forEach((c,i)=>{const x=X(c[0]),w=Math.max(X(c[1])-x,1.5);g+=`<rect x="${x}" y="4" width="${w}" height="20" fill="#2f9be0" data-i="${i}"/>`});
+for(const h of [0,6,12,18,24]){const x=h/24*W2;g+=`<text x="${x}" y="38" font-size="10" fill="#8a96a3" text-anchor="${h==0?'start':h==24?'end':'middle'}">${h==24?'jetzt':'−'+(24-h)+' h'}</text>`}
+return `<div class="tl" data-dev="${esc(f.dev)}"><svg viewBox="0 0 ${W2} ${H}">${g}</svg><div class="tt"></div></div>`}
+function frCard(f){const on=f.state=='on',cls=f.alarm?'alarm':on?'cool':'',st=f.alarm?f.alarm_text:on?'Kühlt':'Pause';
+const dutyTxt=f.duty==null?'–':Math.round(f.duty*100)+' %',hint=f.duty==null?`Noch zu wenige Daten (${Math.round(f.duty_hours*10)/10} h).`:f.duty>0.75?'Laufanteil ungewöhnlich hoch.':f.duty<0.08&&f.duty_hours>=24?'Laufanteil sehr niedrig.':'';
+return `<div class="app ${cls} ${f.online?'':'off'}"><div class="ah"><div class="ai">${SNOW}</div>
+<div style="flex:1"><div class="row sp"><span class="dn">${esc(f.label)}</span><span class="l">${esc(f.name)}${f.online?'':' · offline'}</span></div>
+<div class="st">${esc(st)} <span class="l" style="font-size:14px;font-weight:400">seit ${f.since?hm(f.since)+' ('+dur(Date.now()/1000-f.since)+')':'–'}</span></div></div></div>
+<div><div class="l" style="margin-bottom:3px">Kompressor – letzte 24 Stunden</div>${timeline(f)}</div>
+<div class="stats4"><div><div class="v">${dutyTxt}</div><div class="l">Laufanteil 24 h</div></div><div><div class="v">${f.cycles}</div><div class="l">Zyklen 24 h</div></div>
+<div><div class="v">${dur(f.avg_on)}</div><div class="l">Ø Laufzeit</div></div><div><div class="v">${dur(f.avg_off)}</div><div class="l">Ø Pause</div></div>
+<div><div class="v">${fmt(f.apower,0,'W')}</div><div class="l">jetzt</div></div><div><div class="v">${kwh(f.today_wh)}</div><div class="l">heute</div></div>
+<div><div class="v">${kwh(f.avg_wh)}</div><div class="l">Ø pro Tag${f.days?' ('+f.days+' T)':''}</div></div><div><div class="v">${f.year_cost!=null?eur(f.year_cost):'–'}</div><div class="l">pro Jahr${f.year_kwh!=null?' · '+fmt(f.year_kwh,0,'kWh'):''}</div></div></div>
+<div class="row sp"><span class="l">${hint}</span><span class="row"><a class="lk" style="font-size:12px" onclick="showEn('${esc(f.dev)}')">Verlauf</a><a class="lk admin-only" style="font-size:12px" onclick="frDlg('${esc(f.dev)}')">Einstellen</a></span></div></div>`}
+let FR={types:{},items:[]};
+async function loadFridges(){FR=await api('fridges');
+$('fridges').innerHTML=FR.items.length?FR.items.map(frCard).join(''):`<div class="card empty" style="grid-column:1/-1">Noch kein Kühlgerät eingerichtet.<br>Kühlschrank oder Gefriertruhe an eine Steckdose mit Messung (z. B. Plug S oder Plug mit Messfirmware) und hier mit „Gerät hinzufügen“ zuordnen.</div>`;
+document.querySelectorAll('#fridges .tl').forEach(box=>{const f=FR.items.find(x=>x.dev==box.dataset.dev),svg=box.querySelector('svg');
+svg.querySelectorAll('rect[data-i]').forEach(el=>{el.onmouseenter=()=>{const c=f.timeline[+el.dataset.i],k=svg.getBoundingClientRect().width/400,open=c[1]>=Date.now()/1000-30;
+tip(box,`<b>${hm(c[0])}–${open?'läuft':hm(c[1])}</b><br>${dur(c[1]-c[0])}`,(+el.getAttribute('x')+(+el.getAttribute('width'))/2)*k,4*k)};el.onmouseleave=()=>box.querySelector('.tt').style.display='none'})})}
+async function frDlg(id){if(!Object.keys(FR.types).length)FR=await api('fridges');
+const f=FR.items.find(x=>x.dev==id),T=FR.types,t=f?f.type:'fridge',c=f?f.cfg:T[t];
+if(!DEVS.some(d=>'apower' in (d.status||{}))){toast('Kein Gerät mit Leistungsmessung verbunden');return}
+dlg(`<h2>Kühlgerät</h2><div class="f">
+<label>Gerät (Messung)</label><select id="fr_d" ${f?'disabled':''}>${devOpts(id,d=>'apower' in d.status)}</select>
+<label>Art</label><select id="fr_t">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${k==t?'selected':''}>${v.label}</option>`).join('')}</select>
+<label>Bezeichnung</label><input id="fr_l" value="${esc(f?f.label:T[t].label)}">
+<label>Kompressor an ab</label><div class="row"><input id="fr_w" style="width:70px" value="${c.on_w}"> W</div>
+<label>Warnung Dauerlauf</label><div class="row">nach <input id="fr_r" style="width:70px" value="${c.max_run_min}"> min ohne Pause</div>
+<label>Warnung Stillstand</label><div class="row">nach <input id="fr_o" style="width:70px" value="${c.max_off_min}"> min ohne Anlauf</div>
+<label>Warnung Verbrauch</label><div class="row">ab <input id="fr_p" style="width:70px" value="${c.dev_pct}"> % über dem Schnitt</div></div>
+<p class="l">Die Schwelle für „Kompressor an“ liegt zwischen der Leistung in der Pause (meist 0–5 W, Licht beim Öffnen 10–25 W) und im Lauf (meist 50–150 W). Abtauen kann kurz deutlich mehr ziehen.</p>
+<div class="row sp" style="margin-top:14px"><div>${f?`<button class="bt r" onclick="frDel('${esc(id)}')">Entfernen</button>`:''}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="frSave()">Speichern</button></div></div>`);
+$('fr_t').onchange=()=>{const v=T[$('fr_t').value];$('fr_l').value=v.label;$('fr_w').value=v.on_w;$('fr_r').value=v.max_run_min;$('fr_o').value=v.max_off_min;$('fr_p').value=v.dev_pct}}
+function frSave(){run(async()=>{await api('fridges/'+encodeURIComponent($('fr_d').value),{method:'POST',body:{type:$('fr_t').value,label:$('fr_l').value,on_w:nIn($('fr_w').value),max_run_min:nIn($('fr_r').value),max_off_min:nIn($('fr_o').value),dev_pct:nIn($('fr_p').value)}});closeDlg();await loadFridges();await loadDevs()},'Gespeichert')}
+function frDel(id){if(!confirm('Kühlgerät-Überwachung entfernen? Die aufgezeichneten Zyklen werden gelöscht.'))return;run(async()=>{await api('fridges/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadFridges()})}
 
 // ---------- Diagramme ----------
 const W=1000,PAD={l:58,r:12,t:12,b:28};
@@ -382,7 +435,7 @@ function ruleDel(id){if(!confirm('Regel löschen?'))return;run(async()=>{await a
 function ruleRun(id){run(async()=>{await api('rules/'+id+'/run',{method:'POST'});setTimeout(loadAuto,800)},'Regel ausgeführt')}
 
 // ---------- Meldungen ----------
-const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel'};
+const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel',fridge:'Kühlgerät'};
 const QUIET=['online','reset','update','rule','finished'];
 async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&!QUIET.includes(x.kind)).length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
 if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><th>Meldung</th><th class="user-only"></th></tr>'+a.map(x=>`<tr class="${x.ack?'ack':''}"><td>${dt(x.ts)}</td>
@@ -447,7 +500,7 @@ $('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' �
 $('bk').textContent=(i.broker||location.hostname)+':1883';$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
 let busy=false;
 async function refresh(force){if(busy&&!force)return;busy=true;try{await loadInfo();await loadDevs();await loadAl();
-if(TAB=='wa')await loadApps();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
+if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
 refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 </script></body></html>

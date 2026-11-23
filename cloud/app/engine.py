@@ -7,6 +7,8 @@ import secrets
 import threading
 import time
 import urllib.request
+
+import fridge
 from datetime import datetime, timedelta
 
 from core import (TZ, alert, dev_name, fmt_dur, fmt_eur, fmt_kwh, now_local, price_eur_kwh, q,
@@ -320,6 +322,7 @@ def new_token():
 def on_status(dev, comp, new, old):
     try:
         _appliance_step(dev, new)
+        fridge.step(dev, new)
         if "apower" in new:
             _power_rules(dev, float(new.get("apower") or 0))
         if "output" in new and old.get("output") is not None and new["output"] != old.get("output"):
@@ -461,6 +464,7 @@ def loop():
         try:
             _schedules()
             _reminders()
+            fridge.checks()
             now = now_local()
             if now.hour == 3 and last_backup_day != now.date():
                 last_backup_day = now.date()
