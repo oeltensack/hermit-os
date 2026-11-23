@@ -82,8 +82,10 @@ Shelly.call("HTTP.GET", { url: "http://192.168.0.70/rpc/CCT.Set?id=0&on=true&bri
 ## Hermit Cloud (optional)
 
 Eine kleine Heim-Cloud als Docker-Paket (Mosquitto + Weboberfläche), z. B. auf Proxmox, einem Raspberry Pi
-oder NAS: Geräteübersicht, Schalten, Energieverlauf (24 h, Tage, Monate, je Gerät) und Meldungen bei
-Überlast, Übertemperatur oder wenn ein Gerät offline geht. Die Geräte verbinden sich per **MQTT im
+oder NAS: Geräte nach Räumen, **Wäsche** (Waschmaschine/Trockner mit Fertig-Meldung und Restzeit), Energie mit
+**Kosten**, Grundlast und CSV-Export, **Zeitpläne und Regeln**, Meldungen mit **Push** (ntfy/Telegram),
+Firmware-Updates für alle Geräte, Sicherung der Geräte-Einstellungen, Benutzer mit Rollen – auch als App
+auf dem Handy. Die Geräte verbinden sich per **MQTT im
 Gen2-Format** – damit klappen auch Home Assistant und Node-RED. Shelly Plus/Pro werden ebenfalls angezeigt.
 
 ![Hermit Cloud](docs/img/cloud.png)

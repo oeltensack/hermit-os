@@ -1,136 +1,297 @@
 <!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Hermit Cloud</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Hermit Cloud</title>
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#1a2129">
+<link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hermit">
 <style>
-:root{--bg:#0f1419;--c:#1a2129;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--w:#d29922;--b:#2a333c}
-*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
-header{padding:12px 18px;background:var(--c);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-h1{font-size:18px;margin:0}main{max-width:1100px;margin:auto;padding:12px}
-nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 12px;border-radius:6px;background:var(--bg);font-size:13px;cursor:pointer}
+:root{--bg:#0f1419;--c:#1a2129;--c2:#222b34;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--w:#d29922;--b:#2a333c}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--fg);padding-bottom:env(safe-area-inset-bottom)}
+header{padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top));background:var(--c);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}h1 img{width:26px;height:26px;border-radius:6px}
+main{max-width:1150px;margin:auto;padding:10px}
+nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 11px;border-radius:6px;background:var(--bg);font-size:13px;cursor:pointer;user-select:none}
 nav a.a{background:var(--a)}.badge{background:var(--e);border-radius:9px;padding:0 6px;font-size:11px;margin-left:5px}
 .tab{display:none}.tab.a{display:block}
 .card{background:var(--c);border-radius:10px;padding:16px;margin:12px 0}
 h2{font-size:13px;margin:0 0 12px;color:var(--m);text-transform:uppercase;letter-spacing:.06em}
+h3{font-size:15px;margin:18px 0 6px;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .devs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .dev{background:var(--c);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;border:1px solid transparent}
 .dev.off{opacity:.55}.dev.err{border-color:var(--e)}
-.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.dn{font-weight:600;font-size:16px;cursor:pointer}.dn:hover{text-decoration:underline}
-.dm{font-size:12px;color:var(--m)}
+.dn{font-weight:600;font-size:16px}.dm{font-size:12px;color:var(--m)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--off)}.dot.on{background:var(--on)}
-.sw{width:64px;height:64px;border-radius:50%;border:0;font-weight:700;color:#fff;background:var(--off);cursor:pointer;flex:none}
+.sw{width:64px;height:64px;border-radius:50%;border:0;font-weight:700;color:#fff;background:var(--off);cursor:pointer;flex:none;font-size:14px}
 .sw.on{background:var(--on);box-shadow:0 0 16px #3fb95055}.sw:disabled{cursor:default}.sw.trip{background:var(--e);font-size:10px}
 .dv{display:flex;gap:14px;align-items:center}.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;flex:1}
 .v{font-size:17px;font-weight:600}.l{font-size:11px;color:var(--m)}
 .err-l{color:var(--e);font-size:12px}
-.links{display:flex;gap:10px;font-size:12px}.links a{color:var(--a);cursor:pointer;text-decoration:none}
-select,input{padding:7px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--fg);font:inherit}
-.bt{padding:7px 13px;border:0;border-radius:6px;background:var(--a);color:#fff;font:inherit;cursor:pointer}.bt.g{background:#3a444f}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 6px;border-bottom:1px solid var(--b);text-align:left}
-th{color:var(--m);font-weight:500}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-tr.ack{color:var(--m)}
-.chart{position:relative}.chart svg{display:block;width:100%;height:auto}
-.tt{position:absolute;pointer-events:none;background:#0b0f13;border:1px solid var(--b);border-radius:6px;padding:5px 8px;font-size:12px;display:none;white-space:nowrap}
+.links{display:flex;gap:12px;font-size:12px;flex-wrap:wrap}.links a,a.lk{color:var(--a);cursor:pointer;text-decoration:none}
+.tag{font-size:11px;padding:1px 7px;border-radius:9px;background:#3a444f;white-space:nowrap}.tag.g{background:#1d4a2a}.tag.r{background:#5a1d1d}.tag.b{background:#173a55}.tag.y{background:#4d3b10}
+select,input,textarea{padding:7px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--fg);font:inherit;max-width:100%}
+input[type=checkbox]{width:auto}
+.bt{padding:7px 13px;border:0;border-radius:6px;background:var(--a);color:#fff;font:inherit;cursor:pointer;white-space:nowrap}.bt.g{background:#3a444f}.bt.r{background:#8e2b2b}.bt.s{padding:4px 9px;font-size:12px}
+.bt:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sp{justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 6px;border-bottom:1px solid var(--b);text-align:left;vertical-align:top}
+th{color:var(--m);font-weight:500}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.ack{color:var(--m)}.scroll{overflow-x:auto}
+.chart{position:relative;user-select:none}.chart svg{display:block;width:100%;height:auto}
+.tt{position:absolute;pointer-events:none;background:#0b0f13;border:1px solid var(--b);border-radius:6px;padding:5px 8px;font-size:12px;display:none;white-space:nowrap;z-index:2}
 .kind{font-size:11px;padding:1px 6px;border-radius:4px;background:#3a444f}
-.kind.overpower,.kind.overtemp,.kind.offline{background:#5a1d1d}.kind.online,.kind.reset{background:#1d4a2a}
-#login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center}
+.kind.overpower,.kind.overtemp,.kind.offline{background:#5a1d1d}.kind.online,.kind.reset,.kind.finished{background:#1d4a2a}.kind.reminder{background:#4d3b10}
+#login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:20}
 #login .card{width:320px}
-#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff;background:var(--e)}
-.empty{color:var(--m);padding:30px;text-align:center}
-code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff;background:var(--e);z-index:30;max-width:90vw}
+#toast.ok{background:var(--on)}
+.empty{color:var(--m);padding:24px;text-align:center}
+code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px;word-break:break-all}
+dialog{background:var(--c);color:var(--fg);border:1px solid var(--b);border-radius:12px;padding:18px;width:min(580px,94vw);max-height:90vh}
+dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
+.f{display:grid;grid-template-columns:150px 1fr;gap:9px 12px;align-items:center}.f label{font-size:13px;color:var(--m)}
+.f input:not([type=checkbox]),.f select,.f textarea{width:100%}.f .row input,.f .row select{width:auto}
+@media(max-width:520px){.f{grid-template-columns:1fr}.f>label{margin-bottom:-6px}}
+.days label{font-size:12px;margin-right:6px;color:var(--fg);white-space:nowrap}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.app{background:var(--c);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;border:1px solid transparent}
+.app.off{opacity:.6}.app.running{border-color:#2f9be066}.app.finished{border-color:#3fb950aa;box-shadow:0 0 18px #3fb95022}
+.ah{display:flex;gap:14px;align-items:center}.ai{width:54px;height:54px;border-radius:14px;background:var(--c2);display:flex;align-items:center;justify-content:center;flex:none}
+.ai svg{width:36px;height:36px}.app.running .ai svg .drum{animation:spin 2.5s linear infinite;transform-box:fill-box;transform-origin:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+.st{font-size:22px;font-weight:700}.app.finished .st{color:var(--on)}.app.running .st{color:var(--a)}
+.bar{height:10px;background:var(--c2);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--a);border-radius:0 5px 5px 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rng a{padding:4px 9px;border-radius:5px;background:var(--bg);font-size:12px;cursor:pointer;color:var(--fg)}.rng a.a{background:var(--a)}
+.ro .admin-only{display:none!important}.vo .user-only{display:none!important}
+@media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
-<header><h1>Hermit Cloud</h1>
-<nav><a data-t="dv" class="a">Geräte</a><a data-t="en">Energie</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="in">Info</a></nav>
+<header><h1><img src="/icon-192.png" alt="">Hermit Cloud</h1>
+<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="en">Energie</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
-<section class="tab a" id="dv"><div class="devs" id="devs"></div></section>
+<section class="tab a" id="dv"><div id="devs"></div></section>
+
+<section class="tab" id="wa">
+<div class="row sp"><h3 style="margin:8px 0">Waschmaschine &amp; Trockner</h3><div class="row"><a class="lk" href="/api/export/runs.csv">Läufe als CSV</a><button class="bt admin-only" onclick="appDlg()">Gerät hinzufügen</button></div></div>
+<div class="apps" id="wapps"></div>
+<div id="oapps-w"><h3>Weitere Geräte mit Fertig-Meldung</h3><div class="apps" id="oapps"></div></div>
+<div class="card"><h2>Letzte Läufe</h2><div class="scroll"><table id="rtab"></table></div></div>
+</section>
 
 <section class="tab" id="en">
-<div class="card"><div class="row"><label class="l">Gerät</label><select id="esel"></select></div></div>
-<div class="card" id="pcard"><h2>Leistung – letzte 24 Stunden</h2><div class="chart" id="pchart"></div></div>
-<div class="card"><h2 id="dh">Energie pro Tag – letzte 31 Tage</h2><div class="chart" id="dchart"></div></div>
+<div class="card"><div class="row sp"><div class="row"><label class="l">Gerät</label><select id="esel"></select></div>
+<div class="row"><a class="lk" id="xcsv">Energie als CSV</a><a class="lk" id="pcsv">Leistung als CSV</a></div></div></div>
+<div class="card" id="pcard"><div class="row sp"><h2 style="margin:0">Leistung</h2><div class="row rng" id="prng"><a data-h="6">6 h</a><a data-h="24" class="a">24 h</a><a data-h="168">7 Tage</a><a data-h="720">30 Tage</a><a id="pzr" style="display:none">⟲ zurück</a></div></div>
+<div class="l" style="margin:6px 0">Linie = Durchschnitt, Fläche = Spitzenwert. Mit der Maus einen Bereich ziehen zum Vergrößern.</div><div class="chart" id="pchart"></div></div>
+<div class="card"><h2>Energie pro Tag – letzte 31 Tage</h2><div class="chart" id="dchart"></div></div>
 <div class="row" style="align-items:stretch">
 <div class="card" style="flex:1;min-width:280px"><h2>Energie pro Monat</h2><table id="mtab"></table></div>
-<div class="card" style="flex:1;min-width:280px" id="rcard"><h2>Verbrauch je Gerät – 30 Tage</h2><div class="chart" id="rchart"></div></div>
-</div></section>
+<div class="card" style="flex:1;min-width:280px" id="rcard"><h2>Verbrauch je Gerät – 30 Tage</h2><div id="rchart"></div></div>
+</div>
+<div class="card" id="bcard"><h2>Grundlast / Standby – letzte 7 Tage</h2><div class="l" style="margin-bottom:8px">Leistung, die ein Gerät fast immer zieht (10-%-Wert der Minutenwerte), hochgerechnet aufs Jahr.</div><div class="scroll"><table id="btab"></table></div></div>
+</section>
 
-<section class="tab" id="al"><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Meldungen</h2>
-<button class="bt g" onclick="ackAll()">Alle quittieren</button></div><table id="atab" style="margin-top:10px"></table></div></section>
+<section class="tab" id="au">
+<div class="card"><div class="row sp"><h2 style="margin:0">Zeitpläne</h2><button class="bt admin-only" onclick="schDlg()">Zeitplan anlegen</button></div><div class="scroll"><table id="stab" style="margin-top:8px"></table></div></div>
+<div class="card"><div class="row sp"><h2 style="margin:0">Regeln (Wenn – Dann)</h2><button class="bt admin-only" onclick="ruleDlg()">Regel anlegen</button></div><div class="scroll"><table id="ltab" style="margin-top:8px"></table></div></div>
+</section>
 
-<section class="tab" id="in"><div class="card"><h2>So verbinden sich Geräte</h2>
-<p>Am Gerät unter <b>System → Cloud / MQTT</b> einschalten und als Server die Adresse dieses Rechners mit Port <code>1883</code> eintragen
-(z. B. <code id="bk">192.168.0.50:1883</code>), dazu Benutzer und Passwort aus der <code>.env</code>. Shelly Plus/Pro (Gen2/Gen3) gehen genauso:
-Einstellungen → MQTT, „RPC status notifications“ und „Generic status update“ einschalten.</p>
-<p class="l">Geräte erscheinen automatisch, sobald sie sich verbinden. Der Energieverlauf wird aus dem Zählerstand der Geräte berechnet.</p>
-<table id="itab"></table></div>
-<div class="card"><h2>Cloud-Update</h2>
-<div class="row" style="justify-content:space-between"><div><div class="v" id="u_v">–</div><div class="l" id="u_s"></div></div>
+<section class="tab" id="al"><div class="card"><div class="row sp"><h2 style="margin:0">Meldungen</h2>
+<button class="bt g user-only" onclick="ackAll()">Alle quittieren</button></div><div class="scroll"><table id="atab" style="margin-top:10px"></table></div></div></section>
+
+<section class="tab" id="se">
+<div class="card admin-only"><h2>Strom &amp; Standort</h2><div class="f">
+<label>Strompreis</label><div class="row"><input id="s_price" style="width:110px" inputmode="decimal"> <span class="l">ct/kWh</span></div>
+<label>Breitengrad</label><input id="s_lat" placeholder="z. B. 50,45" inputmode="decimal">
+<label>Längengrad</label><input id="s_lon" placeholder="z. B. 8,66" inputmode="decimal">
+<label>Adresse der Cloud</label><input id="s_pub" placeholder="http://192.168.0.50:8080 (für URL-Auslöser)">
+</div><p class="l">Standort nur für Zeitpläne mit Sonnenauf-/untergang. Kosten werden mit dem aktuellen Preis berechnet.</p><button class="bt" onclick="saveBase()">Speichern</button></div>
+
+<div class="card admin-only"><h2>Push-Nachrichten</h2><div class="f">
+<label>ntfy-Adresse</label><input id="p_ntfy" placeholder="https://ntfy.sh/hermit-langes-zufaelliges-thema">
+<label>ntfy-Token</label><input id="p_ntok" type="password" placeholder="optional">
+<label>Telegram-Bot-Token</label><input id="p_ttok" type="password" placeholder="optional">
+<label>Telegram-Chat-ID</label><input id="p_tchat" placeholder="optional">
+<label>Senden bei</label><div id="p_kinds" class="days"></div></div>
+<p class="l">ntfy: App „ntfy“ installieren und das gleiche Thema abonnieren. Das Thema wirkt wie ein Passwort – lang und zufällig wählen oder einen eigenen ntfy-Server nutzen.</p>
+<div class="row"><button class="bt" onclick="savePush()">Speichern</button><button class="bt g" onclick="testPush()">Testnachricht</button></div></div>
+
+<div class="card admin-only"><div class="row sp"><h2 style="margin:0">Firmware</h2><div class="row"><button class="bt g" onclick="fwCheck()">Prüfen</button><button class="bt" id="fw_all" onclick="fwAll()">Alle aktualisieren</button></div></div>
+<div class="l" id="fw_s" style="margin:6px 0"></div><div class="scroll"><table id="fwtab"></table></div></div>
+
+<div class="card admin-only"><div class="row sp"><h2 style="margin:0">Sicherungen der Geräte-Einstellungen</h2><button class="bt" onclick="bkNow()">Jetzt sichern</button></div>
+<p class="l">Jede Nacht automatisch, die letzten 10 je Gerät. Zurückgespielt werden Name, Zeit, LED, Schalter-/Licht-/Eingangs-Einstellungen und Aktionen – kein WLAN, kein MQTT.</p><div class="scroll"><table id="bktab"></table></div></div>
+
+<div class="card admin-only"><div class="row sp"><h2 style="margin:0">Benutzer</h2><button class="bt" onclick="userDlg()">Benutzer anlegen</button></div>
+<p class="l">Administrator: alles · Benutzer: schalten und quittieren · Betrachter: nur ansehen</p><table id="utab"></table></div>
+
+<div class="card admin-only"><h2>Cloud-Update</h2>
+<div class="row sp"><div><div class="v" id="u_v">–</div><div class="l" id="u_s"></div></div>
 <div class="row"><button class="bt g" onclick="updCheck()">Jetzt prüfen</button><button class="bt" id="u_btn" onclick="updInstall()" style="display:none">Jetzt aktualisieren</button></div></div>
 <div class="row" style="margin-top:12px"><label class="l">Modus</label><select id="u_mode" onchange="updCfg()"><option value="off">Aus</option><option value="check">Nur prüfen</option><option value="install">Automatisch installieren</option></select>
 <label class="l">um</label><select id="u_hour" onchange="updCfg()"></select></div>
-<p class="l" id="u_hint"></p><pre id="u_log" style="display:none;white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre></div></section>
+<p class="l" id="u_hint"></p><pre id="u_log" style="display:none;white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre></div>
+
+<div class="card"><h2>So verbinden sich Geräte</h2>
+<p>Am Gerät unter <b>System → Cloud / MQTT</b> einschalten und als Server <code id="bk">…:1883</code> eintragen, dazu Benutzer und Passwort
+aus der <code>.env</code>. Shelly Plus/Pro (Gen2/Gen3): Einstellungen → MQTT, „RPC status notifications“ und „Generic status update“ einschalten.</p>
+<p class="l">Auf dem Handy: im Browser „Zum Startbildschirm hinzufügen“ – dann startet die Cloud wie eine App.</p>
+<div class="row sp"><span class="l" id="me"></span><button class="bt g" id="lo" onclick="logout()" style="display:none">Abmelden</button></div></div>
+</section>
 </main>
-<div id="login"><div class="card"><h2>Anmelden</h2><input id="pw" type="password" placeholder="Passwort" style="width:100%">
+
+<div id="login"><div class="card"><h2>Anmelden</h2><input id="lu" placeholder="Benutzer" value="admin" style="width:100%;margin-bottom:8px" autocomplete="username">
+<input id="pw" type="password" placeholder="Passwort" style="width:100%" autocomplete="current-password">
 <button class="bt" style="margin-top:12px;width:100%" onclick="login()">Anmelden</button></div></div>
+<dialog id="dlg"></dialog>
 <div id="toast"></div>
+
 <script>
-const $=i=>document.getElementById(i);let DEVS=[],TAB='dv';
-function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',3500)}
-async function api(p,o={}){const r=await fetch('/api/'+p,{headers:{'Content-Type':'application/json'},...o,body:o.body?JSON.stringify(o.body):undefined});
+const $=i=>document.getElementById(i);let DEVS=[],TAB='dv',ME={role:'admin'},PRICE=30,APPS={types:{},items:[]};
+const isAdmin=()=>ME.role=='admin',canSw=()=>ME.role!='viewer';
+function toast(t,ok){const e=$('toast');e.textContent=t;e.className=ok?'ok':'';e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',ok?2200:5000)}
+async function api(p,o={}){const r=await fetch('/api/'+p,{headers:{'Content-Type':'application/json'},...o,body:o.body!==undefined?JSON.stringify(o.body):undefined});
 if(r.status==401){$('login').style.display='flex';throw new Error('login')}
 const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||('HTTP '+r.status));return d}
-async function login(){try{await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('pw').value})}).then(r=>{if(!r.ok)throw 0});$('login').style.display='none';refresh()}catch(e){toast('Passwort falsch')}}
+const run=async(f,ok)=>{try{await f();if(ok)toast(ok,1)}catch(e){if(e.message!='login')toast(e.message)}};
+async function login(){try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('lu').value,password:$('pw').value})});if(!r.ok)throw 0;$('login').style.display='none';$('pw').value='';refresh(true)}catch(e){toast('Name oder Passwort falsch')}}
 $('pw').onkeydown=e=>{if(e.key=='Enter')login()};
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const fmt=(v,d,u)=>v==null||isNaN(v)?'–':(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+' '+u;
-const kwh=wh=>wh>=1000?fmt(wh/1000,2,'kWh'):fmt(wh,0,'Wh');
+async function logout(){await api('logout',{method:'POST'});location.reload()}
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=(v,d)=>(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmt=(v,d,u)=>v==null||isNaN(v)?'–':num(v,d)+' '+u;
+const kwh=wh=>wh==null?'–':wh>=1000?fmt(wh/1000,2,'kWh'):fmt(wh,0,'Wh');
+const eur=e=>e==null?'–':fmt(e,2,'€');const costOf=wh=>(wh||0)/1000*PRICE/100;
+const dur=s=>{if(s==null)return'–';s=Math.round(s);if(s<60)return s+' s';const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+':'+String(m).padStart(2,'0')+' h':m+' min'};
 const ago=t=>{if(!t)return'nie';const s=Date.now()/1000-t;return s<90?'gerade eben':s<3600?Math.round(s/60)+' min':s<86400?Math.round(s/3600)+' h':Math.round(s/86400)+' Tage'};
-document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');TAB=a.dataset.t;refresh()});
+const dt=t=>new Date(t*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const hm=t=>new Date(t*1000).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+const devName=id=>{const d=DEVS.find(x=>x.id==id);return d?(d.name||d.id):id};
+document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('#nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');TAB=a.dataset.t;history.replaceState(null,'','#'+TAB);refresh(true)});
+{const h=location.hash.slice(1),a=h&&document.querySelector(`#nav a[data-t="${h}"]`);if(a){document.querySelectorAll('#nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(h).classList.add('a');TAB=h}}
 
-// ---------- Geräte ----------
-function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output;
+// ---------- Dialog-Helfer ----------
+function dlg(html){const d=$('dlg');d.innerHTML=html;d.showModal();return d}
+function closeDlg(){$('dlg').close()}
+function devOpts(sel,filter){return DEVS.filter(filter||(()=>true)).map(d=>`<option value="${esc(d.id)}" ${d.id==sel?'selected':''}>${esc(d.name||d.id)}${d.room?' · '+esc(d.room):''}</option>`).join('')}
+function targetOpts(sel){const rooms=[...new Set(DEVS.map(d=>d.room).filter(Boolean))];
+return '<optgroup label="Geräte">'+DEVS.filter(d=>!d.status.meter_only&&'output' in d.status).map(d=>`<option value="dev:${esc(d.id)}" ${sel=='dev:'+d.id?'selected':''}>${esc(d.name||d.id)}</option>`).join('')+'</optgroup>'+
+(rooms.length?'<optgroup label="Räume">'+rooms.map(r=>`<option value="room:${esc(r)}" ${sel=='room:'+r?'selected':''}>Raum ${esc(r)}</option>`).join('')+'</optgroup>':'')}
+const DAYN=['Mo','Di','Mi','Do','Fr','Sa','So'];
+function daysHtml(mask,id){return `<div class="days" id="${id}">`+DAYN.map((n,i)=>`<label><input type="checkbox" value="${i}" ${(mask>>i)&1?'checked':''}>${n}</label>`).join('')+'</div>'}
+function daysVal(id){let m=0;document.querySelectorAll('#'+id+' input:checked').forEach(c=>m|=1<<+c.value);return m}
+const daysTxt=m=>m==127?'täglich':m==31?'Mo–Fr':m==96?'Sa, So':DAYN.filter((_,i)=>(m>>i)&1).join(', ');
+const nIn=x=>+String(x).replace(',','.')||0;
+
+// ---------- Geraete ----------
+function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance;
 const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
-<div class="dh"><div><div class="dn" onclick="ren('${esc(d.id)}')" title="Umbenennen">${esc(d.name||d.id)}</div>
-<div class="dm"><span class="dot ${d.online?'on':''}"></span>${d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div></div>
-<div class="dv"><button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>
+<div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
+<div class="dm"><span class="dot ${d.online?'on':''}"></span>${d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
+<div class="row" style="gap:4px">${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
+<div class="dv"><button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canSw()||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>
 <div class="kv">${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
-<div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute</div></div>`:''}
+<div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute · ${eur(d.today_cost)}</div></div>`:''}
 ${s.temperature?`<div><div class="v">${fmt(s.temperature.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`:''}
 ${s.voltage!=null?`<div><div class="v">${fmt(s.voltage,0,'V')}</div><div class="l">Spannung</div></div>`:''}
 ${s.brightness!=null?`<div><div class="v">${s.brightness} %</div><div class="l">Helligkeit</div></div><div><div class="v">${s.ct} K</div><div class="l">Farbtemperatur</div></div>`:''}
 </div></div>
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur'}[e]||e)).join(', ')}</div>`:''}
-<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}<a onclick="del('${esc(d.id)}')">Entfernen</a></div></div>`}
-async function loadDevs(){DEVS=await api('devices');$('devs').innerHTML=DEVS.length?DEVS.map(devCard).join(''):'<div class="empty">Noch keine Geräte. Unter „Info“ steht, wie sie sich verbinden.</div>';fillSel()}
-async function sw(id){try{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{}});loadDevs()}catch(e){toast(e.message)}}
-async function ren(id){const d=DEVS.find(x=>x.id==id);const n=prompt('Name für '+id,d.name||'');if(n==null)return;await api('devices/'+encodeURIComponent(id)+'/name',{method:'POST',body:{name:n}});loadDevs()}
-async function del(id){if(!confirm('Gerät '+id+' mit allen gespeicherten Werten entfernen? Verbindet es sich wieder, erscheint es neu.'))return;await api('devices/'+encodeURIComponent(id),{method:'DELETE'});loadDevs()}
-function showEn(id){$('esel').value=id;document.querySelector('nav a[data-t=en]').click()}
+<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
+async function loadDevs(){DEVS=await api('devices');if(TAB!='dv')return;
+const groups={};DEVS.forEach(d=>(groups[d.room||'']=groups[d.room||'']||[]).push(d));
+const keys=Object.keys(groups).sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
+$('devs').innerHTML=DEVS.length?keys.map(k=>{const g=groups[k],sw=g.filter(d=>!d.status.meter_only&&d.online&&'output' in d.status);
+return `<h3><span>${k?esc(k):(keys.length>1?'Ohne Raum':'Alle Geräte')} <span class="l">${g.length}</span></span>${k&&sw.length>1?`<span class="row user-only"><button class="bt g s" onclick="roomSw('${esc(k)}',true)">alle an</button><button class="bt g s" onclick="roomSw('${esc(k)}',false)">alle aus</button></span>`:''}</h3><div class="devs">${g.map(devCard).join('')}</div>`}).join('')
+:'<div class="empty">Noch keine Geräte. Unter „Einstellungen“ steht, wie sie sich verbinden.</div>'}
+function sw(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{}});await loadDevs()})}
+function roomSw(r,on){run(async()=>{const x=await api('rooms/switch',{method:'POST',body:{room:r,on}});if(x.errors.length)toast(x.errors.join('; '));await loadDevs()})}
+function devDlg(id){const d=DEVS.find(x=>x.id==id),rooms=[...new Set(DEVS.map(x=>x.room).filter(Boolean))];
+dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="dd_n" value="${esc(d.name)}">
+<label>Raum</label><input id="dd_r" value="${esc(d.room)}" list="dd_rl" placeholder="z. B. Bad, Keller"><datalist id="dd_rl">${rooms.map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
+<label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
+<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button>`:''}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
+function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:{name:$('dd_n').value,room:$('dd_r').value}});closeDlg();await loadDevs()},'Gespeichert')}
+function delDev(id){if(!confirm('Gerät mit allen gespeicherten Werten, Läufen und Sicherungen entfernen? Verbindet es sich wieder, erscheint es neu.'))return;run(async()=>{await api('devices/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadDevs()})}
+function showEn(id){document.querySelector('#nav a[data-t=en]').click();setTimeout(()=>{$('esel').value=id;PZ=null;loadEn()},50)}
 
-// ---------- Diagramme (eine Reihe je Diagramm, SVG) ----------
-const W=1000,PAD={l:56,r:12,t:12,b:28};
+// ---------- Waesche & Co. ----------
+const ICON={washer:'<svg viewBox="0 0 40 40" fill="none" stroke="#8a96a3" stroke-width="2"><rect x="6" y="4" width="28" height="32" rx="4"/><line x1="6" y1="11" x2="34" y2="11"/><circle cx="11" cy="7.5" r="1" fill="#8a96a3"/><g class="drum"><circle cx="20" cy="23" r="8" stroke="#2f9be0"/><path d="M15 23c2-2 3 2 5 0s3 2 5 0" stroke="#2f9be0"/></g></svg>',
+dryer:'<svg viewBox="0 0 40 40" fill="none" stroke="#8a96a3" stroke-width="2"><rect x="6" y="4" width="28" height="32" rx="4"/><line x1="6" y1="11" x2="34" y2="11"/><circle cx="11" cy="7.5" r="1" fill="#8a96a3"/><g class="drum"><circle cx="20" cy="23" r="8" stroke="#d29922"/><path d="M17 20q3 3 0 6M22 20q3 3 0 6" stroke="#d29922"/></g></svg>',
+dishwasher:'<svg viewBox="0 0 40 40" fill="none" stroke="#8a96a3" stroke-width="2"><rect x="6" y="4" width="28" height="32" rx="4"/><line x1="6" y1="11" x2="34" y2="11"/><g class="drum"><circle cx="20" cy="24" r="7" stroke="#2f9be0"/><line x1="13" y1="24" x2="27" y2="24" stroke="#2f9be0"/></g></svg>',
+other:'<svg viewBox="0 0 40 40" fill="none" stroke="#8a96a3" stroke-width="2"><path d="M14 4v8M26 4v8"/><rect x="10" y="12" width="20" height="12" rx="3"/><path d="M20 24v6c0 3-2 5-5 5"/><g class="drum"><circle cx="30" cy="31" r="3" stroke="#2f9be0"/></g></svg>'};
+const STN={idle:'Bereit',running:'Läuft',finished:'Fertig'};
+function appCard(a){const r=a.state=='running',fin=a.state=='finished',L=a.last||{};
+return `<div class="app ${a.state} ${a.online?'':'off'}"><div class="ah"><div class="ai">${ICON[a.type]||ICON.other}</div>
+<div style="flex:1"><div class="row sp"><span class="dn">${esc(a.label)}</span><span class="l">${esc(a.name)}${a.online?'':' · offline'}</span></div>
+<div class="st">${STN[a.state]}${r&&a.remaining!=null?` <span class="l" style="font-size:14px;font-weight:400">noch ca. ${dur(a.remaining)}</span>`:''}</div></div></div>
+${r?`<div class="bar" title="${a.progress!=null?'geschätzt aus den letzten Läufen':'noch keine Erfahrungswerte'}"><i style="width:${a.progress!=null?Math.round(a.progress*100):5}%"></i></div>
+<div class="stats"><div><div class="v">${dur(a.elapsed)}</div><div class="l">seit ${hm(a.since)}</div></div>
+<div><div class="v">${fmt(a.apower,0,'W')}</div><div class="l">jetzt</div></div><div><div class="v">${kwh(a.wh)}</div><div class="l">${eur(a.cost)}</div></div></div>`:''}
+${fin?`<div class="stats"><div><div class="v">${dur(L.end-L.start)}</div><div class="l">Laufzeit</div></div><div><div class="v">${kwh(L.wh)}</div><div class="l">${eur(L.cost)}</div></div>
+<div><div class="v">${dur(a.waiting)}</div><div class="l">wartet seit ${hm(L.end)}</div></div></div>
+<button class="bt user-only" onclick="appAck('${esc(a.dev)}')">${a.type=='washer'?'Wäsche ist raus':a.type=='dryer'?'Trockner ist leer':'Erledigt'}</button>`:''}
+${a.state=='idle'?`<div class="l">${a.avg_dur?`Ein Lauf dauert im Schnitt ${dur(a.avg_dur)} und braucht ${kwh(a.avg_wh)} (${eur(costOf(a.avg_wh))}).`:'Noch keine Läufe aufgezeichnet.'} ${a.apower!=null?'Jetzt '+fmt(a.apower,1,'W')+'.':''}</div>`:''}
+<div class="row sp"><span class="l">Diesen Monat: ${a.month.n} ${a.month.n==1?'Lauf':'Läufe'} · ${kwh(a.month.wh)} · ${eur(a.month.cost)}</span><a class="lk admin-only" style="font-size:12px" onclick="appDlg('${esc(a.dev)}')">Einstellen</a></div></div>`}
+async function loadApps(){APPS=await api('appliances');const isL=a=>a.type=='washer'||a.type=='dryer',L=APPS.items.filter(isL),O=APPS.items.filter(a=>!isL(a));
+$('wapps').innerHTML=L.length?L.map(appCard).join(''):`<div class="card empty" style="grid-column:1/-1">Noch keine Waschmaschine und kein Trockner eingerichtet.<br>Ein Gerät mit Leistungsmessung (z. B. Plug S oder 1PM mit Messfirmware) davorschalten und hier mit „Gerät hinzufügen“ zuordnen.</div>`;
+$('oapps-w').style.display=O.length?'':'none';$('oapps').innerHTML=O.map(appCard).join('');
+const R=await api('runs?limit=40'),T=APPS.types;
+$('rtab').innerHTML=R.length?'<tr><th>Start</th><th>Gerät</th><th class="n">Dauer</th><th class="n">Energie</th><th class="n">Kosten</th><th class="n hm">Spitze</th><th class="admin-only"></th></tr>'+R.map(r=>`<tr><td>${dt(r.start)}</td><td>${esc((T[r.type]||{}).label||r.type)} <span class="l hm">${esc(r.name)}</span></td><td class="n">${dur(r.end-r.start)}</td><td class="n">${kwh(r.wh)}</td><td class="n">${eur(r.cost)}</td><td class="n hm">${fmt(r.peak_w,0,'W')}</td><td class="n admin-only"><a class="lk" onclick="delRun(${r.id})" title="Lauf löschen">✕</a></td></tr>`).join(''):'<tr><td class="empty">Noch keine Läufe.</td></tr>'}
+function appAck(dev){run(async()=>{await api('appliances/'+encodeURIComponent(dev)+'/ack',{method:'POST'});await loadApps()})}
+function delRun(id){if(!confirm('Lauf löschen (z. B. Fehlerkennung)?'))return;run(async()=>{await api('runs/'+id,{method:'DELETE'});await loadApps()})}
+async function appDlg(id){if(!Object.keys(APPS.types).length)APPS=await api('appliances');
+const a=APPS.items.find(x=>x.dev==id),T=APPS.types,t=a?a.type:'washer',c=a?a.cfg:T[t];
+const cand=DEVS.filter(d=>'apower' in (d.status||{}));if(!cand.length){toast('Kein Gerät mit Leistungsmessung verbunden');return}
+dlg(`<h2>Fertig-Erkennung</h2><div class="f">
+<label>Gerät (Messung)</label><select id="ap_d" ${a?'disabled':''}>${devOpts(id,d=>'apower' in d.status)}</select>
+<label>Art</label><select id="ap_t">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${k==t?'selected':''}>${v.label}</option>`).join('')}</select>
+<label>Bezeichnung</label><input id="ap_l" value="${esc(a?a.label:T[t].label)}">
+<label>Start ab</label><div class="row"><input id="ap_sw" style="width:70px" value="${c.start_w}"> W für <input id="ap_ss" style="width:70px" value="${c.start_s}"> s</div>
+<label>Fertig unter</label><div class="row"><input id="ap_ew" style="width:70px" value="${c.end_w}"> W für <input id="ap_es" style="width:70px" value="${Math.round(c.end_s/60)}"> min</div>
+<label>Erinnerung nach</label><div class="row"><input id="ap_r" style="width:70px" value="${c.remind_min}"> min <span class="l">falls nicht ausgeräumt, 0 = aus</span></div></div>
+<p class="l">Waschmaschinen machen beim Einweichen Pausen mit wenigen Watt – die Zeit für „Fertig“ deshalb nicht zu kurz wählen. Trockner mit Knitterschutz drehen nach dem Ende kurz nach.</p>
+<div class="row sp" style="margin-top:14px"><div>${a?`<button class="bt r" onclick="appDel('${esc(id)}')">Entfernen</button>`:''}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="appSave()">Speichern</button></div></div>`);
+$('ap_t').onchange=()=>{const v=T[$('ap_t').value];$('ap_l').value=v.label;$('ap_sw').value=v.start_w;$('ap_ss').value=v.start_s;$('ap_ew').value=v.end_w;$('ap_es').value=Math.round(v.end_s/60);$('ap_r').value=v.remind_min}}
+function appSave(){run(async()=>{await api('appliances/'+encodeURIComponent($('ap_d').value),{method:'POST',body:{type:$('ap_t').value,label:$('ap_l').value,start_w:nIn($('ap_sw').value),start_s:nIn($('ap_ss').value),end_w:nIn($('ap_ew').value),end_s:Math.round(nIn($('ap_es').value)*60),remind_min:nIn($('ap_r').value)}});closeDlg();await loadApps();await loadDevs()},'Gespeichert')}
+function appDel(id){if(!confirm('Fertig-Erkennung für dieses Gerät entfernen? Bisherige Läufe bleiben erhalten.'))return;run(async()=>{await api('appliances/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadApps()})}
+
+// ---------- Diagramme ----------
+const W=1000,PAD={l:58,r:12,t:12,b:28};
 function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p}
 function divs(max){const m=max/Math.pow(10,Math.floor(Math.log10(max)));return Math.abs(m-2)<1e-9?4:5}
 function axisY(h,max,unit){let g='';const n=divs(max);for(let i=0;i<=n;i++){const y=PAD.t+(h-PAD.t-PAD.b)*(1-i/n),v=max*i/n;
-g+=`<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="#2a333c" stroke-width="1"/><text x="${PAD.l-8}" y="${y+4}" text-anchor="end" font-size="12" fill="#8a96a3">${v.toLocaleString('de-DE',{maximumFractionDigits:max<10?1:0})}${i==n?' '+unit:''}</text>`}return g}
-function tip(box,html,x,y){const t=box.querySelector('.tt');t.innerHTML=html;t.style.display='block';const bw=box.clientWidth;t.style.left=Math.min(Math.max(x-t.offsetWidth/2,0),bw-t.offsetWidth)+'px';t.style.top=(y-t.offsetHeight-10)+'px'}
-function lineChart(box,pts,unit){const h=260;if(!pts.length){box.innerHTML='<div class="empty">Noch keine Messwerte.</div>';return}
-const t0=pts[0][0],t1=Math.max(pts[pts.length-1][0],t0+60),max=niceMax(Math.max(...pts.map(p=>p[1]))*1.05);
-const X=t=>PAD.l+(W-PAD.l-PAD.r)*(t-t0)/(t1-t0),Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max);
-let d='',prev=null;for(const p of pts){d+=(prev&&p[0]-prev>300?'M':(prev==null?'M':'L'))+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1);prev=p[0]}
-let xt='';const step=(t1-t0)>86400*2?86400:(t1-t0)>6*3600?3*3600:3600;for(let t=Math.ceil(t0/step)*step;t<=t1;t+=step){const dt=new Date(t*1000);
-xt+=`<text x="${X(t)}" y="${h-8}" text-anchor="middle" font-size="12" fill="#8a96a3">${step>=86400?dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</text>`}
-box.innerHTML=`<svg viewBox="0 0 ${W} ${h}">${axisY(h,max,unit)}<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="#56606b"/>${xt}
-<path d="${d}" fill="none" stroke="#2f9be0" stroke-width="2" stroke-linejoin="round"/>${pts.length<3?pts.map(p=>`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="#2f9be0"/>`).join(''):''}<line class="ch" y1="${PAD.t}" y2="${Y(0)}" stroke="#8a96a3" stroke-dasharray="3 3" style="display:none"/>
-<circle class="hp" r="5" fill="#2f9be0" stroke="#1a2129" stroke-width="2" style="display:none"/><rect x="${PAD.l}" y="0" width="${W-PAD.l-PAD.r}" height="${h}" fill="transparent"/></svg><div class="tt"></div>`;
-const svg=box.querySelector('svg'),ch=svg.querySelector('.ch'),hp=svg.querySelector('.hp');
-svg.onmousemove=e=>{const r=svg.getBoundingClientRect(),sx=(e.clientX-r.left)*W/r.width,t=t0+(sx-PAD.l)/(W-PAD.l-PAD.r)*(t1-t0);
-let b=pts[0];for(const p of pts)if(Math.abs(p[0]-t)<Math.abs(b[0]-t))b=p;const x=X(b[0]),y=Y(b[1]);
-ch.setAttribute('x1',x);ch.setAttribute('x2',x);ch.style.display='';hp.setAttribute('cx',x);hp.setAttribute('cy',y);hp.style.display='';
-tip(box,`<b>${fmt(b[1],1,unit)}</b><br>${new Date(b[0]*1000).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'})}`,x*r.width/W,y*r.height/h)};
-svg.onmouseleave=()=>{ch.style.display='none';hp.style.display='none';box.querySelector('.tt').style.display='none'}}
-function barChart(box,rows,unit,lab){const h=240;const vals=rows.map(r=>r[1]);if(!rows.length||!vals.some(v=>v>0)){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
+g+=`<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${y}" y2="${y}" stroke="#2a333c"/><text x="${PAD.l-8}" y="${y+4}" text-anchor="end" font-size="12" fill="#8a96a3">${v.toLocaleString('de-DE',{maximumFractionDigits:max<10?1:0})}${i==n?' '+unit:''}</text>`}return g}
+function tip(box,html,x,y){const t=box.querySelector('.tt');t.innerHTML=html;t.style.display='block';const bw=box.clientWidth;t.style.left=Math.min(Math.max(x-t.offsetWidth/2,0),bw-t.offsetWidth)+'px';t.style.top=Math.max(y-t.offsetHeight-10,0)+'px'}
+let PZ=null,PH=24;
+function powerChart(box,res){const h=280,pts=res.data;if(!pts.length){box.innerHTML='<div class="empty">Keine Messwerte in diesem Zeitraum.</div>';return}
+const t0=res.start,t1=res.end,max=niceMax(Math.max(...pts.map(p=>p[2]))*1.05);
+const X=t=>PAD.l+(W-PAD.l-PAD.r)*(t-t0)/(t1-t0),Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max),gap=Math.max(300,(res.bucket_s||60)*3);
+let d='',area='',seg=[],prev=null;const flush=()=>{if(seg.length){area+='M'+seg.map(p=>X(p[0]).toFixed(1)+','+Y(p[2]).toFixed(1)).join('L')+`L${X(seg[seg.length-1][0]).toFixed(1)},${Y(0)}L${X(seg[0][0]).toFixed(1)},${Y(0)}Z`;seg=[]}};
+for(const p of pts){if(prev!=null&&p[0]-prev>gap)flush();seg.push(p);d+=(prev==null||p[0]-prev>gap?'M':'L')+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1);prev=p[0]}flush();
+const span=t1-t0,step=span>20*86400?5*86400:span>4*86400?86400:span>36*3600?12*3600:span>12*3600?3*3600:span>4*3600?3600:span>3600?1800:600;
+let xt='';for(let t=Math.ceil(t0/step)*step;t<=t1;t+=step){const q=new Date(t*1000),lbl=step>=86400?q.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):q.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+xt+=`<text x="${X(t)}" y="${h-8}" text-anchor="middle" font-size="12" fill="#8a96a3">${lbl}</text>`}
+box.innerHTML=`<svg viewBox="0 0 ${W} ${h}">${axisY(h,max,'W')}<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="#56606b"/>${xt}
+<path d="${area}" fill="#2f9be0" fill-opacity=".18"/><path d="${d}" fill="none" stroke="#2f9be0" stroke-width="2" stroke-linejoin="round"/>
+${pts.length<3?pts.map(p=>`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="#2f9be0"/>`).join(''):''}
+<rect class="sel" y="${PAD.t}" height="${Y(0)-PAD.t}" fill="#2f9be0" fill-opacity=".15" style="display:none"/>
+<line class="ch" y1="${PAD.t}" y2="${Y(0)}" stroke="#8a96a3" stroke-dasharray="3 3" style="display:none"/>
+<circle class="hp" r="5" fill="#2f9be0" stroke="#1a2129" stroke-width="2" style="display:none"/><rect x="${PAD.l}" y="0" width="${W-PAD.l-PAD.r}" height="${h}" fill="transparent" style="cursor:crosshair"/></svg><div class="tt"></div>`;
+const svg=box.querySelector('svg'),ch=svg.querySelector('.ch'),hp=svg.querySelector('.hp'),sel=svg.querySelector('.sel');let drag=null;
+const sx=e=>{const r=svg.getBoundingClientRect();return Math.min(Math.max((e.clientX-r.left)*W/r.width,PAD.l),W-PAD.r)};
+const tAt=x=>t0+(x-PAD.l)/(W-PAD.l-PAD.r)*(t1-t0);
+svg.onmousedown=e=>{drag=sx(e);sel.setAttribute('x',drag);sel.setAttribute('width',0);sel.style.display=''};
+svg.onmousemove=e=>{const r=svg.getBoundingClientRect(),x=sx(e);if(drag!=null){sel.setAttribute('x',Math.min(drag,x));sel.setAttribute('width',Math.abs(x-drag))}
+const t=tAt(x);let b=pts[0];for(const p of pts)if(Math.abs(p[0]-t)<Math.abs(b[0]-t))b=p;const bx=X(b[0]),by=Y(b[1]);
+ch.setAttribute('x1',bx);ch.setAttribute('x2',bx);ch.style.display='';hp.setAttribute('cx',bx);hp.setAttribute('cy',by);hp.style.display='';
+tip(box,`<b>${fmt(b[1],1,'W')}</b>${b[2]>b[1]+0.5?` · Spitze ${fmt(b[2],0,'W')}`:''}<br>${new Date(b[0]*1000).toLocaleString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${eur(costOf(b[1]))} pro Stunde`,bx*r.width/W,by*r.height/h)};
+svg.onmouseup=e=>{if(drag==null)return;const x=sx(e),a=Math.min(drag,x),b=Math.max(drag,x);drag=null;sel.style.display='none';if(b-a>8){PZ=[tAt(a),tAt(b)];loadPower()}};
+svg.onmouseleave=()=>{drag=null;sel.style.display='none';ch.style.display='none';hp.style.display='none';box.querySelector('.tt').style.display='none'}}
+function barChart(box,rows,unit,lab){const h=240,vals=rows.map(r=>r[1]);if(!rows.length||!vals.some(v=>v>0)){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
 const max=niceMax(Math.max(...vals)*1.05),n=rows.length,slot=(W-PAD.l-PAD.r)/n,bw=Math.max(Math.min(slot-2,28),2);
 const Y=v=>PAD.t+(h-PAD.t-PAD.b)*(1-v/max),base=Y(0);let g='',xt='';
 rows.forEach((r,i)=>{const x=PAD.l+i*slot+(slot-bw)/2,y=Y(r[1]),hh=base-y;
@@ -138,45 +299,155 @@ if(r[1]>0){const rr=Math.min(4,bw/2,hh);g+=`<path d="M${x},${base}V${y+rr}Q${x},
 g+=`<rect x="${PAD.l+i*slot}" y="0" width="${slot}" height="${h}" fill="transparent" data-i="${i}"/>`;
 if(i%Math.ceil(n/10)==0||i==n-1)xt+=`<text x="${x+bw/2}" y="${h-8}" text-anchor="middle" font-size="12" fill="#8a96a3">${lab(r[0])}</text>`});
 box.innerHTML=`<svg viewBox="0 0 ${W} ${h}">${axisY(h,max,unit)}<line x1="${PAD.l}" x2="${W-PAD.r}" y1="${base}" y2="${base}" stroke="#56606b"/>${xt}${g}</svg><div class="tt"></div>`;
-const svg=box.querySelector('svg');svg.querySelectorAll('rect[data-i]').forEach(el=>{el.onmouseenter=e=>{const r=rows[+el.dataset.i],sr=svg.getBoundingClientRect(),k=sr.width/W;
-tip(box,`<b>${unit=='kWh'?fmt(r[1],2,'kWh'):fmt(r[1],0,unit)}</b><br>${new Date(r[0]).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}`,(+el.getAttribute('x')+slot/2)*k,Y(r[1])*k)};
+const svg=box.querySelector('svg');svg.querySelectorAll('rect[data-i]').forEach(el=>{el.onmouseenter=()=>{const r=rows[+el.dataset.i],k=svg.getBoundingClientRect().width/W;
+tip(box,`<b>${kwh(r[2])}</b> · ${eur(costOf(r[2]))}<br>${new Date(r[0]).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}`,(+el.getAttribute('x')+slot/2)*k,Y(r[1])*k)};
 el.onmouseleave=()=>box.querySelector('.tt').style.display='none'})}
 function rankChart(box,rows){if(!rows.length){box.innerHTML='<div class="empty">Noch keine Energiewerte.</div>';return}
-const max=Math.max(...rows.map(r=>r.wh))||1;box.innerHTML='<table>'+rows.map(r=>`<tr><td style="width:40%">${esc(r.name)}</td>
-<td><div style="height:10px;border-radius:0 4px 4px 0;background:#2f9be0;width:${Math.max(r.wh/max*100,1)}%"></div></td><td class="n" style="width:90px">${kwh(r.wh)}</td></tr>`).join('')+'</table>'}
+const max=Math.max(...rows.map(r=>r.wh))||1;box.innerHTML='<table>'+rows.map(r=>`<tr><td style="width:38%">${esc(r.name)}</td>
+<td style="vertical-align:middle"><div style="height:10px;border-radius:0 4px 4px 0;background:#2f9be0;width:${Math.max(r.wh/max*100,1)}%"></div></td><td class="n" style="width:80px">${kwh(r.wh)}</td><td class="n" style="width:70px">${eur(r.cost)}</td></tr>`).join('')+'</table>'}
 
-function fillSel(){const s=$('esel'),v=s.value;s.innerHTML='<option value="">Alle Geräte</option>'+DEVS.filter(d=>'apower' in (d.status||{})).map(d=>`<option value="${esc(d.id)}">${esc(d.name||d.id)}</option>`).join('');if([...s.options].some(o=>o.value==v))s.value=v}
-$('esel').onchange=()=>loadEn();
-async function loadEn(){const dev=$('esel').value,qd=dev?'dev='+encodeURIComponent(dev)+'&':'';
-$('pcard').style.display=dev?'':'none';$('rcard').style.display=dev?'none':'';
-if(dev)lineChart($('pchart'),await api('devices/'+encodeURIComponent(dev)+'/power?hours=24'),'W');
-const days=await api('energy?'+qd+'days=31');const big=days.some(r=>r[1]>=1000);
-barChart($('dchart'),days.map(r=>[r[0],big?r[1]/1000:r[1]]),big?'kWh':'Wh',d=>new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}));
-const m=await api('energy/months?'+qd);$('mtab').innerHTML=m.length?'<tr><th>Monat</th><th class="n">Energie</th></tr>'+m.map(r=>`<tr><td>${new Date(r[0]+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</td><td class="n">${kwh(r[1])}</td></tr>`).join(''):'<tr><td class="empty">Noch keine Werte.</td></tr>';
-if(!dev)rankChart($('rchart'),await api('energy/by_device?days=30'))}
+// ---------- Energie ----------
+function fillSel(){const s=$('esel'),v=s.value;s.innerHTML='<option value="">Alle Geräte</option>'+devOpts(null,d=>'apower' in (d.status||{}));if([...s.options].some(o=>o.value==v))s.value=v}
+$('esel').onchange=()=>{PZ=null;loadEn()};
+document.querySelectorAll('#prng a[data-h]').forEach(a=>a.onclick=()=>{document.querySelectorAll('#prng a').forEach(x=>x.classList.remove('a'));a.classList.add('a');PH=+a.dataset.h;PZ=null;loadPower()});
+$('pzr').onclick=()=>{PZ=null;loadPower()};
+async function loadPower(){const dev=$('esel').value;if(!dev)return;$('pzr').style.display=PZ?'':'none';$('pcsv').href='/api/export/power.csv?hours='+PH+'&dev='+encodeURIComponent(dev);
+const qs=PZ?`start=${PZ[0]}&end=${PZ[1]}`:`hours=${PH}`;powerChart($('pchart'),await api('devices/'+encodeURIComponent(dev)+'/power?'+qs))}
+async function loadEn(){fillSel();const dev=$('esel').value,qd=dev?'dev='+encodeURIComponent(dev)+'&':'';
+$('pcard').style.display=dev?'':'none';$('rcard').style.display=dev?'none':'';$('bcard').style.display=dev?'none':'';$('pcsv').style.display=dev?'':'none';
+$('xcsv').href='/api/export/energy.csv?'+qd;
+if(dev)await loadPower();
+const days=await api('energy?'+qd+'days=31'),big=days.some(r=>r[1]>=1000);
+barChart($('dchart'),days.map(r=>[r[0],big?r[1]/1000:r[1],r[1]]),big?'kWh':'Wh',d=>new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}));
+const m=await api('energy/months?'+qd);$('mtab').innerHTML=m.length?'<tr><th>Monat</th><th class="n">Energie</th><th class="n">Kosten</th></tr>'+m.map(r=>`<tr><td>${new Date(r[0]+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</td><td class="n">${kwh(r[1])}</td><td class="n">${eur(r[2])}</td></tr>`).join(''):'<tr><td class="empty">Noch keine Werte.</td></tr>';
+if(!dev){rankChart($('rchart'),await api('energy/by_device?days=30'));const b=await api('baseload');
+$('btab').innerHTML=b.devices.length?'<tr><th>Gerät</th><th class="n">Grundlast</th><th class="n">pro Jahr</th><th class="n">Kosten/Jahr</th></tr>'+b.devices.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${fmt(x.w,1,'W')}</td><td class="n">${fmt(x.kwh_year,0,'kWh')}</td><td class="n">${eur(x.cost_year)}</td></tr>`).join('')+`<tr><th>Summe</th><th class="n">${fmt(b.total_w,1,'W')}</th><th class="n">${fmt(b.total_kwh_year,0,'kWh')}</th><th class="n">${eur(b.total_cost_year)}</th></tr>`:'<tr><td class="empty">Noch zu wenige Messwerte (mindestens eine Stunde je Gerät).</td></tr>'}}
+
+// ---------- Automatik ----------
+const ACT={on:'einschalten',off:'ausschalten',toggle:'umschalten'};
+const timeTxt=t=>t.startsWith('sunrise')?'Sonnenaufgang'+(t.slice(7)?' '+t.slice(7)+' min':''):t.startsWith('sunset')?'Sonnenuntergang'+(t.slice(6)?' '+t.slice(6)+' min':''):t;
+async function loadAuto(){const S=await api('schedules');window._S=S;
+$('stab').innerHTML=S.length?'<tr><th>Name</th><th>Wann</th><th>Was</th><th class="admin-only"></th></tr>'+S.map(s=>`<tr class="${s.enabled?'':'ack'}"><td>${esc(s.name||'–')}${s.enabled?'':' <span class="tag">aus</span>'}</td><td>${daysTxt(s.days)}, ${esc(timeTxt(s.time))}${s.today&&s.today!=s.time?` <span class="l">(heute ${s.today})</span>`:''}</td><td>${esc(s.target_label)} ${ACT[s.action]}</td><td class="n admin-only"><a class="lk" onclick="schDlg(${s.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Zeitpläne.</td></tr>';
+const R=await api('rules');window._R=R;
+$('ltab').innerHTML=R.length?'<tr><th>Name</th><th>Wenn</th><th>Dann</th><th>Zuletzt</th><th class="admin-only"></th></tr>'+R.map(r=>`<tr class="${r.enabled?'':'ack'}"><td>${esc(r.name)}${r.enabled?'':' <span class="tag">aus</span>'}</td><td>${trigTxt(r.trig)}${r.hook_url?`<br><code>${esc(r.hook_url)}</code>`:''}</td><td>${r.action.map(actTxt).join('<br>')}</td><td>${r.last_fire?dt(r.last_fire):'–'}</td><td class="n admin-only" style="white-space:nowrap"><a class="lk" onclick="ruleRun(${r.id})">Test</a> · <a class="lk" onclick="ruleDlg(${r.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Regeln.</td></tr>'}
+const TRIG={power:'Leistung',switch:'Schalter',event:'Ereignis am Gerät',offline:'Gerät geht offline',online:'Gerät kommt online',finished:'Gerät fertig (Fertig-Erkennung)',started:'Gerät startet (Fertig-Erkennung)',webhook:'URL-Aufruf (z. B. Tür-/Fensterkontakt)'};
+function trigTxt(t){const n=t.dev?esc(devName(t.dev)):'';let s={power:`${n}: Leistung ${t.op=='<'?'unter':'über'} ${fmt(t.w,0,'W')}${t.for_s?` für ${dur(t.for_s)}`:''}`,switch:`${n} wird ${t.state=='off'?'ausgeschaltet':'eingeschaltet'}`,event:`${n}: Ereignis „${esc(t.event)}“`,offline:`${n} geht offline`,online:`${n} kommt online`,finished:`${n} ist fertig`,started:`${n} startet`,webhook:'URL wird aufgerufen'}[t.type]||esc(t.type);
+if(t.window&&t.window.from)s+=` <span class="l">(${t.window.from}–${t.window.to})</span>`;if(t.days!=null&&t.days!=127)s+=` <span class="l">${daysTxt(t.days)}</span>`;return s}
+function actTxt(a){if(a.type=='notify')return `Push: „${esc(a.text||'')}“`;const tl=(a.target||'').startsWith('room:')?'Raum '+esc(a.target.slice(5)):esc(devName((a.target||'').slice(4)));
+return `${tl} ${ACT[a.mode]||esc(a.mode)}${a.delay_s?` nach ${dur(a.delay_s)}`:''}${a.auto_off_s?`, nach ${dur(a.auto_off_s)} wieder aus`:''}`}
+function schDlg(id){const s=(window._S||[]).find(x=>x.id==id)||{name:'',enabled:1,days:127,time:'07:00',target:'',action:'on'};
+const sun=s.time.startsWith('sun'),kind=sun?(s.time.startsWith('sunrise')?'sunrise':'sunset'):'time',off=sun?(s.time.slice(kind.length)||'0'):'0';
+dlg(`<h2>${id?'Zeitplan bearbeiten':'Neuer Zeitplan'}</h2><div class="f"><label>Name</label><input id="sc_n" value="${esc(s.name)}" placeholder="z. B. Heizlüfter morgens">
+<label>Tage</label>${daysHtml(s.days,'sc_d')}
+<label>Zeit</label><div class="row"><select id="sc_k"><option value="time">Uhrzeit</option><option value="sunrise" ${kind=='sunrise'?'selected':''}>Sonnenaufgang</option><option value="sunset" ${kind=='sunset'?'selected':''}>Sonnenuntergang</option></select>
+<input id="sc_t" type="time" value="${sun?'07:00':esc(s.time)}" style="${sun?'display:none':''}"><span id="sc_ow" style="${sun?'':'display:none'}">± <input id="sc_o" style="width:60px" value="${off}"> min</span></div>
+<label>Ziel</label><select id="sc_g">${targetOpts(s.target)}</select>
+<label>Aktion</label><select id="sc_a">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${k==s.action?'selected':''}>${v}</option>`).join('')}</select>
+<label>Aktiv</label><div><input type="checkbox" id="sc_e" ${s.enabled?'checked':''}></div></div>
+<p class="l">Sonnenzeiten brauchen den Standort unter Einstellungen.</p>
+<div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="schDel(${id})">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="schSave(${id||0})">Speichern</button></div></div>`);
+$('sc_k').onchange=()=>{const t=$('sc_k').value=='time';$('sc_t').style.display=t?'':'none';$('sc_ow').style.display=t?'none':''}}
+function schSave(id){const k=$('sc_k').value,o=parseInt($('sc_o').value||'0')||0;const time=k=='time'?$('sc_t').value:k+(o?(o>0?'+':'')+o:'');
+run(async()=>{await api('schedules',{method:'POST',body:{id,name:$('sc_n').value,days:daysVal('sc_d'),time,target:$('sc_g').value,action:$('sc_a').value,enabled:$('sc_e').checked}});closeDlg();await loadAuto()},'Gespeichert')}
+function schDel(id){if(!confirm('Zeitplan löschen?'))return;run(async()=>{await api('schedules/'+id,{method:'DELETE'});closeDlg();await loadAuto()})}
+function stepHtml(a){return `<div class="card" style="background:var(--c2);margin:8px 0;padding:10px" data-step><div class="row sp"><select class="st_t"><option value="switch" ${a.type!='notify'?'selected':''}>Schalten</option><option value="notify" ${a.type=='notify'?'selected':''}>Push-Nachricht</option></select><a class="lk" onclick="this.closest('[data-step]').remove()">entfernen</a></div>
+<div class="st_sw" style="margin-top:8px;${a.type=='notify'?'display:none':''}"><div class="row"><select class="st_g">${targetOpts(a.target)}</select><select class="st_m">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${k==(a.mode||'on')?'selected':''}>${v}</option>`).join('')}</select></div>
+<div class="row" style="margin-top:6px"><span class="l">nach</span><input class="st_dl" style="width:60px" value="${(a.delay_s||0)/60}"><span class="l">min · bei „einschalten“ wieder aus nach</span><input class="st_ao" style="width:60px" value="${(a.auto_off_s||0)/60}"><span class="l">min (0 = nie)</span></div></div>
+<div class="st_nt" style="margin-top:8px;${a.type=='notify'?'':'display:none'}"><input class="st_x" style="width:100%" value="${esc(a.text||'')}" placeholder="Text – {why} wird durch den Auslöser ersetzt"></div></div>`}
+function ruleDlg(id){const r=(window._R||[]).find(x=>x.id==id)||{name:'',enabled:1,trig:{type:'power',op:'>',w:100,for_s:0},action:[{type:'switch',mode:'off'}]};const t=r.trig,w=t.window||{};
+dlg(`<h2>${id?'Regel bearbeiten':'Neue Regel'}</h2><div class="f"><label>Name</label><input id="ru_n" value="${esc(r.name)}" placeholder="z. B. Fenster auf → Heizung aus">
+<label>Wenn</label><select id="ru_t">${Object.entries(TRIG).map(([k,v])=>`<option value="${k}" ${k==t.type?'selected':''}>${v}</option>`).join('')}</select>
+<label class="rt rt-d">Gerät</label><select id="ru_d" class="rt rt-d">${devOpts(t.dev)}</select>
+<label class="rt rt-p">Bedingung</label><div class="row rt rt-p"><select id="ru_op"><option value=">" ${t.op!='<'?'selected':''}>über</option><option value="<" ${t.op=='<'?'selected':''}>unter</option></select><input id="ru_w" style="width:80px" value="${t.w??100}"> W für <input id="ru_f" style="width:60px" value="${(t.for_s||0)/60}"> min</div>
+<label class="rt rt-s">Zustand</label><select id="ru_s" class="rt rt-s"><option value="on">eingeschaltet</option><option value="off" ${t.state=='off'?'selected':''}>ausgeschaltet</option></select>
+<label class="rt rt-e">Ereignis</label><input id="ru_e" class="rt rt-e" value="${esc(t.event||'single_push')}" placeholder="single_push, double_push, toggle_on, overpower …">
+<label>Nur zwischen</label><div class="row"><input id="ru_wf" type="time" value="${w.from||''}"> und <input id="ru_wt" type="time" value="${w.to||''}"> <span class="l">leer = immer</span></div>
+<label>Nur an</label>${daysHtml(t.days??127,'ru_dy')}
+<label>Aktiv</label><div><input type="checkbox" id="ru_en" ${r.enabled?'checked':''}></div></div>
+<h3>Dann</h3><div id="ru_steps">${r.action.map(stepHtml).join('')}</div><a class="lk" onclick="addStep()">+ weitere Aktion</a>
+${r.hook_url?`<p class="l">URL für den Auslöser: <code>${esc(r.hook_url)}</code></p>`:'<p class="l" id="ru_hk" style="display:none">Die URL steht nach dem Speichern in der Liste. Beim Tür-/Fensterkontakt (Original-Firmware) unter „Actions“ bei „geöffnet“ eintragen.</p>'}
+<div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="ruleDel(${id})">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="ruleSave(${id||0})">Speichern</button></div></div>`);
+const upd=()=>{const v=$('ru_t').value;document.querySelectorAll('#dlg .rt').forEach(e=>e.style.display='none');const show=c=>document.querySelectorAll('#dlg .rt-'+c).forEach(e=>e.style.display='');
+if(v!='webhook')show('d');if(v=='power')show('p');if(v=='switch')show('s');if(v=='event')show('e');if($('ru_hk'))$('ru_hk').style.display=v=='webhook'?'':'none'};$('ru_t').onchange=upd;upd();wireSteps()}
+function wireSteps(){document.querySelectorAll('#ru_steps [data-step]').forEach(el=>{el.querySelector('.st_t').onchange=e=>{const n=e.target.value=='notify';el.querySelector('.st_sw').style.display=n?'none':'';el.querySelector('.st_nt').style.display=n?'':'none'}})}
+function addStep(){$('ru_steps').insertAdjacentHTML('beforeend',stepHtml({type:'switch',mode:'on'}));wireSteps()}
+function ruleSave(id){const v=$('ru_t').value,trig={type:v};
+if(v!='webhook')trig.dev=$('ru_d').value;if(v=='power'){trig.op=$('ru_op').value;trig.w=nIn($('ru_w').value);trig.for_s=Math.round(nIn($('ru_f').value)*60)}
+if(v=='switch')trig.state=$('ru_s').value;if(v=='event')trig.event=$('ru_e').value.trim();
+if($('ru_wf').value&&$('ru_wt').value)trig.window={from:$('ru_wf').value,to:$('ru_wt').value};trig.days=daysVal('ru_dy');
+const action=[...document.querySelectorAll('#ru_steps [data-step]')].map(el=>el.querySelector('.st_t').value=='notify'?{type:'notify',text:el.querySelector('.st_x').value}:
+{type:'switch',target:el.querySelector('.st_g').value,mode:el.querySelector('.st_m').value,delay_s:Math.round(nIn(el.querySelector('.st_dl').value)*60),auto_off_s:Math.round(nIn(el.querySelector('.st_ao').value)*60)});
+run(async()=>{await api('rules',{method:'POST',body:{id,name:$('ru_n').value,enabled:$('ru_en').checked,trig,action}});closeDlg();await loadAuto()},'Gespeichert')}
+function ruleDel(id){if(!confirm('Regel löschen?'))return;run(async()=>{await api('rules/'+id,{method:'DELETE'});closeDlg();await loadAuto()})}
+function ruleRun(id){run(async()=>{await api('rules/'+id+'/run',{method:'POST'});setTimeout(loadAuto,800)},'Regel ausgeführt')}
 
 // ---------- Meldungen ----------
-const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update'};
-async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&x.kind!='online'&&x.kind!='reset'&&x.kind!='update').length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
-if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><th>Meldung</th><th></th></tr>'+a.map(x=>`<tr class="${x.ack?'ack':''}"><td>${new Date(x.ts*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-<td><span class="kind ${x.kind}">${KIND[x.kind]||x.kind}</span></td><td>${esc(x.text)}</td><td class="n">${x.ack?'':`<a style="color:var(--a);cursor:pointer" onclick="ack(${x.id})">quittieren</a>`}</td></tr>`).join(''):'<tr><td class="empty">Keine Meldungen.</td></tr>'}
-async function ack(id){await api('alerts/ack',{method:'POST',body:{id}});loadAl()}
-async function ackAll(){await api('alerts/ack',{method:'POST',body:{}});loadAl()}
+const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel'};
+const QUIET=['online','reset','update','rule','finished'];
+async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&!QUIET.includes(x.kind)).length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
+if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><th>Meldung</th><th class="user-only"></th></tr>'+a.map(x=>`<tr class="${x.ack?'ack':''}"><td>${dt(x.ts)}</td>
+<td><span class="kind ${x.kind}">${KIND[x.kind]||esc(x.kind)}</span></td><td>${esc(x.text)}</td><td class="n user-only">${x.ack?'':`<a class="lk" onclick="ack(${x.id})">quittieren</a>`}</td></tr>`).join(''):'<tr><td class="empty">Keine Meldungen.</td></tr>'}
+function ack(id){run(async()=>{await api('alerts/ack',{method:'POST',body:{id}});await loadAl()})}
+function ackAll(){run(async()=>{await api('alerts/ack',{method:'POST',body:{}});await loadAl()})}
 
-async function loadInfo(){const i=await api('info');$('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' · v'+i.version;
-$('bk').textContent=(i.broker||location.hostname)+':1883';
-if(i.update)$('hs').textContent+=' · Update '+i.update+' verfügbar';if(TAB=='in'){loadUpd().catch(()=>{});}if(TAB=='in')$('itab').innerHTML='<tr><th>Gerät</th><th>ID / Topic</th><th>Modell</th><th>Firmware</th><th>IP</th></tr>'+DEVS.map(d=>`<tr><td>${esc(d.name)}</td><td><code>${esc(d.id)}</code></td><td>${esc(d.model)}</td><td>${esc(d.ver)}</td><td>${esc(d.ip)}</td></tr>`).join('')}
+// ---------- Einstellungen ----------
+async function loadSet(){if(!isAdmin())return;const s=await api('settings');
+$('s_price').value=num(s.price_ct,2);$('s_lat').value=s.location.lat!=null?num(s.location.lat,4):'';$('s_lon').value=s.location.lon!=null?num(s.location.lon,4):'';$('s_pub').value=s.public_url||'';
+$('p_ntfy').value=s.push.ntfy_url;$('p_tchat').value=s.push.tg_chat;$('p_ntok').placeholder=s.push.ntfy_token_set?'gesetzt – leer = unverändert':'optional';$('p_ttok').placeholder=s.push.tg_token_set?'gesetzt – leer = unverändert':'optional';
+$('p_kinds').innerHTML=Object.entries(s.push_all).map(([k,v])=>`<label><input type="checkbox" value="${k}" ${s.push_kinds.includes(k)?'checked':''}>${v}</label>`).join(' ');
+await Promise.all([loadFw(),loadBk(),loadUsers(),loadUpd()])}
+function saveBase(){run(async()=>{const s=await api('settings',{method:'POST',body:{price_ct:$('s_price').value,location:{lat:$('s_lat').value,lon:$('s_lon').value},public_url:$('s_pub').value}});PRICE=s.price_ct},'Gespeichert')}
+function savePush(){const p={ntfy_url:$('p_ntfy').value,tg_chat:$('p_tchat').value};if($('p_ntok').value)p.ntfy_token=$('p_ntok').value;if($('p_ttok').value)p.tg_token=$('p_ttok').value;
+run(async()=>{await api('settings',{method:'POST',body:{push:p,push_kinds:[...document.querySelectorAll('#p_kinds input:checked')].map(c=>c.value)}});$('p_ntok').value='';$('p_ttok').value='';await loadSet()},'Gespeichert')}
+function testPush(){run(async()=>{await api('push/test',{method:'POST'})},'Testnachricht gesendet')}
+async function loadFw(){const f=await api('firmware');window._FW=f;const upd=f.devices.filter(d=>d.fw_new&&d.online);
+$('fw_s').textContent=(f.hermit_latest?'Aktuelle Hermit-OS-Version: '+f.hermit_latest:'Hermit-OS-Version noch nicht geprüft')+(f.checked?' · geprüft '+dt(f.checked):'');
+$('fw_all').disabled=!upd.length;$('fw_all').textContent=upd.length?`Alle aktualisieren (${upd.length})`:'Alle aktuell';
+$('fwtab').innerHTML=f.devices.length?'<tr><th>Gerät</th><th>Modell</th><th>Version</th><th></th></tr>'+f.devices.map(d=>`<tr><td>${esc(d.name||d.id)}</td><td>${esc(d.model)}</td><td>${esc(d.ver||'–')}${d.fw_new?` → <b>${esc(d.fw_new)}</b>`:''}</td><td class="n">${d.fw_new&&d.online?`<button class="bt s" onclick="fwUpd(['${esc(d.id)}'])">Aktualisieren</button>`:d.online?'<span class="l">aktuell</span>':'<span class="l">offline</span>'}</td></tr>`).join(''):'<tr><td class="empty">Keine Geräte.</td></tr>'}
+function fwCheck(){run(async()=>{await api('firmware/check',{method:'POST'});await loadFw()},'Geprüft')}
+function fwUpd(devs){if(!confirm(devs.length+' Gerät(e) aktualisieren? Sie starten danach neu, das Relais bleibt im Zustand.'))return;
+run(async()=>{const r=await api('firmware/update',{method:'POST',body:{devices:devs}});const bad=Object.entries(r.result).filter(([k,v])=>v!='gestartet');if(bad.length)toast(bad.map(([k,v])=>devName(k)+': '+v).join('; '));else toast('Update gestartet – die Geräte melden sich in 1–2 Minuten mit der neuen Version',1)})}
+function fwAll(){fwUpd(window._FW.devices.filter(d=>d.fw_new&&d.online).map(d=>d.id))}
+async function loadBk(){const b=await api('backups');window._BK=b;
+$('bktab').innerHTML=b.length?'<tr><th>Gerät</th><th>Gesichert</th><th>Version</th><th></th></tr>'+b.map(x=>`<tr><td>${esc(x.name)}</td><td>${dt(x.ts)}</td><td>${esc(x.ver||'')}</td><td class="n" style="white-space:nowrap"><a class="lk" href="/api/backups/${x.id}">Laden</a> · <a class="lk" onclick="bkDlg(${x.id})">Zurückspielen</a> · <a class="lk" onclick="bkDel(${x.id})" title="Löschen">✕</a></td></tr>`).join(''):'<tr><td class="empty">Noch keine Sicherungen.</td></tr>'}
+function bkNow(){run(async()=>{const r=await api('backups',{method:'POST',body:{}});const bad=Object.entries(r.result).filter(([k,v])=>String(v).startsWith('Fehler'));if(bad.length)toast(bad.map(([k,v])=>devName(k)+': '+v).join('; '));else toast('Gesichert',1);await loadBk()})}
+function bkDel(id){if(!confirm('Sicherung löschen?'))return;run(async()=>{await api('backups/'+id,{method:'DELETE'});await loadBk()})}
+function bkDlg(id){const b=window._BK.find(x=>x.id==id);
+dlg(`<h2>Sicherung zurückspielen</h2><p>Sicherung von <b>${esc(b.name)}</b> (${dt(b.ts)}, ${esc(b.model||'')} ${esc(b.ver||'')})</p><div class="f">
+<label>Auf Gerät</label><select id="bk_d">${devOpts(b.dev,d=>d.online)}</select>
+<label>Aktionen</label><label style="color:var(--fg)"><input type="checkbox" id="bk_h" checked> ersetzen (vorhandene werden gelöscht)</label></div>
+<p class="l">Am besten auf ein Gerät gleichen Typs. WLAN und MQTT werden nicht verändert.</p><pre id="bk_log" style="font-size:12px;white-space:pre-wrap"></pre>
+<div class="row sp" style="margin-top:14px"><span></span><div class="row"><button class="bt g" onclick="closeDlg()">Schließen</button><button class="bt" id="bk_go" onclick="bkRestore(${id})">Zurückspielen</button></div></div>`)}
+function bkRestore(id){if(!$('bk_d').value){toast('Kein Gerät online');return}run(async()=>{$('bk_go').disabled=true;try{const r=await api('backups/'+id+'/restore',{method:'POST',body:{dev:$('bk_d').value,hooks:$('bk_h').checked}});
+$('bk_log').textContent=r.log.map(s=>(s.ok?'✓ ':'✗ ')+s.step+(s.error?' – '+s.error:'')).join('\n')}finally{$('bk_go').disabled=false}})}
+async function loadUsers(){const u=await api('users');const RL={admin:'Administrator',user:'Benutzer',viewer:'Betrachter'};
+$('utab').innerHTML=u.length?'<tr><th>Name</th><th>Rolle</th><th></th></tr>'+u.map(x=>`<tr><td>${esc(x.name)}</td><td>${RL[x.role]}</td><td class="n"><a class="lk" onclick="userDlg('${esc(x.name)}','${x.role}')">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="l">Keine Benutzer – die Oberfläche ist ohne Anmeldung offen. Lege einen Administrator an oder setze CLOUD_PASSWORD in der .env.</td></tr>'}
+function userDlg(name,role){dlg(`<h2>${name?'Benutzer bearbeiten':'Neuer Benutzer'}</h2><div class="f"><label>Name</label><input id="us_n" value="${esc(name||'')}" ${name?'disabled':''} autocomplete="off">
+<label>Rolle</label><select id="us_r"><option value="admin">Administrator</option><option value="user">Benutzer</option><option value="viewer">Betrachter</option></select>
+<label>Passwort</label><input id="us_p" type="password" placeholder="${name?'leer = unverändert':'mindestens 6 Zeichen'}" autocomplete="new-password"></div>
+<div class="row sp" style="margin-top:14px"><div>${name&&name!='admin'?`<button class="bt r" onclick="userDel('${esc(name)}')">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="userSave()">Speichern</button></div></div>`);
+$('us_r').value=role||'user'}
+function userSave(){run(async()=>{const first=!$('utab').querySelector('a');await api('users',{method:'POST',body:{name:$('us_n').value,role:$('us_r').value,password:$('us_p').value}});closeDlg();if(first){location.reload();return}await loadUsers()},'Gespeichert')}
+function userDel(n){if(!confirm('Benutzer '+n+' löschen?'))return;run(async()=>{await api('users/'+encodeURIComponent(n),{method:'DELETE'});closeDlg();await loadUsers()})}
 for(let h=0;h<24;h++)$('u_hour').insertAdjacentHTML('beforeend',`<option value="${h}">${String(h).padStart(2,'0')}:00</option>`);
 function showUpd(u){$('u_v').textContent='Version '+u.current+(u.available?' → '+u.available+' verfügbar':' – aktuell');
-$('u_s').textContent=u.running?'Update läuft … die Seite lädt danach neu.':(u.error||(u.last_check?'zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''));
+$('u_s').textContent=u.running?'Update läuft … die Seite lädt danach neu.':(u.error||(u.last_check?'zuletzt geprüft '+dt(u.last_check):''));
 $('u_btn').style.display=u.available&&u.updater&&!u.running?'':'none';$('u_mode').value=u.mode;$('u_hour').value=u.hour;
 $('u_hint').textContent=u.updater?'':'Der Updater-Container läuft nicht – installieren geht dann nur von Hand (siehe cloud/README.md).';
 $('u_log').textContent=u.log;$('u_log').style.display=u.log?'':'none';if(u.running&&!window._ur){window._ur=u.current;waitUpd()}}
 async function loadUpd(){showUpd(await api('update'))}
-async function updCheck(){showUpd(await api('update/check',{method:'POST'}))}
-async function updInstall(){if(!confirm('Cloud jetzt aktualisieren? Die Oberfläche ist dabei kurz nicht erreichbar.'))return;try{showUpd(await api('update/install',{method:'POST'}))}catch(e){toast(e.message)}}
-async function updCfg(){showUpd(await api('update/config',{method:'POST',body:{mode:$('u_mode').value,hour:+$('u_hour').value}}))}
+function updCheck(){run(async()=>showUpd(await api('update/check',{method:'POST'})))}
+function updInstall(){if(!confirm('Cloud jetzt aktualisieren? Die Oberfläche ist dabei kurz nicht erreichbar.'))return;run(async()=>showUpd(await api('update/install',{method:'POST'})))}
+function updCfg(){run(async()=>showUpd(await api('update/config',{method:'POST',body:{mode:$('u_mode').value,hour:+$('u_hour').value}})))}
 async function waitUpd(){for(let i=0;i<120;i++){await new Promise(r=>setTimeout(r,5000));try{const u=await api('update');if(u.current!=window._ur||(!u.running&&u.log.includes('FERTIG'))){location.reload();return}if(!u.running&&u.log.includes('FEHLER')){window._ur=null;showUpd(u);return}}catch(e){}}}
-async function refresh(){try{await loadDevs();await loadAl();await loadInfo();if(TAB=='en')await loadEn()}catch(e){if(e.message!='login')console.warn(e)}}
-refresh();setInterval(()=>{if(TAB!='en')refresh();else loadInfo().catch(()=>{})},5000);
+
+// ---------- Ablauf ----------
+async function loadInfo(){const i=await api('info');ME=i.user;PRICE=i.price_ct;document.body.classList.toggle('ro',!isAdmin());document.body.classList.toggle('vo',!canSw());
+$('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' · v'+i.version+(i.update&&isAdmin()?' · Update '+i.update:'');
+$('bk').textContent=(i.broker||location.hostname)+':1883';$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
+let busy=false;
+async function refresh(force){if(busy&&!force)return;busy=true;try{await loadInfo();await loadDevs();await loadAl();
+if(TAB=='wa')await loadApps();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
+refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
+if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 </script></body></html>

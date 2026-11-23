@@ -2,279 +2,174 @@
 # Copyright (C) 2026 D.Koch – Hermit OS
 """Hermit Cloud – kleine Heim-Cloud fuer Hermit-OS- und Shelly-Gen2+-Geraete.
 
-Die Geraete verbinden sich per MQTT (Gen2-Format) mit dem Broker. Diese App liest mit,
-speichert Status, Leistung und Energie in SQLite und bietet eine Weboberflaeche:
-Geraeteuebersicht, Schalten, Energieverlauf und Meldungen.
+Die Geraete verbinden sich per MQTT (Gen2-Format) mit dem Broker. Diese App liest mit, speichert Status,
+Leistung und Energie in SQLite und bietet die Weboberflaeche: Geraete und Raeume, Waesche & Co. mit
+Fertig-Erkennung, Energie und Kosten, Zeitplaene und Regeln, Meldungen mit Push, Firmware, Sicherungen.
 """
 import asyncio
+import csv
 import hashlib
 import hmac
-import itertools
+import io
 import json
 import os
-import sqlite3
+import secrets
 import threading
 import time
 import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-import paho.mqtt.client as mqtt
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+
+import core
+import engine
+from bus import BUS, seen
+from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
+                  set_setting, setting, today)
 
 VERSION = json.loads((Path(__file__).parent / "version.json").read_text())["version"]
 UPDATE_URL = os.environ.get("UPDATE_URL",
-    "https://raw.githubusercontent.com/oeltensack/hermit-os/main/cloud/app/version.json")
-DATA = Path(os.environ.get("DATA_DIR", "/data"))
-DB_PATH = DATA / "cloud.db"
-MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
-MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
-MQTT_USER = os.environ.get("MQTT_USER", "")
-MQTT_PASS = os.environ.get("MQTT_PASS", "")
+                            "https://raw.githubusercontent.com/oeltensack/hermit-os/main/cloud/app/version.json")
 PASSWORD = os.environ.get("CLOUD_PASSWORD", "")
-TZ = ZoneInfo(os.environ.get("TZ", "Europe/Berlin"))
-KEEP_POWER_DAYS = int(os.environ.get("KEEP_POWER_DAYS", "31"))
-OFFLINE_AFTER = int(os.environ.get("OFFLINE_AFTER", "180"))     # s ohne Lebenszeichen
-SRC = "hermit-cloud"
 STATIC = Path(__file__).parent / "static"
 
-# ======================= Datenbank =======================
-_db_lock = threading.Lock()
+app = FastAPI(title="Hermit Cloud", version=VERSION)
 
 
-def db():
-    c = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10)
-    c.row_factory = sqlite3.Row
-    return c
+# ======================= Benutzer =======================
+ROLES = ("admin", "user", "viewer")      # Admin: alles · Benutzer: schalten · Betrachter: nur lesen
 
 
-DB = None
+def pw_hash(pw, salt=None):
+    salt = salt or secrets.token_hex(8)
+    h = hashlib.pbkdf2_hmac("sha256", pw.encode(), salt.encode(), 120_000).hex()
+    return f"{salt}${h}"
 
 
-def q(sql, args=(), one=False):
-    with _db_lock:
-        cur = DB.execute(sql, args)
-        rows = cur.fetchall()
-        DB.commit()
-    return (rows[0] if rows else None) if one else rows
+def pw_ok(pw, stored):
+    try:
+        salt, _ = stored.split("$", 1)
+        return hmac.compare_digest(pw_hash(pw, salt), stored)
+    except Exception:
+        return False
 
 
-def init_db():
-    global DB
-    DATA.mkdir(parents=True, exist_ok=True)
-    DB = db()
-    DB.executescript("""
-    PRAGMA journal_mode=WAL;
-    CREATE TABLE IF NOT EXISTS devices(
-      id TEXT PRIMARY KEY, name TEXT, model TEXT, app TEXT, ver TEXT, mac TEXT, ip TEXT, gen INTEGER,
-      online INTEGER DEFAULT 0, last_seen REAL DEFAULT 0, first_seen REAL,
-      comp TEXT, status TEXT DEFAULT '{}', info TEXT DEFAULT '{}',
-      last_total REAL, today_wh REAL DEFAULT 0, hidden INTEGER DEFAULT 0);
-    CREATE TABLE IF NOT EXISTS power(dev TEXT, ts INTEGER, w REAL, PRIMARY KEY(dev, ts));
-    CREATE TABLE IF NOT EXISTS energy(dev TEXT, day TEXT, wh REAL, PRIMARY KEY(dev, day));
-    CREATE TABLE IF NOT EXISTS alerts(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, dev TEXT,
-      kind TEXT, text TEXT, ack INTEGER DEFAULT 0);
-    CREATE INDEX IF NOT EXISTS alerts_ts ON alerts(ts);
-    CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT);
-    """)
-    DB.commit()
+def users_exist():
+    return bool(q("SELECT 1 FROM users LIMIT 1", one=True))
 
 
-def today():
-    return datetime.now(TZ).strftime("%Y-%m-%d")
-
-
-def dev_name(dev):
-    r = q("SELECT name FROM devices WHERE id=?", (dev,), one=True)
-    return (r["name"] if r and r["name"] else dev)
-
-
-def alert(dev, kind, text):
-    q("INSERT INTO alerts(ts, dev, kind, text) VALUES(?,?,?,?)", (time.time(), dev, kind, text))
-
-
-# ======================= MQTT =======================
-class Bus:
-    def __init__(self):
-        self.c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"{SRC}-{os.getpid()}")
-        if MQTT_USER:
-            self.c.username_pw_set(MQTT_USER, MQTT_PASS)
-        self.c.on_connect = self.on_connect
-        self.c.on_message = self.on_message
-        self.c.on_disconnect = lambda *a: None
-        self.connected = False
-        self.ids = itertools.count(1)
-        self.wait = {}          # rpc-id -> (Event, [Antwort])
-        self.loop = None
-
-    def start(self):
-        self.c.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
-        self.c.loop_start()
-
-    def on_connect(self, c, userdata, flags, rc, props=None):
-        self.connected = not rc.is_failure
-        if self.connected:
-            c.subscribe([("+/online", 0), ("+/info", 0), ("+/status/+", 0), ("+/events/rpc", 0),
-                         (f"{SRC}/rpc", 0)])
-
-    # ---- eingehend ----
-    def on_message(self, c, userdata, msg):
-        try:
-            self.handle(msg.topic, msg.payload, msg.retain)
-        except Exception as e:                       # nie den MQTT-Thread sterben lassen
-            print("Fehler bei", msg.topic, e, flush=True)
-
-    def handle(self, topic, payload, retained=False):
-        # Gespeicherte (retained) Nachrichten liefert der Broker beim Verbinden der Cloud erneut aus –
-        # sie aktualisieren die Daten, zaehlen aber nicht als Lebenszeichen. Massgeblich ist dann /online.
-        if topic == f"{SRC}/rpc":
-            d = json.loads(payload)
-            w = self.wait.get(d.get("id"))
-            if w:
-                w[1].append(d)
-                w[0].set()
-            return
-        dev, _, rest = topic.partition("/")
-        if not dev or dev == SRC:
-            return
-        if rest == "online":
-            on = payload.decode().strip() == "true"
-            seen(dev, online=on)
-            if on and not q("SELECT info FROM devices WHERE id=? AND info!='{}'", (dev,), one=True):
-                # Shelly Gen2+ ohne /info: Geraeteinfo per RPC holen
-                threading.Thread(target=self.fetch_info, args=(dev,), daemon=True).start()
-            return
-        if not payload:
-            return
-        d = json.loads(payload)
-        if rest == "info":
-            set_info(dev, d, live=not retained)
-        elif rest.startswith("status/"):
-            comp = rest[7:]
-            if comp.startswith(("switch:", "cct:", "light:")):
-                set_status(dev, comp, d, live=not retained)
-            elif not retained:
-                seen(dev)
-        elif rest == "events/rpc":
-            m = d.get("method")
-            p = d.get("params") or {}
-            if m == "NotifyEvent":
-                for e in p.get("events", []):
-                    on_event(dev, e)
-            elif m in ("NotifyStatus", "NotifyFullStatus"):
-                for k, v in p.items():
-                    if isinstance(v, dict) and k.startswith(("switch:", "cct:", "light:")):
-                        set_status(dev, k, v, merge=True)
-                seen(dev)
-
-    def fetch_info(self, dev):
-        try:
-            set_info(dev, self.rpc(dev, "Shelly.GetDeviceInfo"))
-        except Exception:
-            pass
-
-    # ---- ausgehend ----
-    def rpc(self, dev, method, params=None, timeout=6):
-        if not self.connected:
-            raise RuntimeError("Keine Verbindung zum MQTT-Broker")
-        rid = next(self.ids)
-        ev, box = threading.Event(), []
-        self.wait[rid] = (ev, box)
-        try:
-            req = {"id": rid, "src": SRC, "method": method}
-            if params:
-                req["params"] = params
-            self.c.publish(f"{dev}/rpc", json.dumps(req))
-            if not ev.wait(timeout):
-                raise TimeoutError("Gerät antwortet nicht")
-            r = box[0]
-            if "error" in r:
-                raise RuntimeError(r["error"].get("message") or str(r["error"]))
-            return r.get("result")
-        finally:
-            self.wait.pop(rid, None)
-
-
-BUS = Bus()
-
-
-# ======================= Geraetezustand =======================
-def ensure(dev):
-    q("INSERT OR IGNORE INTO devices(id, first_seen) VALUES(?,?)", (dev, time.time()))
-
-
-def seen(dev, online=None):
-    ensure(dev)
-    r = q("SELECT online, hidden FROM devices WHERE id=?", (dev,), one=True)
-    now = time.time()
-    if online is False:
-        if r["online"]:
-            q("UPDATE devices SET online=0 WHERE id=?", (dev,))
-            if not r["hidden"]:
-                alert(dev, "offline", f"{dev_name(dev)} ist offline")
+def ensure_admin():
+    """CLOUD_PASSWORD legt beim ersten Start den Benutzer 'admin' an (bzw. setzt sein Passwort)."""
+    if not PASSWORD:
         return
-    if not r["online"] and r["hidden"] == 0 and q("SELECT 1 FROM alerts WHERE dev=? AND kind='offline'", (dev,), one=True):
-        alert(dev, "online", f"{dev_name(dev)} ist wieder online")
-    q("UPDATE devices SET online=1, last_seen=? WHERE id=?", (now, dev))
+    r = q("SELECT pw FROM users WHERE name='admin'", one=True)
+    if not r:
+        q("INSERT INTO users(name, pw, role, created) VALUES('admin',?,'admin',?)", (pw_hash(PASSWORD), time.time()))
+    elif setting("admin_pw_from_env", True) and not pw_ok(PASSWORD, r["pw"]):
+        q("UPDATE users SET pw=? WHERE name='admin'", (pw_hash(PASSWORD),))
 
 
-def set_info(dev, d, live=True):
-    ensure(dev)
-    q("""UPDATE devices SET info=?, model=?, app=?, ver=?, mac=?, gen=?, ip=COALESCE(?, ip),
-         name=COALESCE(?, name) WHERE id=?""",
-      (json.dumps(d), d.get("model"), d.get("app"), d.get("ver"), d.get("mac"), d.get("gen"),
-       d.get("ip"), d.get("name"), dev))
-    if live:
-        seen(dev)
+def current_user(request: Request):
+    if not users_exist():
+        return {"name": "admin", "role": "admin", "open": True}
+    tok = request.cookies.get("hc", "")
+    if tok:
+        s = q("SELECT s.name, u.role FROM sessions s JOIN users u ON u.name=s.name WHERE s.token=?", (tok,), one=True)
+        if s:
+            q("UPDATE sessions SET seen=? WHERE token=?", (time.time(), tok))
+            return {"name": s["name"], "role": s["role"]}
+    return None
 
 
-def set_status(dev, comp, st, merge=False, live=True):
-    ensure(dev)
-    r = q("SELECT status, comp, last_total, today_wh FROM devices WHERE id=?", (dev,), one=True)
-    old = json.loads(r["status"] or "{}") if r["comp"] in (None, comp) else {}
-    new = {**old, **st} if merge else st
-    if merge and "aenergy" in st:
-        new["aenergy"] = st["aenergy"]
-    q("UPDATE devices SET status=?, comp=? WHERE id=?", (json.dumps(new), comp, dev))
-    if not live:
-        return                            # alter Stand vom Broker: keine Leistung/Energie verbuchen
-    seen(dev)
-    now = int(time.time())
-    if "apower" in st:
-        q("INSERT OR REPLACE INTO power(dev, ts, w) VALUES(?,?,?)", (dev, now // 60 * 60, float(st["apower"])))
-    tot = (st.get("aenergy") or {}).get("total")
-    if tot is not None:
-        tot = float(tot)
-        last = r["last_total"]
-        if last is not None:
-            delta = tot - last
-            if delta < 0:                 # Zaehler zurueckgesetzt (Reset, Werkseinstellung)
-                delta = 0
-            if delta > 0:
-                q("""INSERT INTO energy(dev, day, wh) VALUES(?,?,?)
-                     ON CONFLICT(dev, day) DO UPDATE SET wh = wh + excluded.wh""", (dev, today(), delta))
-        q("UPDATE devices SET last_total=? WHERE id=?", (tot, dev))
+def need(request, role):
+    u = request.state.user
+    order = {"viewer": 0, "user": 1, "admin": 2}
+    if order.get(u["role"], -1) < order[role]:
+        raise HTTPException(403, "Keine Berechtigung")
 
 
-EVENT_TEXT = {
-    "overpower": ("overpower", "Überlast – Relais abgeschaltet"),
-    "overtemperature": ("overtemp", "Übertemperatur – Relais abgeschaltet"),
-    "overtemp": ("overtemp", "Übertemperatur – Relais abgeschaltet"),
-    "reset": ("reset", "Schutzabschaltung am Gerät zurückgesetzt"),
-    "overvoltage": ("overvoltage", "Überspannung"),
-}
+OPEN_PATHS = ("/api/login", "/api/info/public")
 
 
-def on_event(dev, e):
-    seen(dev)
-    ev = e.get("event", "")
-    if ev in EVENT_TEXT:
-        kind, text = EVENT_TEXT[ev]
-        alert(dev, kind, f"{dev_name(dev)}: {text}")
+@app.middleware("http")
+async def auth(request: Request, call_next):
+    p = request.url.path
+    if p.startswith("/api/") and p not in OPEN_PATHS:
+        u = current_user(request)
+        if not u:
+            return JSONResponse({"detail": "Anmeldung erforderlich"}, status_code=401)
+        request.state.user = u
+    return await call_next(request)
 
 
+@app.post("/api/login")
+async def login(request: Request, response: Response):
+    d = await request.json()
+    if not users_exist():
+        return {"ok": True}
+    name = str(d.get("name") or "admin").strip()
+    r = q("SELECT pw FROM users WHERE name=?", (name,), one=True)
+    if not r or not pw_ok(str(d.get("password", "")), r["pw"]):
+        raise HTTPException(401, "Name oder Passwort falsch")
+    tok = secrets.token_urlsafe(24)
+    q("INSERT INTO sessions(token, name, created, seen) VALUES(?,?,?,?)", (tok, name, time.time(), time.time()))
+    response.set_cookie("hc", tok, max_age=365 * 86400, httponly=True, samesite="lax")
+    return {"ok": True}
+
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response):
+    q("DELETE FROM sessions WHERE token=?", (request.cookies.get("hc", ""),))
+    response.delete_cookie("hc")
+    return {"ok": True}
+
+
+@app.get("/api/users")
+def users(request: Request):
+    need(request, "admin")
+    return [{"name": r["name"], "role": r["role"], "created": r["created"]}
+            for r in q("SELECT * FROM users ORDER BY name")]
+
+
+@app.post("/api/users")
+async def user_save(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    name, role, pw = str(d.get("name", "")).strip(), d.get("role", "user"), d.get("password") or ""
+    if not name or role not in ROLES:
+        raise HTTPException(400, "Name und Rolle angeben")
+    r = q("SELECT 1 FROM users WHERE name=?", (name,), one=True)
+    if not r:
+        if len(pw) < 6:
+            raise HTTPException(400, "Passwort mindestens 6 Zeichen")
+        q("INSERT INTO users(name, pw, role, created) VALUES(?,?,?,?)", (name, pw_hash(pw), role, time.time()))
+    else:
+        if name == "admin" and role != "admin":
+            raise HTTPException(400, "admin bleibt Administrator")
+        q("UPDATE users SET role=? WHERE name=?", (role, name))
+        if pw:
+            if len(pw) < 6:
+                raise HTTPException(400, "Passwort mindestens 6 Zeichen")
+            q("UPDATE users SET pw=? WHERE name=?", (pw_hash(pw), name))
+            q("DELETE FROM sessions WHERE name=?", (name,))
+            if name == "admin":
+                set_setting("admin_pw_from_env", False)
+    return {"ok": True}
+
+
+@app.delete("/api/users/{name}")
+def user_delete(name: str, request: Request):
+    need(request, "admin")
+    if name == "admin":
+        raise HTTPException(400, "admin kann nicht gelöscht werden")
+    q("DELETE FROM users WHERE name=?", (name,))
+    q("DELETE FROM sessions WHERE name=?", (name,))
+    return {"ok": True}
+
+
+# ======================= Start =======================
 def watchdog():
     while True:
         time.sleep(30)
@@ -284,54 +179,617 @@ def watchdog():
                 seen(r["id"], online=False)
             q("DELETE FROM power WHERE ts<?", (int(time.time()) - KEEP_POWER_DAYS * 86400,))
             q("DELETE FROM alerts WHERE ts<? AND ack=1", (time.time() - 180 * 86400,))
+            q("DELETE FROM sessions WHERE seen<?", (time.time() - 365 * 86400,))
         except Exception as e:
             print("Watchdog:", e, flush=True)
 
 
-# ======================= Web =======================
-app = FastAPI(title="Hermit Cloud", version=VERSION)
-
-
-def token():
-    return hmac.new(PASSWORD.encode(), b"hermit-cloud", hashlib.sha256).hexdigest()
-
-
-@app.middleware("http")
-async def auth(request: Request, call_next):
-    p = request.url.path
-    if PASSWORD and p.startswith("/api/") and p != "/api/login":
-        if not hmac.compare_digest(request.cookies.get("hc", ""), token()):
-            return JSONResponse({"detail": "Anmeldung erforderlich"}, status_code=401)
-    return await call_next(request)
-
-
 @app.on_event("startup")
 def startup():
-    init_db()
+    core.init_db()
+    ensure_admin()
+    core.start_push()
     BUS.start()
+    engine.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
 
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
-@app.post("/api/login")
-async def login(request: Request, response: Response):
+def _static(f, t):
+    return lambda: FileResponse(STATIC / f, media_type=t, headers={"Cache-Control": "no-cache"})
+
+
+for _f, _t in (("manifest.webmanifest", "application/manifest+json"), ("sw.js", "text/javascript"),
+               ("icon-192.png", "image/png"), ("icon-512.png", "image/png"), ("apple-touch-icon.png", "image/png")):
+    app.get("/" + _f, include_in_schema=False)(_static(_f, _t))
+
+
+# ======================= Geraete =======================
+async def rpc_async(dev, method, params=None, timeout=6):
+    try:
+        return await asyncio.to_thread(BUS.rpc, dev, method, params, timeout)
+    except Exception as e:
+        raise HTTPException(502, str(e))
+
+
+def is_hermit(r):
+    info = json.loads(r["info"] or "{}")
+    return str(info.get("fw_id", "")).startswith("hermit") or str(r["model"] or "").startswith("HERMIT")
+
+
+def dev_row(r, latest=None):
+    st = json.loads(r["status"] or "{}")
+    e = q("SELECT wh FROM energy WHERE dev=? AND day=?", (r["id"], today()), one=True)
+    wh = round(e["wh"], 1) if e else 0.0
+    hermit = is_hermit(r)
+    out = {
+        "id": r["id"], "name": r["name"] or "", "room": r["room"] or "", "model": r["model"], "app": r["app"],
+        "ver": r["ver"], "mac": r["mac"], "ip": r["ip"], "gen": r["gen"], "online": bool(r["online"]),
+        "last_seen": r["last_seen"], "comp": r["comp"], "status": st, "hermit": hermit,
+        "today_wh": wh, "today_cost": round(wh / 1000 * price_eur_kwh(), 2), "fw_new": None,
+    }
+    if hermit and latest:
+        out["fw_new"] = latest if engine.ver_tuple(latest) > engine.ver_tuple(r["ver"]) else None
+    elif r["id"] in engine.FW["gen2"]:
+        out["fw_new"] = engine.FW["gen2"][r["id"]]
+    a = engine.appliance(r["id"])
+    if a:
+        out["appliance"] = {"type": a["type"], "label": a["label"], "state": a["state"]}
+    return out
+
+
+@app.get("/api/devices")
+def devices():
+    latest = engine.FW["hermit"]
+    rows = q("SELECT * FROM devices WHERE hidden=0 ORDER BY COALESCE(NULLIF(room,''),'~'), COALESCE(NULLIF(name,''), id)")
+    return [dev_row(r, latest) for r in rows]
+
+
+def get_dev(dev):
+    r = q("SELECT * FROM devices WHERE id=?", (dev,), one=True)
+    if not r:
+        raise HTTPException(404, "Unbekanntes Gerät")
+    return r
+
+
+@app.post("/api/devices/{dev}/rpc")
+async def dev_rpc(dev: str, request: Request):
+    need(request, "admin")
+    get_dev(dev)
     d = await request.json()
-    if not PASSWORD:
-        return {"ok": True}
-    if not hmac.compare_digest(str(d.get("password", "")), PASSWORD):
-        raise HTTPException(401, "Passwort falsch")
-    response.set_cookie("hc", token(), max_age=180 * 86400, httponly=True, samesite="lax")
+    return {"result": await rpc_async(dev, d["method"], d.get("params"))}
+
+
+@app.post("/api/devices/{dev}/switch")
+async def dev_switch(dev: str, request: Request):
+    need(request, "user")
+    get_dev(dev)
+    d = await request.json()
+    try:
+        res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None)
+    except Exception as e:
+        raise HTTPException(502, str(e))
+    return {"result": res}
+
+
+@app.post("/api/devices/{dev}/meta")
+async def dev_meta(dev: str, request: Request):
+    """Name und Raum (der Name wird auch am Geraet gesetzt, wenn es erreichbar ist)."""
+    need(request, "admin")
+    get_dev(dev)
+    d = await request.json()
+    if "room" in d:
+        q("UPDATE devices SET room=? WHERE id=?", (str(d["room"]).strip(), dev))
+    if "name" in d:
+        name = str(d["name"]).strip()
+        q("UPDATE devices SET name=? WHERE id=?", (name, dev))
+        try:
+            await asyncio.to_thread(BUS.rpc, dev, "Sys.SetConfig", {"config": {"device": {"name": name}}}, 4)
+        except Exception:
+            pass
     return {"ok": True}
 
 
-@app.post("/api/logout")
-def logout(response: Response):
-    response.delete_cookie("hc")
+@app.post("/api/devices/{dev}/name")
+async def dev_rename(dev: str, request: Request):
+    return await dev_meta(dev, request)
+
+
+@app.delete("/api/devices/{dev}")
+def dev_delete(dev: str, request: Request):
+    need(request, "admin")
+    get_dev(dev)
+    for t in ("power", "energy", "appliances", "runs", "backups"):
+        q(f"DELETE FROM {t} WHERE dev=?", (dev,))
+    q("DELETE FROM devices WHERE id=?", (dev,))
+    return {"ok": True}
+
+
+@app.get("/api/rooms")
+def rooms():
+    return [r["room"] for r in q("SELECT DISTINCT room FROM devices WHERE room!='' AND hidden=0 ORDER BY room")]
+
+
+@app.post("/api/rooms/switch")
+async def room_switch(request: Request):
+    need(request, "user")
+    d = await request.json()
+    errs = await asyncio.to_thread(engine.do_switch, f"room:{d['room']}", "on" if d.get("on") else "off")
+    return {"errors": errs}
+
+
+# ======================= Leistung, Energie, Kosten =======================
+@app.get("/api/devices/{dev}/power")
+def dev_power(dev: str, hours: float = 24, start: float = 0, end: float = 0, points: int = 800):
+    end = end or time.time()
+    start = start or end - min(hours, KEEP_POWER_DAYS * 24) * 3600
+    rows = q("SELECT ts, w, COALESCE(wmax, w) AS wmax FROM power WHERE dev=? AND ts>=? AND ts<=? ORDER BY ts",
+             (dev, int(start), int(end)))
+    if len(rows) <= points:
+        return {"start": start, "end": end, "data": [[r["ts"], r["w"], r["wmax"]] for r in rows], "bucket_s": 60}
+    step = (end - start) / points
+    buckets = {}
+    for r in rows:
+        b = int((r["ts"] - start) // step)
+        s = buckets.setdefault(b, [0.0, 0, 0.0])
+        s[0] += r["w"]
+        s[1] += 1
+        s[2] = max(s[2], r["wmax"])
+    data = [[int(start + (b + 0.5) * step), s[0] / s[1], s[2]] for b, s in sorted(buckets.items())]
+    return {"start": start, "end": end, "data": data, "bucket_s": step}
+
+
+@app.get("/api/energy")
+def energy(dev: str = "", days: int = 31):
+    start = (now_local() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    if dev:
+        rows = q("SELECT day, wh FROM energy WHERE dev=? AND day>=? ORDER BY day", (dev, start))
+    else:
+        rows = q("SELECT day, SUM(wh) AS wh FROM energy WHERE day>=? GROUP BY day ORDER BY day", (start,))
+    have = {r["day"]: r["wh"] for r in rows}
+    out = []
+    for i in range(days):
+        d = (now_local() - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+        out.append([d, round(have.get(d, 0.0), 1)])
+    return out
+
+
+@app.get("/api/energy/months")
+def energy_months(dev: str = ""):
+    p = price_eur_kwh()
+    if dev:
+        rows = q("SELECT substr(day,1,7) AS m, SUM(wh) AS wh FROM energy WHERE dev=? GROUP BY m ORDER BY m DESC LIMIT 24", (dev,))
+    else:
+        rows = q("SELECT substr(day,1,7) AS m, SUM(wh) AS wh FROM energy GROUP BY m ORDER BY m DESC LIMIT 24")
+    return [[r["m"], round(r["wh"], 1), round(r["wh"] / 1000 * p, 2)] for r in rows]
+
+
+@app.get("/api/energy/by_device")
+def energy_by_device(days: int = 30):
+    start = (now_local() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    p = price_eur_kwh()
+    rows = q("""SELECT e.dev, COALESCE(NULLIF(d.name,''), e.dev) AS name, SUM(e.wh) AS wh FROM energy e
+                LEFT JOIN devices d ON d.id=e.dev WHERE e.day>=? GROUP BY e.dev ORDER BY wh DESC""", (start,))
+    return [{"dev": r["dev"], "name": r["name"], "wh": round(r["wh"], 1), "cost": round(r["wh"] / 1000 * p, 2)}
+            for r in rows]
+
+
+@app.get("/api/baseload")
+def baseload(days: int = 7):
+    """Grundlast je Geraet: 10-%-Quantil der Minutenwerte der letzten Tage."""
+    since = int(time.time()) - days * 86400
+    p = price_eur_kwh()
+    out = []
+    for d in q("SELECT id, name FROM devices WHERE hidden=0"):
+        ws = [r["w"] for r in q("SELECT w FROM power WHERE dev=? AND ts>=? ORDER BY w", (d["id"], since))]
+        if len(ws) < 60:
+            continue
+        base = ws[len(ws) // 10]
+        if base < 0.3:
+            continue
+        kwh_y = base * 8.76
+        out.append({"dev": d["id"], "name": d["name"] or d["id"], "w": round(base, 1), "kwh_year": round(kwh_y, 1),
+                    "cost_year": round(kwh_y * p, 2), "hours": round(len(ws) / 60)})
+    out.sort(key=lambda x: -x["w"])
+    return {"devices": out, "total_w": round(sum(x["w"] for x in out), 1),
+            "total_kwh_year": round(sum(x["kwh_year"] for x in out), 1),
+            "total_cost_year": round(sum(x["cost_year"] for x in out), 2)}
+
+
+def csv_response(name, header, rows):
+    buf = io.StringIO()
+    buf.write("﻿")                         # BOM: Excel erkennt UTF-8
+    w = csv.writer(buf, delimiter=";")
+    w.writerow(header)
+    for r in rows:
+        w.writerow([str(x).replace(".", ",") if isinstance(x, float) else x for x in r])
+    return Response(buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/api/export/energy.csv")
+def export_energy(start: str = "", end: str = "", dev: str = ""):
+    start = start or (now_local() - timedelta(days=30)).strftime("%Y-%m-%d")
+    end = end or today()
+    p = price_eur_kwh()
+    sql = """SELECT e.day, e.dev, COALESCE(NULLIF(d.name,''), e.dev) AS name, d.room, e.wh FROM energy e
+             LEFT JOIN devices d ON d.id=e.dev WHERE e.day>=? AND e.day<=?"""
+    args = [start, end]
+    if dev:
+        sql += " AND e.dev=?"
+        args.append(dev)
+    rows = q(sql + " ORDER BY e.day, name", args)
+    return csv_response(f"energie_{start}_{end}.csv", ["Tag", "Gerät", "Name", "Raum", "kWh", "Kosten €"],
+                        [[r["day"], r["dev"], r["name"], r["room"] or "", round(r["wh"] / 1000, 3),
+                          round(r["wh"] / 1000 * p, 2)] for r in rows])
+
+
+@app.get("/api/export/power.csv")
+def export_power(dev: str, hours: float = 24):
+    since = int(time.time() - hours * 3600)
+    rows = q("SELECT ts, w, wmax FROM power WHERE dev=? AND ts>=? ORDER BY ts", (dev, since))
+    return csv_response(f"leistung_{dev}.csv", ["Zeit", "Leistung W", "Spitze W"],
+                        [[datetime.fromtimestamp(r["ts"], TZ).strftime("%d.%m.%Y %H:%M"), float(r["w"]),
+                          float(r["wmax"] if r["wmax"] is not None else r["w"])] for r in rows])
+
+
+@app.get("/api/export/runs.csv")
+def export_runs(dev: str = ""):
+    sql = """SELECT r.*, COALESCE(NULLIF(d.name,''), r.dev) AS name FROM runs r LEFT JOIN devices d ON d.id=r.dev
+             WHERE r.end IS NOT NULL"""
+    args = []
+    if dev:
+        sql += " AND r.dev=?"
+        args.append(dev)
+    rows = q(sql + " ORDER BY r.start", args)
+    lbl = {k: v["label"] for k, v in engine.TYPES.items()}
+    return csv_response("laeufe.csv", ["Start", "Ende", "Dauer min", "Gerät", "Art", "kWh", "Kosten €", "Spitze W"],
+                        [[datetime.fromtimestamp(r["start"], TZ).strftime("%d.%m.%Y %H:%M"),
+                          datetime.fromtimestamp(r["end"], TZ).strftime("%d.%m.%Y %H:%M"),
+                          round((r["end"] - r["start"]) / 60), r["name"], lbl.get(r["type"], r["type"]),
+                          round((r["wh"] or 0) / 1000, 3), round(r["cost"] or 0, 2), float(r["peak_w"] or 0)]
+                         for r in rows])
+
+
+# ======================= Waesche & Co. =======================
+@app.get("/api/appliances")
+def appliances():
+    return {"types": engine.TYPES,
+            "items": [engine.appliance_view(a) for a in q("SELECT * FROM appliances ORDER BY type, dev")]}
+
+
+@app.post("/api/appliances/{dev}")
+async def appliance_save(dev: str, request: Request):
+    need(request, "admin")
+    get_dev(dev)
+    try:
+        engine.set_appliance(dev, await request.json())
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/appliances/{dev}")
+def appliance_delete(dev: str, request: Request):
+    need(request, "admin")
+    q("DELETE FROM appliances WHERE dev=?", (dev,))
+    return {"ok": True}
+
+
+@app.post("/api/appliances/{dev}/ack")
+def appliance_ack(dev: str, request: Request):
+    need(request, "user")
+    engine.ack_appliance(dev)
+    return {"ok": True}
+
+
+@app.get("/api/runs")
+def runs(dev: str = "", limit: int = 50):
+    sql = """SELECT r.*, COALESCE(NULLIF(d.name,''), r.dev) AS name FROM runs r LEFT JOIN devices d ON d.id=r.dev
+             WHERE r.end IS NOT NULL"""
+    args = []
+    if dev:
+        sql += " AND r.dev=?"
+        args.append(dev)
+    return [dict(r) for r in q(sql + " ORDER BY r.start DESC LIMIT ?", args + [limit])]
+
+
+@app.delete("/api/runs/{rid}")
+def run_delete(rid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM runs WHERE id=? AND end IS NOT NULL", (rid,))
+    return {"ok": True}
+
+
+# ======================= Zeitplaene + Regeln =======================
+def _target_ok(t):
+    if not t or t.partition(":")[0] not in ("dev", "room") or not t.partition(":")[2]:
+        raise HTTPException(400, "Ziel fehlt")
+
+
+@app.get("/api/schedules")
+def schedules():
+    out = []
+    for s in q("SELECT * FROM schedules ORDER BY time"):
+        d = dict(s)
+        d["target_label"] = engine.target_label(s["target"])
+        try:
+            t = engine.sched_time(s["time"], now_local().date())
+            d["today"] = t.strftime("%H:%M") if t else None
+        except Exception:
+            d["today"] = None
+        out.append(d)
+    return out
+
+
+@app.post("/api/schedules")
+async def schedule_save(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    _target_ok(d.get("target"))
+    if d.get("action") not in ("on", "off", "toggle"):
+        raise HTTPException(400, "Aktion fehlt")
+    try:
+        engine.sched_time(d.get("time"), now_local().date())
+    except Exception:
+        raise HTTPException(400, "Zeit als HH:MM oder sunrise±Minuten / sunset±Minuten")
+    vals = (d.get("name") or "", 1 if d.get("enabled", True) else 0, int(d.get("days", 127)), d["time"].strip(),
+            d["target"], d["action"])
+    if d.get("id"):
+        q("UPDATE schedules SET name=?, enabled=?, days=?, time=?, target=?, action=?, last_run=NULL WHERE id=?",
+          vals + (int(d["id"]),))
+    else:
+        qid("INSERT INTO schedules(name, enabled, days, time, target, action) VALUES(?,?,?,?,?,?)", vals)
+    return {"ok": True}
+
+
+@app.delete("/api/schedules/{sid}")
+def schedule_delete(sid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM schedules WHERE id=?", (sid,))
+    return {"ok": True}
+
+
+def hook_base(request):
+    return (setting("public_url", "") or str(request.base_url)).rstrip("/")
+
+
+@app.get("/api/rules")
+def rules(request: Request):
+    base = hook_base(request)
+    out = []
+    for r in q("SELECT * FROM rules ORDER BY id"):
+        d = dict(r)
+        d["trig"] = json.loads(r["trig"])
+        d["action"] = json.loads(r["action"] or "[]")
+        if d["trig"].get("type") == "webhook" and r["token"]:
+            d["hook_url"] = f"{base}/hook/{r['token']}"
+        out.append(d)
+    return out
+
+
+RULE_TYPES = ("power", "switch", "event", "online", "offline", "webhook", "finished", "started")
+
+
+@app.post("/api/rules")
+async def rule_save(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    trig, action = d.get("trig") or {}, d.get("action") or []
+    if trig.get("type") not in RULE_TYPES:
+        raise HTTPException(400, "Auslöser fehlt")
+    if trig["type"] != "webhook" and not trig.get("dev"):
+        raise HTTPException(400, "Gerät für den Auslöser fehlt")
+    if trig["type"] == "power":
+        try:
+            trig["w"] = float(str(trig.get("w")).replace(",", "."))
+        except Exception:
+            raise HTTPException(400, "Leistungsschwelle fehlt")
+    if not action:
+        raise HTTPException(400, "Mindestens eine Aktion")
+    for a in action:
+        if a.get("type") == "switch":
+            _target_ok(a.get("target"))
+    vals = (d.get("name") or "Regel", 1 if d.get("enabled", True) else 0, json.dumps(trig), json.dumps(action))
+    if d.get("id"):
+        r = q("SELECT token FROM rules WHERE id=?", (int(d["id"]),), one=True)
+        tok = (r["token"] if r and r["token"] else engine.new_token()) if trig["type"] == "webhook" else None
+        q("UPDATE rules SET name=?, enabled=?, trig=?, action=?, active=0, token=? WHERE id=?",
+          vals + (tok, int(d["id"])))
+    else:
+        tok = engine.new_token() if trig["type"] == "webhook" else None
+        qid("INSERT INTO rules(name, enabled, trig, action, token) VALUES(?,?,?,?,?)", vals + (tok,))
+    return {"ok": True}
+
+
+@app.delete("/api/rules/{rid}")
+def rule_delete(rid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM rules WHERE id=?", (rid,))
+    return {"ok": True}
+
+
+@app.post("/api/rules/{rid}/run")
+def rule_run(rid: int, request: Request):
+    need(request, "admin")
+    r = q("SELECT * FROM rules WHERE id=?", (rid,), one=True)
+    if not r:
+        raise HTTPException(404, "Regel nicht gefunden")
+    engine.fire({**dict(r), "enabled": 1, "trig": json.dumps({"type": "test"})}, "Test")
+    return {"ok": True}
+
+
+@app.api_route("/hook/{token}", methods=["GET", "POST"])
+def hook(token: str):
+    """Ausloeser fuer Regeln vom Typ 'URL-Aufruf' (z. B. Aktion eines Tuer-/Fensterkontakts)."""
+    r = engine.fire_webhook(token)
+    if r is None:
+        return PlainTextResponse("unbekannt", status_code=404)
+    return PlainTextResponse("ok" if r else "ausserhalb des Zeitfensters")
+
+
+# ======================= Meldungen =======================
+@app.get("/api/alerts")
+def alerts(limit: int = 200):
+    rows = q("""SELECT a.*, COALESCE(NULLIF(d.name,''), a.dev) AS name FROM alerts a
+                LEFT JOIN devices d ON d.id=a.dev ORDER BY a.id DESC LIMIT ?""", (limit,))
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/alerts/ack")
+async def alerts_ack(request: Request):
+    need(request, "user")
+    d = await request.json() if (await request.body()) else {}
+    if d.get("id"):
+        q("UPDATE alerts SET ack=1 WHERE id=?", (int(d["id"]),))
+    else:
+        q("UPDATE alerts SET ack=1 WHERE ack=0")
+    return {"ok": True}
+
+
+# ======================= Einstellungen + Push =======================
+@app.get("/api/settings")
+def settings_get():
+    p = core.push_cfg()
+    return {"price_ct": setting("price_ct", 30.0), "push_kinds": setting("push_kinds", core.DEFAULT_PUSH),
+            "push_all": core.PUSH_KINDS, "location": setting("location", {}) or {},
+            "push": {"ntfy_url": p.get("ntfy_url", ""), "ntfy_token_set": bool(p.get("ntfy_token")),
+                     "tg_chat": p.get("tg_chat", ""), "tg_token_set": bool(p.get("tg_token"))},
+            "public_url": setting("public_url", "")}
+
+
+@app.post("/api/settings")
+async def settings_set(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    try:
+        if "price_ct" in d:
+            set_setting("price_ct", max(0.0, float(str(d["price_ct"]).replace(",", "."))))
+        if "location" in d:
+            loc = d["location"] or {}
+            f = lambda v: float(str(v).replace(",", ".")) if v not in (None, "") else None   # noqa: E731
+            set_setting("location", {"lat": f(loc.get("lat")), "lon": f(loc.get("lon"))})
+    except ValueError:
+        raise HTTPException(400, "Zahl erwartet")
+    if "push_kinds" in d:
+        set_setting("push_kinds", [k for k in d["push_kinds"] if k in core.PUSH_KINDS])
+    if "public_url" in d:
+        set_setting("public_url", str(d["public_url"]).strip())
+    if "push" in d:
+        p = core.push_cfg()
+        for k in ("ntfy_url", "tg_chat"):
+            if k in d["push"]:
+                p[k] = str(d["push"][k]).strip()
+        for k in ("ntfy_token", "tg_token"):
+            if d["push"].get(k) is not None:
+                p[k] = str(d["push"][k]).strip()
+        set_setting("push", p)
+    return settings_get()
+
+
+@app.post("/api/push/test")
+async def push_test(request: Request):
+    need(request, "admin")
+    errs = await asyncio.to_thread(core.push_test)
+    if errs:
+        raise HTTPException(502, "; ".join(errs))
+    return {"ok": True}
+
+
+# ======================= Firmware =======================
+@app.get("/api/firmware")
+def firmware():
+    latest = engine.FW["hermit"]
+    out = []
+    for r in q("SELECT * FROM devices WHERE hidden=0 ORDER BY COALESCE(NULLIF(name,''), id)"):
+        d = dev_row(r, latest)
+        out.append({k: d.get(k) for k in ("id", "name", "model", "ver", "online", "hermit", "fw_new")})
+    return {"hermit_latest": latest, "checked": engine.FW["checked"], "devices": out}
+
+
+@app.post("/api/firmware/check")
+async def firmware_check(request: Request):
+    need(request, "admin")
+    await asyncio.to_thread(engine.fw_check, True)
+    for r in q("SELECT * FROM devices WHERE online=1 AND hidden=0"):
+        if is_hermit(r):
+            continue
+        try:                                     # Shelly Gen2+: beim Geraet nachfragen
+            res = await asyncio.to_thread(BUS.rpc, r["id"], "Shelly.CheckForUpdate", None, 10)
+            engine.FW["gen2"][r["id"]] = ((res or {}).get("stable") or {}).get("version")
+        except Exception:
+            pass
+    return firmware()
+
+
+@app.post("/api/firmware/update")
+async def firmware_update(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    res = {}
+    for dev in d.get("devices") or []:
+        try:
+            await asyncio.to_thread(BUS.rpc, dev, "Shelly.Update", {"stage": "stable"}, 10)
+            res[dev] = "gestartet"
+        except Exception as e:
+            res[dev] = f"Fehler: {e}"
+    return {"result": res}
+
+
+# ======================= Sicherungen =======================
+@app.get("/api/backups")
+def backups():
+    rows = q("""SELECT b.id, b.dev, b.ts, b.model, b.ver, length(b.data) AS size,
+                COALESCE(NULLIF(d.name,''), b.dev) AS name FROM backups b LEFT JOIN devices d ON d.id=b.dev
+                ORDER BY b.ts DESC LIMIT 300""")
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/backups")
+async def backup_now(request: Request):
+    need(request, "admin")
+    d = await request.json() if (await request.body()) else {}
+    devs = [d["dev"]] if d.get("dev") else [r["id"] for r in q("SELECT id FROM devices WHERE online=1 AND hidden=0")]
+    res = {}
+    for dev in devs:
+        try:
+            res[dev] = await asyncio.to_thread(engine.backup_device, dev)
+        except Exception as e:
+            res[dev] = f"Fehler: {e}"
+    return {"result": res}
+
+
+@app.get("/api/backups/{bid}")
+def backup_get(bid: int):
+    b = q("SELECT * FROM backups WHERE id=?", (bid,), one=True)
+    if not b:
+        raise HTTPException(404, "Sicherung nicht gefunden")
+    return Response(b["data"], media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="sicherung_{b["dev"]}_{int(b["ts"])}.json"'})
+
+
+@app.post("/api/backups/{bid}/restore")
+async def backup_restore(bid: int, request: Request):
+    need(request, "admin")
+    d = await request.json()
+    dev = d.get("dev")
+    get_dev(dev)
+    try:
+        log = await asyncio.to_thread(engine.restore_backup, bid, dev, bool(d.get("hooks", True)))
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    return {"log": log}
+
+
+@app.delete("/api/backups/{bid}")
+def backup_delete(bid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM backups WHERE id=?", (bid,))
     return {"ok": True}
 
 
@@ -341,24 +799,11 @@ def logout(response: Response):
 UPD = {"available": None, "last_check": 0, "error": ""}
 
 
-def setting(k, default=None):
-    r = q("SELECT v FROM settings WHERE k=?", (k,), one=True)
-    return r["v"] if r else default
-
-
-def set_setting(k, v):
-    q("INSERT OR REPLACE INTO settings(k, v) VALUES(?,?)", (k, str(v)))
-
-
-def ver_tuple(v):
-    return tuple(int(x) for x in str(v).split(".") if x.isdigit())
-
-
 def upd_check():
     try:
         with urllib.request.urlopen(UPDATE_URL + f"?t={int(time.time())}", timeout=15) as r:
             v = json.loads(r.read())["version"]
-        UPD["available"] = v if ver_tuple(v) > ver_tuple(VERSION) else None
+        UPD["available"] = v if engine.ver_tuple(v) > engine.ver_tuple(VERSION) else None
         UPD["error"] = ""
     except Exception as e:
         UPD["error"] = f"Prüfung fehlgeschlagen: {e}"
@@ -377,7 +822,7 @@ def upd_request():
     if not updater_present():
         raise RuntimeError("Updater-Container läuft nicht (siehe cloud/README.md)")
     (DATA / "update.request").write_text(UPD["available"] or "manual")
-    alert("cloud", "update", f"Cloud-Update auf {UPD['available'] or 'aktuellen Stand'} gestartet")
+    alert("cloud", "update", f"Cloud-Update auf {UPD['available'] or 'aktuellen Stand'} gestartet", push=False)
 
 
 def updater_loop():
@@ -385,8 +830,8 @@ def updater_loop():
     last_day = None
     while True:
         try:
-            mode, hour = setting("upd_mode", "install"), int(setting("upd_hour", "4"))
-            now = datetime.now(TZ)
+            mode, hour = setting("upd_mode", "install"), int(setting("upd_hour", 4))
+            now = now_local()
             if mode != "off" and (time.time() - UPD["last_check"] > 6 * 3600 or
                                   (now.hour == hour and last_day != now.date())):
                 if upd_check() and mode == "install" and now.hour == hour and last_day != now.date() \
@@ -407,18 +852,20 @@ def update_info():
         except Exception:
             return ""
     return {"current": VERSION, "available": UPD["available"], "last_check": UPD["last_check"],
-            "error": UPD["error"], "mode": setting("upd_mode", "install"), "hour": int(setting("upd_hour", "4")),
+            "error": UPD["error"], "mode": setting("upd_mode", "install"), "hour": int(setting("upd_hour", 4)),
             "updater": updater_present(), "running": (DATA / "update.request").exists(), "log": rd("update.log")}
 
 
 @app.post("/api/update/check")
-def update_check():
+def update_check(request: Request):
+    need(request, "admin")
     upd_check()
     return update_info()
 
 
 @app.post("/api/update/install")
-def update_install():
+def update_install(request: Request):
+    need(request, "admin")
     try:
         upd_request()
     except Exception as e:
@@ -428,6 +875,7 @@ def update_install():
 
 @app.post("/api/update/config")
 async def update_config(request: Request):
+    need(request, "admin")
     d = await request.json()
     if d.get("mode") in ("off", "check", "install"):
         set_setting("upd_mode", d["mode"])
@@ -437,138 +885,12 @@ async def update_config(request: Request):
 
 
 @app.get("/api/info")
-def info():
-    return {"version": VERSION, "mqtt": BUS.connected, "auth": bool(PASSWORD), "update": UPD["available"],
-            "broker": f"{os.environ.get('PUBLIC_BROKER', '')}"}
+def info(request: Request):
+    return {"version": VERSION, "mqtt": BUS.connected, "auth": users_exist(), "update": UPD["available"],
+            "broker": os.environ.get("PUBLIC_BROKER", ""), "user": request.state.user,
+            "price_ct": setting("price_ct", 30.0)}
 
 
-def dev_row(r):
-    st = json.loads(r["status"] or "{}")
-    info = json.loads(r["info"] or "{}")
-    e = q("SELECT wh FROM energy WHERE dev=? AND day=?", (r["id"], today()), one=True)
-    return {
-        "id": r["id"], "name": r["name"] or "", "model": r["model"], "app": r["app"], "ver": r["ver"],
-        "mac": r["mac"], "ip": r["ip"], "gen": r["gen"], "online": bool(r["online"]),
-        "last_seen": r["last_seen"], "comp": r["comp"], "status": st,
-        "hermit": str(info.get("fw_id", "")).startswith("hermit") or str(r["model"] or "").startswith("HERMIT"),
-        "today_wh": round(e["wh"], 1) if e else 0.0,
-    }
-
-
-@app.get("/api/devices")
-def devices():
-    rows = q("SELECT * FROM devices WHERE hidden=0 ORDER BY COALESCE(NULLIF(name,''), id)")
-    return [dev_row(r) for r in rows]
-
-
-def get_dev(dev):
-    r = q("SELECT * FROM devices WHERE id=?", (dev,), one=True)
-    if not r:
-        raise HTTPException(404, "Unbekanntes Gerät")
-    return r
-
-
-async def rpc_async(dev, method, params=None):
-    try:
-        return await asyncio.to_thread(BUS.rpc, dev, method, params)
-    except Exception as e:
-        raise HTTPException(502, str(e))
-
-
-@app.post("/api/devices/{dev}/rpc")
-async def dev_rpc(dev: str, request: Request):
-    get_dev(dev)
-    d = await request.json()
-    return {"result": await rpc_async(dev, d["method"], d.get("params"))}
-
-
-@app.post("/api/devices/{dev}/switch")
-async def dev_switch(dev: str, request: Request):
-    r = get_dev(dev)
-    d = await request.json()
-    comp = r["comp"] or "switch:0"
-    kind, cid = comp.split(":")
-    method = {"switch": "Switch", "cct": "CCT", "light": "Light"}.get(kind, "Switch")
-    if "on" in d:
-        res = await rpc_async(dev, f"{method}.Set", {"id": int(cid), "on": bool(d["on"])})
-    else:
-        res = await rpc_async(dev, f"{method}.Toggle", {"id": int(cid)})
-    st = await rpc_async(dev, f"{method}.GetStatus", {"id": int(cid)})
-    set_status(dev, comp, st, merge=True)
-    return {"result": res, "status": st}
-
-
-@app.post("/api/devices/{dev}/name")
-async def dev_rename(dev: str, request: Request):
-    get_dev(dev)
-    name = (await request.json()).get("name", "").strip()
-    q("UPDATE devices SET name=? WHERE id=?", (name, dev))
-    try:                                     # auch am Geraet setzen, wenn erreichbar
-        await asyncio.to_thread(BUS.rpc, dev, "Sys.SetConfig", {"config": {"device": {"name": name}}}, 4)
-    except Exception:
-        pass
-    return {"ok": True}
-
-
-@app.delete("/api/devices/{dev}")
-def dev_delete(dev: str):
-    get_dev(dev)
-    q("DELETE FROM devices WHERE id=?", (dev,))
-    q("DELETE FROM power WHERE dev=?", (dev,))
-    q("DELETE FROM energy WHERE dev=?", (dev,))
-    return {"ok": True}
-
-
-@app.get("/api/devices/{dev}/power")
-def dev_power(dev: str, hours: int = 24):
-    since = int(time.time()) - min(hours, KEEP_POWER_DAYS * 24) * 3600
-    return [[r["ts"], r["w"]] for r in q("SELECT ts, w FROM power WHERE dev=? AND ts>=? ORDER BY ts", (dev, since))]
-
-
-@app.get("/api/energy")
-def energy(dev: str = "", days: int = 31):
-    start = (datetime.now(TZ) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-    if dev:
-        rows = q("SELECT day, wh FROM energy WHERE dev=? AND day>=? ORDER BY day", (dev, start))
-    else:
-        rows = q("SELECT day, SUM(wh) AS wh FROM energy WHERE day>=? GROUP BY day ORDER BY day", (start,))
-    have = {r["day"]: r["wh"] for r in rows}
-    out = []
-    for i in range(days):
-        d = (datetime.now(TZ) - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
-        out.append([d, round(have.get(d, 0.0), 1)])
-    return out
-
-
-@app.get("/api/energy/months")
-def energy_months(dev: str = ""):
-    if dev:
-        rows = q("SELECT substr(day,1,7) AS m, SUM(wh) AS wh FROM energy WHERE dev=? GROUP BY m ORDER BY m DESC LIMIT 24", (dev,))
-    else:
-        rows = q("SELECT substr(day,1,7) AS m, SUM(wh) AS wh FROM energy GROUP BY m ORDER BY m DESC LIMIT 24")
-    return [[r["m"], round(r["wh"], 1)] for r in rows]
-
-
-@app.get("/api/energy/by_device")
-def energy_by_device(days: int = 30):
-    start = (datetime.now(TZ) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-    rows = q("""SELECT e.dev, COALESCE(NULLIF(d.name,''), e.dev) AS name, SUM(e.wh) AS wh FROM energy e
-                LEFT JOIN devices d ON d.id=e.dev WHERE e.day>=? GROUP BY e.dev ORDER BY wh DESC""", (start,))
-    return [{"dev": r["dev"], "name": r["name"], "wh": round(r["wh"], 1)} for r in rows]
-
-
-@app.get("/api/alerts")
-def alerts(limit: int = 200):
-    rows = q("""SELECT a.*, COALESCE(NULLIF(d.name,''), a.dev) AS name FROM alerts a
-                LEFT JOIN devices d ON d.id=a.dev ORDER BY a.id DESC LIMIT ?""", (limit,))
-    return [dict(r) for r in rows]
-
-
-@app.post("/api/alerts/ack")
-async def alerts_ack(request: Request):
-    d = await request.json() if (await request.body()) else {}
-    if d.get("id"):
-        q("UPDATE alerts SET ack=1 WHERE id=?", (int(d["id"]),))
-    else:
-        q("UPDATE alerts SET ack=1 WHERE ack=0")
-    return {"ok": True}
+@app.get("/api/info/public")
+def info_public():
+    return {"version": VERSION, "auth": users_exist()}

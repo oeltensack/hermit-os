@@ -1,5 +1,19 @@
 # Änderungen
 
+## Hermit Cloud 1.2.0
+- **Wäsche:** Fertig-Erkennung für Waschmaschine, Trockner, Spülmaschine und beliebige Geräte – Läufe mit Dauer,
+  Energie, Kosten und Spitzenleistung, Restzeit-Schätzung, Push bei „fertig“ und Erinnerung
+- **Kosten:** Strompreis einstellbar, Euro überall neben kWh
+- **Push** über ntfy (optional eigener Server per Compose-Profil) oder Telegram, Arten wählbar, Testnachricht
+- **Räume** und Schalten je Raum
+- **Zeitpläne** mit Uhrzeit oder Sonnenauf-/untergang, **Regeln** (Leistung, Schalter, Ereignis, online/offline,
+  fertig/startet, URL-Aufruf) mit Zeitfenster, Verzögerung, automatischem Ausschalten und Push
+- **Grundlast/Standby** je Gerät mit Kosten pro Jahr, **CSV-Export** (Energie, Leistung, Läufe)
+- Leistungsverlauf 6 h bis 30 Tage mit Spitzenwerten und Zoom
+- **Firmware-Übersicht** mit Update einzeln/alle, **Sicherung und Rücksicherung** der Geräte-Einstellungen
+- **Benutzer mit Rollen** (Administrator, Benutzer, Betrachter)
+- **PWA:** als App auf dem Handy-Startbildschirm
+
 ## Hermit Cloud 1.1.1 / Hermit OS 1.12.2
 - Cloud: Nach einem Neustart der Cloud (z. B. Update) wurden abgezogene Geräte durch gespeicherte
   Broker-Nachrichten wieder als online angezeigt – gespeicherte Nachrichten zählen jetzt nicht mehr als Lebenszeichen

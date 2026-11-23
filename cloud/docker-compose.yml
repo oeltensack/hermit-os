@@ -34,6 +34,22 @@ services:
     volumes:
       - ./data:/data
 
+  # Optional: eigener Push-Server (ntfy). Start mit:  docker compose --profile ntfy up -d
+  # In der Cloud dann als ntfy-Adresse  http://<IP>:8090/<thema>  eintragen und in der ntfy-App
+  # diesen Server hinzufuegen.
+  ntfy:
+    image: binwiederhier/ntfy
+    container_name: hermit-ntfy
+    profiles: ["ntfy"]
+    restart: unless-stopped
+    command: serve
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+    ports:
+      - "8090:80"
+    volumes:
+      - ntfy-cache:/var/cache/ntfy
+
   # Updater: installiert Cloud-Updates (Knopf in der Oberflaeche oder automatisch).
   # Braucht Zugriff auf Docker und auf den Repo-Ordner. Wer das nicht will: Dienst auskommentieren
   # und von Hand aktualisieren (git pull && docker compose up -d --build).
@@ -52,3 +68,4 @@ services:
 
 volumes:
   mosquitto-data:
+  ntfy-cache:

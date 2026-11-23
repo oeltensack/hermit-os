@@ -4,12 +4,23 @@ Kleine Heim-Cloud für Hermit-OS-Geräte (und Shelly Plus/Pro Gen2/Gen3). Läuft
 Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die Cloud liest nur mit.
 
 **Funktionen**
-- Selbst-Update aus diesem Repo (Knopf oder automatisch nachts)
-- Geräteübersicht: online/offline, Modell, Firmware, Leistung, Energie heute, Temperatur, Fehler
-- Schalten aus der Oberfläche (bei der Messfirmware gesperrt, Reset nur am Gerät)
-- Energieverlauf: Leistung der letzten 24 h, Energie pro Tag (31 Tage), pro Monat, Verbrauch je Gerät
-- Meldungen: Überlast, Übertemperatur, Gerät offline/wieder online, Reset am Gerät – mit Quittieren
-- Umbenennen (auch am Gerät), Link zur Geräteoberfläche
+- **Geräte nach Räumen**, Schalten einzeln oder „alle an/aus“ je Raum, Energie und Kosten von heute
+- **Wäsche:** Waschmaschine und Trockner mit Fertig-Erkennung – läuft/fertig, Restzeit aus früheren Läufen,
+  Energie und Kosten je Lauf, Push „fertig“ und Erinnerung, wenn nicht ausgeräumt wird. Dazu Spülmaschine
+  und beliebige Geräte (z. B. Akkuladegerät) mit Fertig-Meldung
+- **Energie:** Leistungsverlauf 6 h bis 30 Tage mit Spitzenwerten und Zoom, Energie pro Tag/Monat mit Kosten,
+  Verbrauch je Gerät, **Grundlast/Standby** mit Kosten pro Jahr, **CSV-Export** für Excel
+- **Automatik:** Zeitpläne (Uhrzeit oder Sonnenauf-/untergang ± Minuten, Wochentage, Gerät oder Raum) und
+  **Regeln** (Wenn Leistung/Schalter/Ereignis/offline/fertig/URL-Aufruf → schalten, verzögert, automatisch
+  wieder aus, Push), mit Zeitfenster
+- **Meldungen** mit **Push** über ntfy oder Telegram
+- **Firmware-Übersicht** mit Update einzeln oder für alle Geräte
+- **Sicherung** der Geräte-Einstellungen (nachts automatisch) und Zurückspielen, auch auf ein Ersatzgerät
+- **Benutzer** mit Rollen (Administrator, Benutzer, Betrachter)
+- **Handy:** als App auf dem Startbildschirm (PWA)
+- **Selbst-Update** aus diesem Repo
+
+![Wäsche](../docs/img/cloud-waesche.png)
 
 ```
 Hermit-Geräte ──MQTT (Gen2-Format)──►  Mosquitto :1883  ◄──►  Hermit Cloud :8080  ──► Browser
@@ -81,7 +92,7 @@ Sicherung: den Ordner `data/` kopieren.
 | Variable | Bedeutung |
 |---|---|
 | `MQTT_USER`, `MQTT_PASS` | Zugang zum Broker für Geräte und Cloud (leer = Broker ohne Anmeldung) |
-| `CLOUD_PASSWORD` | Passwort der Weboberfläche (leer = ohne Anmeldung) |
+| `CLOUD_PASSWORD` | Passwort des Benutzers `admin` (leer und keine Benutzer = ohne Anmeldung) |
 | `PUBLIC_BROKER` | IP des Rechners, wird in der Oberfläche unter *Info* angezeigt |
 | `WEB_PORT` | Port der Weboberfläche (Standard 8080) |
 | `TZ` | Zeitzone für die Tageswerte |
@@ -92,6 +103,29 @@ Weitere Werte im Container: `KEEP_POWER_DAYS` (Leistungsverlauf, Standard 31 Tag
 Ein abgezogenes Gerät meldet der Broker nach etwa 45 s (Hermit OS ab 1.12.2) als offline; spätestens nach
 `OFFLINE_AFTER` setzt die Cloud es selbst auf offline. Offline-Geräte bleiben mit ihren Werten in der Liste,
 bis du sie mit **Entfernen** löschst.
+
+## Erste Schritte
+
+1. **Einstellungen → Strom & Standort:** Strompreis in ct/kWh, Breiten-/Längengrad (für Sonnenzeiten) und die
+   Adresse der Cloud (z. B. `http://192.168.0.50:8080`, für URL-Auslöser).
+2. **Einstellungen → Push:** ntfy oder Telegram eintragen, **Testnachricht** senden.
+3. **Geräte → Bearbeiten:** Name und Raum vergeben.
+4. **Wäsche → Gerät hinzufügen:** die Messsteckdose der Waschmaschine bzw. des Trockners zuordnen.
+   Die Vorgaben passen für die meisten Geräte; nach ein paar Läufen zeigt die Cloud auch die Restzeit.
+
+**Push über ntfy:** App „ntfy“ installieren, ein langes, zufälliges Thema abonnieren (z. B.
+`hermit-k7f3q9x2`) und in der Cloud `https://ntfy.sh/hermit-k7f3q9x2` eintragen. Wer nichts über ntfy.sh
+schicken will, startet den eigenen ntfy-Server mit `docker compose --profile ntfy up -d` und trägt
+`http://<IP>:8090/<thema>` ein (Server in der App hinzufügen).
+
+**Push über Telegram:** Bei @BotFather einen Bot anlegen (Token), dem Bot schreiben, die Chat-ID z. B. über
+`https://api.telegram.org/bot<TOKEN>/getUpdates` ablesen.
+
+**Tür-/Fensterkontakt (z. B. Shelly Door/Window 2):** Regel mit Auslöser „URL-Aufruf“ anlegen, die angezeigte
+URL am Kontakt unter *Actions → Open* eintragen. Beispiel: Fenster auf → Raum Bad ausschalten.
+
+**Benutzer:** Der Administrator `admin` kommt aus `CLOUD_PASSWORD`. Weitere Benutzer unter Einstellungen;
+ändert man dort das admin-Passwort, gilt ab dann dieses (die `.env` wird dann ignoriert).
 
 ## Von unterwegs
 
