@@ -12,9 +12,15 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
   Stillstand und auffälligem Verbrauch
 - **Energie:** Leistungsverlauf 6 h bis 30 Tage mit Spitzenwerten und Zoom, Energie pro Tag/Monat mit Kosten,
   Verbrauch je Gerät, **Grundlast/Standby** mit Kosten pro Jahr, **CSV-Export** für Excel
+- **Beschattung:** Rollläden nach Sonnenstand und Temperatur – je Fassade Himmelsrichtung und Sonnenhöhe,
+  Temperatur von Fühlern (Shelly H&T, Add-on …) oder Wetter (Open-Meteo, ohne Schlüssel), optional Innentemperatur,
+  Höchstwert-Vorhersage und Sonneneinstrahlung, Verzögerung, Zeitfenster, Frostschutz. Fährt nur nach unten,
+  öffnet danach nur, wenn der Rollladen noch dort steht, und lässt von Hand bewegte Rollläden in Ruhe
+- **Parallel zur Shelly Cloud:** Shelly Gen2/Gen3/Gen4 mit Original-Firmware im Netz suchen und mit einem Klick
+  verbinden – App, Szenen und Shelly Cloud laufen weiter
 - **Automatik:** Zeitpläne (Uhrzeit oder Sonnenauf-/untergang ± Minuten, Wochentage, Gerät oder Raum) und
   **Regeln** (Wenn Leistung/Schalter/Ereignis/offline/fertig/URL-Aufruf → schalten, verzögert, automatisch
-  wieder aus, Push), mit Zeitfenster
+  wieder aus, Push), mit Zeitfenster; Rollläden: öffnen, schließen oder auf Position
 - **Meldungen** mit **Push** über ntfy oder Telegram
 - **Firmware-Übersicht** mit Update einzeln oder für alle Geräte
 - **Sicherung** der Geräte-Einstellungen (nachts automatisch) und Zurückspielen, auch auf ein Ersatzgerät
@@ -56,10 +62,43 @@ Alternativ geht jeder Rechner mit Docker (VM, Raspberry Pi, NAS).
 - Benutzer/Passwort: `MQTT_USER` / `MQTT_PASS` aus der `.env`
 - Topic-Präfix leer lassen (= Geräte-ID)
 
-**Shelly Plus/Pro**: *Einstellungen → MQTT*, gleicher Server und Zugang,
+**Shelly Gen2/Gen3/Gen4 mit Original-Firmware** (Plus, Pro, Gen3, Gen4 – auch neben der Shelly Cloud):
+am einfachsten in der Cloud unter *Einstellungen → Shelly Gen2+ anbinden* das Netz durchsuchen und
+„Verbinden“ klicken. Die Cloud trägt sich am Gerät als MQTT-Server ein (bei Gerätepasswort dieses angeben)
+und startet es neu. Shelly-App und Shelly Cloud laufen weiter – nur ein anderer MQTT-Server geht verloren
+(ein Gerät kann nur einen), darauf weist die Cloud vorher hin.
+
+Von Hand geht es auch: *Einstellungen → MQTT*, gleicher Server und Zugang, Client-ID und Präfix = Geräte-ID,
 „RPC status notifications over MQTT“ und „Generic status update over MQTT“ einschalten.
 
+Mehrkanal-Geräte (Plus 2PM, Pro 4PM, Pro Dual Cover, Shelly 2.5 mit Hermit OS) erscheinen je Kanal als
+eigenes Gerät. Temperatur-, Feuchte- und Helligkeitsfühler stehen unter *Beschattung → Fühler*.
+
 Die Geräte erscheinen automatisch, sobald sie verbunden sind.
+
+## Beschattung
+
+Unter *Einstellungen* den **Standort** eintragen (Breiten-/Längengrad), dann unter *Beschattung* je Fassade
+eine Regel anlegen:
+
+| Einstellung | Bedeutung |
+|---|---|
+| Fassade | Himmelsrichtung der Fenster (Süd = 180°) und Bereich ± Grad, in dem die Sonne hereinscheint |
+| Sonnenhöhe | z. B. ab 10° (tiefer verdecken oft Nachbarhäuser) |
+| Beschatten auf | Position in % offen (0 = zu) – Rollläden ohne Positionssteuerung fahren ganz zu |
+| Temperatur | Fühler oder Wetter; an ab … °C, aus unter … °C (Abstand verhindert Hin und Her) |
+| Innentemperatur, Höchstwert heute, Einstrahlung | zusätzliche Bedingungen, leer = egal |
+| Verzögerung | so lange müssen die Bedingungen anhalten (Standard 5 min an, 15 min aus) |
+| Danach | ganz öffnen, vorige Position oder stehen lassen |
+
+Die Regel fährt nur nach unten (ein Rollladen, der schon weiter zu ist, bleibt) und öffnet danach nur,
+wenn er noch auf der Beschattungsposition steht. Wer während der Beschattung von Hand fährt – am Taster,
+in der Shelly-App oder in der Cloud –, hat bis zum Ende der Beschattung Vorrang. „Heute pausieren“ setzt
+eine Regel bis Mitternacht aus. **Frostschutz:** unter der eingestellten Außentemperatur bewegen Regeln und
+Zeitpläne keine Rollläden (festgefrorener Behang).
+
+Morgens öffnen und abends schließen geht über *Automatik → Zeitpläne* (Sonnenaufgang/-untergang ± Minuten,
+Aktion „Rollladen auf Position“, „öffnen“ oder „schließen“).
 
 ## Update
 

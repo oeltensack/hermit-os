@@ -168,10 +168,23 @@ def target_label(target):
 
 
 def do_switch(target, mode):
-    """mode: 'on' | 'off' | 'toggle'. Liefert Fehlerliste."""
+    """mode: 'on' | 'off' | 'toggle' | 'pos:NN' (Rollladen). Liefert Fehlerliste."""
+    import shade
     errs = []
     for dev in resolve(target):
         try:
+            r = q("SELECT comp FROM devices WHERE id=?", (dev,), one=True)
+            cover = bool(r and (r["comp"] or "").startswith("cover:"))
+            if cover and mode != "toggle" and shade.frost_block():
+                errs.append(f"{dev_name(dev)}: Frostschutz – nicht bewegt")
+                continue
+            if mode.startswith("pos:"):
+                if not cover:
+                    continue                             # Position nur fuer Rollläden
+                shade.move(dev, max(0, min(100, int(float(mode[4:])))))
+                continue
+            if cover:
+                shade.AUTO[dev] = time.time()
             BUS.switch(dev, None if mode == "toggle" else mode == "on")
         except Exception as e:
             errs.append(f"{dev_name(dev)}: {e}")

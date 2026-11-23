@@ -27,6 +27,8 @@ import core
 import energy_view
 import engine
 import fridge
+import gen2
+import shade
 from bus import BUS, check_offline, seen
 from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
                   set_setting, setting, today)
@@ -199,6 +201,7 @@ def startup():
     core.start_push()
     BUS.start()
     engine.start(BUS)
+    shade.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
 
@@ -589,7 +592,8 @@ async def schedule_save(request: Request):
     need(request, "admin")
     d = await request.json()
     _target_ok(d.get("target"))
-    if d.get("action") not in ("on", "off", "toggle"):
+    act = str(d.get("action") or "")
+    if act not in ("on", "off", "toggle") and not (act.startswith("pos:") and act[4:].isdigit() and int(act[4:]) <= 100):
         raise HTTPException(400, "Aktion fehlt")
     try:
         engine.sched_time(d.get("time"), now_local().date())
@@ -707,6 +711,83 @@ async def alerts_ack(request: Request):
     else:
         q("UPDATE alerts SET ack=1 WHERE ack=0")
     return {"ok": True}
+
+
+# ======================= Beschattung =======================
+@app.get("/api/shade")
+def shade_get():
+    return shade.overview()
+
+
+@app.post("/api/shade")
+async def shade_save(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    try:
+        rid = shade.save_rule(d)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+    return {"id": rid}
+
+
+@app.delete("/api/shade/{rid}")
+def shade_delete(rid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM shades WHERE id=?", (rid,))
+    return {"ok": True}
+
+
+@app.post("/api/shade/{rid}/pause")
+async def shade_pause(rid: int, request: Request):
+    need(request, "user")
+    d = await request.json() if (await request.body()) else {}
+    shade.pause_today(rid, d.get("on", True))
+    await asyncio.to_thread(shade.step)
+    return shade.overview()
+
+
+@app.post("/api/shade/settings")
+async def shade_settings(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    if "frost_c" in d:
+        v = d["frost_c"]
+        set_setting("frost_c", float(str(v).replace(",", ".")) if v not in (None, "") else None)
+    if "weather_on" in d:
+        set_setting("weather_on", bool(d["weather_on"]))
+    await asyncio.to_thread(shade.fetch_weather)
+    return shade.overview()
+
+
+@app.post("/api/shade/check")
+async def shade_check(request: Request):
+    """Sofort pruefen (statt bis zur naechsten Minute zu warten)."""
+    need(request, "user")
+    await asyncio.to_thread(shade.fetch_weather)
+    await asyncio.to_thread(shade.step)
+    return shade.overview()
+
+
+# ======================= Gen2+ (Original-Firmware) anbinden =======================
+@app.post("/api/gen2/scan")
+async def gen2_scan(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    try:
+        return await asyncio.to_thread(gen2.scan, d.get("net", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/gen2/connect")
+async def gen2_connect(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    try:
+        return await asyncio.to_thread(gen2.connect, str(d.get("ip", "")).strip(), d.get("password") or "",
+                                       str(d.get("broker") or "").strip(), bool(d.get("force")))
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 
 # ======================= Einstellungen + Push =======================

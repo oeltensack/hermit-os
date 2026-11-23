@@ -10,6 +10,7 @@ import time
 import paho.mqtt.client as mqtt
 
 import engine
+import shade
 from core import OFFLINE_ALERT_AFTER, alert, dev_name, now_local, q, today
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
@@ -24,7 +25,10 @@ MAIN_COMPS = ("switch:", "cct:", "light:", "cover:")
 # mit eigener Leistung, Energie, Raum, Regeln. Das Geraet selbst (MQTT-Topic) bleibt <id>.
 def row_id(dev, comp):
     kind, _, cid = comp.partition(":")
-    return f"{dev}~{cid}" if kind == "switch" and cid.isdigit() and int(cid) > 0 else dev
+    return f"{dev}~{cid}" if comp.startswith(MAIN_COMPS) and cid.isdigit() and int(cid) > 0 else dev
+
+
+SENSOR_COMPS = ("temperature:", "humidity:", "illuminance:")
 
 
 def real_id(row):
@@ -102,6 +106,10 @@ class Bus:
                         q("UPDATE devices SET model=?, app=?, ver=?, mac=?, gen=?, ip=?, room=? WHERE id=?",
                           (base["model"], base["app"], base["ver"], base["mac"], base["gen"], base["ip"], base["room"], rid))
                 set_status(rid, comp, d, live=live)
+            elif comp.startswith(SENSOR_COMPS):
+                shade.sensor(dev, comp, d)
+                if live:
+                    seen(dev)
             elif live:
                 seen(dev)
         elif rest == "events/rpc" and live:
@@ -114,6 +122,8 @@ class Bus:
                 for k, v in p.items():
                     if isinstance(v, dict) and k.startswith(MAIN_COMPS):
                         set_status(row_id(dev, k), k, v, merge=True)
+                    elif isinstance(v, dict) and k.startswith(SENSOR_COMPS):
+                        shade.sensor(dev, k, v)
                 seen(dev)
 
     def fetch_info(self, dev):
@@ -261,6 +271,7 @@ def set_status(dev, comp, st, merge=False, live=True):
               (dev, now_local().strftime("%Y-%m-%d %H"), tot - last))
         q("UPDATE devices SET last_total=? WHERE id=?", (tot, dev))   # kleiner = Zaehler zurueckgesetzt
     engine.on_status(dev, comp, new, old)
+    shade.on_status(dev, comp, new, old)
 
 
 EVENT_TEXT = {

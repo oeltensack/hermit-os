@@ -69,7 +69,7 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 @media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
 <header><h1><img src="/icon-192.png" alt="">Hermit Cloud</h1>
-<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="en">Energie</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
+<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
 <section class="tab a" id="dv"><div id="devs"></div></section>
@@ -106,6 +106,20 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 <div class="card" id="bcard"><h2>Grundlast / Standby – letzte 7 Tage</h2><div class="l" style="margin-bottom:8px">Leistung, die ein Gerät fast immer zieht (10-%-Wert der Minutenwerte), hochgerechnet aufs Jahr.</div><div class="scroll"><table id="btab"></table></div></div>
 </section>
 
+<section class="tab" id="sh">
+<div class="card"><div class="row sp"><h2 style="margin:0">Jetzt</h2><button class="bt g s user-only" onclick="shCheck()">Jetzt prüfen</button></div>
+<div class="row" style="align-items:center;gap:18px;margin-top:8px"><div id="shsvg"></div><div class="kv" id="shnow" style="flex:1"></div></div></div>
+<div class="card"><div class="row sp"><h2 style="margin:0">Beschattungsregeln</h2><button class="bt admin-only" onclick="shDlg()">Regel anlegen</button></div>
+<div class="l" style="margin:6px 0">Eine Regel je Fassade: Steht die Sonne darauf und ist es warm genug, fahren die Rollläden auf die Beschattungsposition – nur nach unten. Danach wieder hoch, wenn sie noch dort stehen. Von Hand bewegte Rollläden lässt die Regel bis zum Ende der Beschattung in Ruhe.</div>
+<div class="scroll"><table id="shtab"></table></div></div>
+<div class="card"><h2>Rollläden</h2><div class="scroll"><table id="shcv"></table></div></div>
+<div class="card"><h2>Fühler</h2><div class="l" style="margin-bottom:6px">Temperatur-, Feuchte- und Helligkeitswerte, die Geräte per MQTT melden (z. B. Shelly H&amp;T, Plus Add-on, BLU über Gateway).</div><div class="scroll"><table id="shse"></table></div></div>
+<div class="card admin-only"><h2>Wetter &amp; Frostschutz</h2><div class="f">
+<label>Wetterdaten</label><div><input type="checkbox" id="sh_wx"> von Open-Meteo laden (Außentemperatur, Vorhersage, Einstrahlung – braucht den Standort)</div>
+<label>Frostschutz</label><div class="row"><span class="l">Rollläden unter</span><input id="sh_fr" style="width:70px" inputmode="decimal" placeholder="aus"><span class="l">°C Außentemperatur nicht automatisch bewegen</span></div></div>
+<button class="bt" onclick="shSet()">Speichern</button></div>
+</section>
+
 <section class="tab" id="au">
 <div class="card"><div class="row sp"><h2 style="margin:0">Zeitpläne</h2><button class="bt admin-only" onclick="schDlg()">Zeitplan anlegen</button></div><div class="scroll"><table id="stab" style="margin-top:8px"></table></div></div>
 <div class="card"><div class="row sp"><h2 style="margin:0">Regeln (Wenn – Dann)</h2><button class="bt admin-only" onclick="ruleDlg()">Regel anlegen</button></div><div class="scroll"><table id="ltab" style="margin-top:8px"></table></div></div>
@@ -121,6 +135,13 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 <label>Längengrad</label><input id="s_lon" placeholder="z. B. 8,66" inputmode="decimal">
 <label>Adresse der Cloud</label><input id="s_pub" placeholder="http://192.168.0.50:8080 (für URL-Auslöser)">
 </div><p class="l">Standort nur für Zeitpläne mit Sonnenauf-/untergang. Kosten werden mit dem aktuellen Preis berechnet.</p><button class="bt" onclick="saveBase()">Speichern</button></div>
+
+<div class="card admin-only"><h2>Shelly Gen2+ mit Original-Firmware anbinden</h2>
+<p class="l">Gen2/Gen3/Gen4 können Shelly Cloud und MQTT gleichzeitig: Die Hermit Cloud trägt sich am Gerät als MQTT-Server ein, App und Shelly Cloud laufen weiter. Danach startet das Gerät kurz neu (Relais bleiben in ihrem Zustand). Ein Gerät kann nur einen MQTT-Server haben.</p>
+<div class="f"><label>Netz durchsuchen</label><div class="row"><input id="g2_net" placeholder="192.168.0.0/24 oder 192.168.0.10-80" style="flex:1"><button class="bt g" onclick="g2Scan()">Suchen</button></div>
+<label>Passwort der Geräte</label><input id="g2_pw" type="password" placeholder="nur wenn gesetzt (Benutzer admin)">
+<label>Broker-Adresse für die Geräte</label><input id="g2_br" placeholder="IP dieses Rechners, z. B. 192.168.0.50"></div>
+<div class="scroll"><table id="g2tab" style="margin-top:8px"></table></div></div>
 
 <div class="card admin-only"><h2>Push-Nachrichten</h2><div class="f">
 <label>ntfy-Adresse</label><input id="p_ntfy" placeholder="https://ntfy.sh/hermit-langes-zufaelliges-thema">
@@ -190,7 +211,7 @@ function dlg(html){const d=$('dlg');d.innerHTML=html;d.showModal();return d}
 function closeDlg(){$('dlg').close()}
 function devOpts(sel,filter){return DEVS.filter(filter||(()=>true)).map(d=>`<option value="${esc(d.id)}" ${d.id==sel?'selected':''}>${esc(d.name||d.id)}${d.room?' · '+esc(d.room):''}</option>`).join('')}
 function targetOpts(sel){const rooms=[...new Set(DEVS.map(d=>d.room).filter(Boolean))];
-return '<optgroup label="Geräte">'+DEVS.filter(d=>!d.status.meter_only&&'output' in d.status).map(d=>`<option value="dev:${esc(d.id)}" ${sel=='dev:'+d.id?'selected':''}>${esc(d.name||d.id)}</option>`).join('')+'</optgroup>'+
+return '<optgroup label="Geräte">'+DEVS.filter(d=>!d.status.meter_only&&('output' in d.status||(d.comp||'').startsWith('cover:'))).map(d=>`<option value="dev:${esc(d.id)}" ${sel=='dev:'+d.id?'selected':''}>${esc(d.name||d.id)}${(d.comp||'').startsWith('cover:')?' (Rollladen)':''}</option>`).join('')+'</optgroup>'+
 (rooms.length?'<optgroup label="Räume">'+rooms.map(r=>`<option value="room:${esc(r)}" ${sel=='room:'+r?'selected':''}>Raum ${esc(r)}</option>`).join('')+'</optgroup>':'')}
 const DAYN=['Mo','Di','Mi','Do','Fr','Sa','So'];
 function daysHtml(mask,id){return `<div class="days" id="${id}">`+DAYN.map((n,i)=>`<label><input type="checkbox" value="${i}" ${(mask>>i)&1?'checked':''}>${n}</label>`).join('')+'</div>'}
@@ -416,17 +437,18 @@ if(!dev){rankChart($('rchart'),await api('energy/by_device?days=30'));const b=aw
 $('btab').innerHTML=b.devices.length?'<tr><th>Gerät</th><th class="n">Grundlast</th><th class="n">pro Jahr</th><th class="n">Kosten/Jahr</th></tr>'+b.devices.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${fmt(x.w,1,'W')}</td><td class="n">${fmt(x.kwh_year,0,'kWh')}</td><td class="n">${eur(x.cost_year)}</td></tr>`).join('')+`<tr><th>Summe</th><th class="n">${fmt(b.total_w,1,'W')}</th><th class="n">${fmt(b.total_kwh_year,0,'kWh')}</th><th class="n">${eur(b.total_cost_year)}</th></tr>`:'<tr><td class="empty">Noch zu wenige Messwerte (mindestens eine Stunde je Gerät).</td></tr>'}}
 
 // ---------- Automatik ----------
-const ACT={on:'einschalten',off:'ausschalten',toggle:'umschalten'};
+const ACT={on:'einschalten (Rollladen: öffnen)',off:'ausschalten (Rollladen: schließen)',toggle:'umschalten',pos:'Rollladen auf Position'};
+const actName=a=>a&&a.startsWith('pos:')?'Rollladen auf '+a.slice(4)+' %':ACT[a]||a;
 const timeTxt=t=>t.startsWith('sunrise')?'Sonnenaufgang'+(t.slice(7)?' '+t.slice(7)+' min':''):t.startsWith('sunset')?'Sonnenuntergang'+(t.slice(6)?' '+t.slice(6)+' min':''):t;
 async function loadAuto(){const S=await api('schedules');window._S=S;
-$('stab').innerHTML=S.length?'<tr><th>Name</th><th>Wann</th><th>Was</th><th class="admin-only"></th></tr>'+S.map(s=>`<tr class="${s.enabled?'':'ack'}"><td>${esc(s.name||'–')}${s.enabled?'':' <span class="tag">aus</span>'}</td><td>${daysTxt(s.days)}, ${esc(timeTxt(s.time))}${s.today&&s.today!=s.time?` <span class="l">(heute ${s.today})</span>`:''}</td><td>${esc(s.target_label)} ${ACT[s.action]}</td><td class="n admin-only"><a class="lk" onclick="schDlg(${s.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Zeitpläne.</td></tr>';
+$('stab').innerHTML=S.length?'<tr><th>Name</th><th>Wann</th><th>Was</th><th class="admin-only"></th></tr>'+S.map(s=>`<tr class="${s.enabled?'':'ack'}"><td>${esc(s.name||'–')}${s.enabled?'':' <span class="tag">aus</span>'}</td><td>${daysTxt(s.days)}, ${esc(timeTxt(s.time))}${s.today&&s.today!=s.time?` <span class="l">(heute ${s.today})</span>`:''}</td><td>${esc(s.target_label)} ${actName(s.action)}</td><td class="n admin-only"><a class="lk" onclick="schDlg(${s.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Zeitpläne.</td></tr>';
 const R=await api('rules');window._R=R;
 $('ltab').innerHTML=R.length?'<tr><th>Name</th><th>Wenn</th><th>Dann</th><th>Zuletzt</th><th class="admin-only"></th></tr>'+R.map(r=>`<tr class="${r.enabled?'':'ack'}"><td>${esc(r.name)}${r.enabled?'':' <span class="tag">aus</span>'}</td><td>${trigTxt(r.trig)}${r.hook_url?`<br><code>${esc(r.hook_url)}</code>`:''}</td><td>${r.action.map(actTxt).join('<br>')}</td><td>${r.last_fire?dt(r.last_fire):'–'}</td><td class="n admin-only" style="white-space:nowrap"><a class="lk" onclick="ruleRun(${r.id})">Test</a> · <a class="lk" onclick="ruleDlg(${r.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Regeln.</td></tr>'}
 const TRIG={power:'Leistung',switch:'Schalter',event:'Ereignis am Gerät',offline:'Gerät geht offline',online:'Gerät kommt online',finished:'Gerät fertig (Fertig-Erkennung)',started:'Gerät startet (Fertig-Erkennung)',webhook:'URL-Aufruf (z. B. Tür-/Fensterkontakt)'};
 function trigTxt(t){const n=t.dev?esc(devName(t.dev)):'';let s={power:`${n}: Leistung ${t.op=='<'?'unter':'über'} ${fmt(t.w,0,'W')}${t.for_s?` für ${dur(t.for_s)}`:''}`,switch:`${n} wird ${t.state=='off'?'ausgeschaltet':'eingeschaltet'}`,event:`${n}: Ereignis „${esc(t.event)}“`,offline:`${n} geht offline`,online:`${n} kommt online`,finished:`${n} ist fertig`,started:`${n} startet`,webhook:'URL wird aufgerufen'}[t.type]||esc(t.type);
 if(t.window&&t.window.from)s+=` <span class="l">(${t.window.from}–${t.window.to})</span>`;if(t.days!=null&&t.days!=127)s+=` <span class="l">${daysTxt(t.days)}</span>`;return s}
 function actTxt(a){if(a.type=='notify')return `Push: „${esc(a.text||'')}“`;const tl=(a.target||'').startsWith('room:')?'Raum '+esc(a.target.slice(5)):esc(devName((a.target||'').slice(4)));
-return `${tl} ${ACT[a.mode]||esc(a.mode)}${a.delay_s?` nach ${dur(a.delay_s)}`:''}${a.auto_off_s?`, nach ${dur(a.auto_off_s)} wieder aus`:''}`}
+return `${tl} ${esc(actName(a.mode))}${a.delay_s?` nach ${dur(a.delay_s)}`:''}${a.auto_off_s?`, nach ${dur(a.auto_off_s)} wieder aus`:''}`}
 function schDlg(id){const s=(window._S||[]).find(x=>x.id==id)||{name:'',enabled:1,days:127,time:'07:00',target:'',action:'on'};
 const sun=s.time.startsWith('sun'),kind=sun?(s.time.startsWith('sunrise')?'sunrise':'sunset'):'time',off=sun?(s.time.slice(kind.length)||'0'):'0';
 dlg(`<h2>${id?'Zeitplan bearbeiten':'Neuer Zeitplan'}</h2><div class="f"><label>Name</label><input id="sc_n" value="${esc(s.name)}" placeholder="z. B. Heizlüfter morgens">
@@ -434,16 +456,17 @@ dlg(`<h2>${id?'Zeitplan bearbeiten':'Neuer Zeitplan'}</h2><div class="f"><label>
 <label>Zeit</label><div class="row"><select id="sc_k"><option value="time">Uhrzeit</option><option value="sunrise" ${kind=='sunrise'?'selected':''}>Sonnenaufgang</option><option value="sunset" ${kind=='sunset'?'selected':''}>Sonnenuntergang</option></select>
 <input id="sc_t" type="time" value="${sun?'07:00':esc(s.time)}" style="${sun?'display:none':''}"><span id="sc_ow" style="${sun?'':'display:none'}">± <input id="sc_o" style="width:60px" value="${off}"> min</span></div>
 <label>Ziel</label><select id="sc_g">${targetOpts(s.target)}</select>
-<label>Aktion</label><select id="sc_a">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${k==s.action?'selected':''}>${v}</option>`).join('')}</select>
+<label>Aktion</label><div class="row"><select id="sc_a" onchange="$('sc_pw').style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==s.action||(k=='pos'&&s.action.startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select>
+<span id="sc_pw" style="${s.action.startsWith('pos:')?'':'display:none'}"><input id="sc_p" style="width:60px" inputmode="numeric" value="${s.action.startsWith('pos:')?s.action.slice(4):'30'}"> % offen</span></div>
 <label>Aktiv</label><div><input type="checkbox" id="sc_e" ${s.enabled?'checked':''}></div></div>
 <p class="l">Sonnenzeiten brauchen den Standort unter Einstellungen.</p>
 <div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="schDel(${id})">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="schSave(${id||0})">Speichern</button></div></div>`);
 $('sc_k').onchange=()=>{const t=$('sc_k').value=='time';$('sc_t').style.display=t?'':'none';$('sc_ow').style.display=t?'none':''}}
 function schSave(id){const k=$('sc_k').value,o=parseInt($('sc_o').value||'0')||0;const time=k=='time'?$('sc_t').value:k+(o?(o>0?'+':'')+o:'');
-run(async()=>{await api('schedules',{method:'POST',body:{id,name:$('sc_n').value,days:daysVal('sc_d'),time,target:$('sc_g').value,action:$('sc_a').value,enabled:$('sc_e').checked}});closeDlg();await loadAuto()},'Gespeichert')}
+run(async()=>{await api('schedules',{method:'POST',body:{id,name:$('sc_n').value,days:daysVal('sc_d'),time,target:$('sc_g').value,action:$('sc_a').value=='pos'?'pos:'+Math.max(0,Math.min(100,parseInt($('sc_p').value)||0)):$('sc_a').value,enabled:$('sc_e').checked}});closeDlg();await loadAuto()},'Gespeichert')}
 function schDel(id){if(!confirm('Zeitplan löschen?'))return;run(async()=>{await api('schedules/'+id,{method:'DELETE'});closeDlg();await loadAuto()})}
 function stepHtml(a){return `<div class="card" style="background:var(--c2);margin:8px 0;padding:10px" data-step><div class="row sp"><select class="st_t"><option value="switch" ${a.type!='notify'?'selected':''}>Schalten</option><option value="notify" ${a.type=='notify'?'selected':''}>Push-Nachricht</option></select><a class="lk" onclick="this.closest('[data-step]').remove()">entfernen</a></div>
-<div class="st_sw" style="margin-top:8px;${a.type=='notify'?'display:none':''}"><div class="row"><select class="st_g">${targetOpts(a.target)}</select><select class="st_m">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${k==(a.mode||'on')?'selected':''}>${v}</option>`).join('')}</select></div>
+<div class="st_sw" style="margin-top:8px;${a.type=='notify'?'display:none':''}"><div class="row"><select class="st_g">${targetOpts(a.target)}</select><select class="st_m" onchange="this.nextElementSibling.style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==(a.mode||'on')||(k=='pos'&&(a.mode||'').startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select><span style="${(a.mode||'').startsWith('pos:')?'':'display:none'}"><input class="st_p" style="width:56px" inputmode="numeric" value="${(a.mode||'').startsWith('pos:')?a.mode.slice(4):'30'}"> %</span></div>
 <div class="row" style="margin-top:6px"><span class="l">nach</span><input class="st_dl" style="width:60px" value="${(a.delay_s||0)/60}"><span class="l">min · bei „einschalten“ wieder aus nach</span><input class="st_ao" style="width:60px" value="${(a.auto_off_s||0)/60}"><span class="l">min (0 = nie)</span></div></div>
 <div class="st_nt" style="margin-top:8px;${a.type=='notify'?'':'display:none'}"><input class="st_x" style="width:100%" value="${esc(a.text||'')}" placeholder="Text – {why} wird durch den Auslöser ersetzt"></div></div>`}
 function ruleDlg(id){const r=(window._R||[]).find(x=>x.id==id)||{name:'',enabled:1,trig:{type:'power',op:'>',w:100,for_s:0},action:[{type:'switch',mode:'off'}]};const t=r.trig,w=t.window||{};
@@ -468,7 +491,7 @@ if(v!='webhook')trig.dev=$('ru_d').value;if(v=='power'){trig.op=$('ru_op').value
 if(v=='switch')trig.state=$('ru_s').value;if(v=='event')trig.event=$('ru_e').value.trim();
 if($('ru_wf').value&&$('ru_wt').value)trig.window={from:$('ru_wf').value,to:$('ru_wt').value};trig.days=daysVal('ru_dy');
 const action=[...document.querySelectorAll('#ru_steps [data-step]')].map(el=>el.querySelector('.st_t').value=='notify'?{type:'notify',text:el.querySelector('.st_x').value}:
-{type:'switch',target:el.querySelector('.st_g').value,mode:el.querySelector('.st_m').value,delay_s:Math.round(nIn(el.querySelector('.st_dl').value)*60),auto_off_s:Math.round(nIn(el.querySelector('.st_ao').value)*60)});
+{type:'switch',target:el.querySelector('.st_g').value,mode:el.querySelector('.st_m').value=='pos'?'pos:'+Math.max(0,Math.min(100,parseInt(el.querySelector('.st_p').value)||0)):el.querySelector('.st_m').value,delay_s:Math.round(nIn(el.querySelector('.st_dl').value)*60),auto_off_s:Math.round(nIn(el.querySelector('.st_ao').value)*60)});
 run(async()=>{await api('rules',{method:'POST',body:{id,name:$('ru_n').value,enabled:$('ru_en').checked,trig,action}});closeDlg();await loadAuto()},'Gespeichert')}
 function ruleDel(id){if(!confirm('Regel löschen?'))return;run(async()=>{await api('rules/'+id,{method:'DELETE'});closeDlg();await loadAuto()})}
 function ruleRun(id){run(async()=>{await api('rules/'+id+'/run',{method:'POST'});setTimeout(loadAuto,800)},'Regel ausgeführt')}
@@ -536,10 +559,65 @@ async function waitUpd(){for(let i=0;i<120;i++){await new Promise(r=>setTimeout(
 // ---------- Ablauf ----------
 async function loadInfo(){const i=await api('info');ME=i.user;PRICE=i.price_ct;document.body.classList.toggle('ro',!isAdmin());document.body.classList.toggle('vo',!canSw());
 $('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' · v'+i.version+(i.update&&isAdmin()?' · Update '+i.update:'');
-$('bk').textContent=(i.broker||location.hostname)+':1883';$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
+$('bk').textContent=(i.broker||location.hostname)+':1883';{const b=i.broker||location.hostname;if(!$('g2_br').value)$('g2_br').value=b;if(!$('g2_net').value&&/^\d+\.\d+\.\d+\.\d+$/.test(b))$('g2_net').value=b.replace(/\.\d+$/,'.0/24')}$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
 let busy=false;
 async function refresh(force){if(busy&&!force)return;busy=true;try{await loadInfo();await loadDevs();await loadAl();
-if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
+if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
 refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+// ---------- Beschattung ----------
+let SH=null;
+const DIRS=['N','NO','O','SO','S','SW','W','NW'],dirTxt=a=>DIRS[Math.round(((a%360)+360)%360/45)%8];
+function compass(sun,rules){const R=70,c=80,pt=(a,r)=>[c+r*Math.sin(a*Math.PI/180),c-r*Math.cos(a*Math.PI/180)];
+let g=`<svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Sonnenstand"><circle cx="80" cy="80" r="${R}" fill="none" stroke="#2a333c" stroke-width="2"/>`;
+(rules||[]).forEach(r=>{const a=r.cfg.azimuth,w=Math.min(r.cfg.width,179.9),[x1,y1]=pt(a-w,R),[x2,y2]=pt(a+w,R),f=r.active?'#d2992233':'#2f9be01a',k=r.active?'#d29922':'#2f9be055';
+g+=r.cfg.width>=180?`<circle cx="80" cy="80" r="${R}" fill="${f}" stroke="${k}"/>`:`<path d="M80 80 L${x1} ${y1} A${R} ${R} 0 ${w*2>180?1:0} 1 ${x2} ${y2} Z" fill="${f}" stroke="${k}"/>`});
+['N','O','S','W'].forEach((t,i)=>{const[x,y]=pt(i*90,R+0);g+=`<text x="${x}" y="${y+4}" text-anchor="middle" font-size="11" fill="#8a96a3" style="paint-order:stroke" stroke="#1a2129" stroke-width="4">${t}</text>`});
+if(sun){const r=sun.elevation>0?R*(1-sun.elevation/90):R,[x,y]=pt(sun.azimuth,r);g+=`<circle cx="${x}" cy="${y}" r="9" fill="${sun.elevation>0?'#f5c542':'#56606b'}"/>`}
+return g+'</svg>'}
+async function loadShade(){SH=await api('shade');const s=SH.sun,w=SH.weather;$('shsvg').innerHTML=compass(s,SH.rules);
+$('shnow').innerHTML=s?`<div><div class="v">${dirTxt(s.azimuth)} · ${num(s.azimuth,0)}°</div><div class="l">Sonne Richtung</div></div><div><div class="v">${num(s.elevation,0)}°</div><div class="l">Sonnenhöhe</div></div>`
++(w.ok?`<div><div class="v">${fmt(w.temp,1,'°C')}</div><div class="l">außen (heute ${num(w.tmin,0)}–${num(w.tmax,0)} °C)</div></div><div><div class="v">${fmt(w.radiation,0,'W/m²')}</div><div class="l">Einstrahlung · ${num(w.clouds,0)} % Wolken</div></div>`:`<div><div class="v">–</div><div class="l">Wetter: ${esc(w.err||'nicht geladen')}</div></div>`):'<div class="empty">Standort fehlt – unter Einstellungen Breiten- und Längengrad eintragen.</div>';
+$('shtab').innerHTML=SH.rules.length?'<tr><th>Regel</th><th>Fassade</th><th>Wann</th><th>Zustand</th><th></th></tr>'+SH.rules.map(r=>{const c=r.cfg;
+return `<tr class="${r.enabled?'':'ack'}"><td><b>${esc(r.name)}</b><div class="l">${r.covers.map(x=>esc(x.name)).join(', ')||'keine Rollläden'}</div></td><td>${dirTxt(c.azimuth)} ${num(c.azimuth,0)}° ±${num(c.width,0)}°<div class="l">Höhe ${num(c.elev_min,0)}–${num(c.elev_max,0)}° · auf ${c.pos} %</div></td>
+<td>${esc(r.temp_label)} ≥ ${num(c.temp_on,1)} °C<div class="l">aus unter ${num(c.temp_off,1)} °C${c.in_src?' · innen ≥ '+num(c.in_on,1)+' °C':''}${c.fc_on!=null?' · Höchstwert ≥ '+num(c.fc_on,0)+' °C':''}${c.rad_min>0?' · ≥ '+num(c.rad_min,0)+' W/m²':''}${c.from&&c.to?' · '+c.from+'–'+c.to:''}</div></td>
+<td>${r.active?'<span class="tag y">beschattet</span>':'<span class="tag">offen</span>'}${r.paused?' <span class="tag">pausiert</span>':''}${r.pending?` <span class="l">wechselt in ${dur(Math.max(0,(r.active?c.delay_off:c.delay_on)*60-(Date.now()/1000-r.pending)))}</span>`:''}<div class="l">${r.why.length?esc(r.why.join(' · ')):(r.active?'alle Bedingungen erfüllt':'')}</div></td>
+<td class="n" style="white-space:nowrap"><a class="lk user-only" onclick="shPause(${r.id},${!r.paused})">${r.paused?'Fortsetzen':'Heute pausieren'}</a><span class="admin-only"> · <a class="lk" onclick="shDlg(${r.id})">Bearbeiten</a></span></td></tr>`}).join(''):'<tr><td class="empty">Noch keine Regel.</td></tr>';
+$('shcv').innerHTML=SH.covers.length?'<tr><th>Rollladen</th><th>Zustand</th><th class="user-only"></th></tr>'+SH.covers.map(c=>`<tr class="${c.online?'':'ack'}"><td>${esc(c.name)}</td><td>${CVS[c.state]||c.state||'–'}${c.pos!=null?' · '+c.pos+' %':''}${c.pos_control?'':' <span class="l">(ohne Position)</span>'}</td><td class="n user-only" style="white-space:nowrap"><a class="lk" onclick="cvAct('${esc(c.id)}','open');setTimeout(loadShade,1500)">Auf</a> · <a class="lk" onclick="cvAct('${esc(c.id)}','stop');setTimeout(loadShade,1500)">Stopp</a> · <a class="lk" onclick="cvAct('${esc(c.id)}','close');setTimeout(loadShade,1500)">Zu</a></td></tr>`).join(''):'<tr><td class="empty">Keine Rollläden verbunden (Hermit OS 2.5 Rollladen oder Shelly Gen2+ im Rollladenbetrieb).</td></tr>';
+$('shse').innerHTML=SH.sensors.length?'<tr><th>Fühler</th><th>Wert</th><th>zuletzt</th></tr>'+SH.sensors.map(x=>`<tr><td>${esc(x.label)}</td><td>${num(x.value,1)} ${esc(x.unit)}</td><td>${dur(x.age)}</td></tr>`).join(''):'<tr><td class="empty">Noch keine Fühler gemeldet.</td></tr>';
+$('sh_wx').checked=SH.weather_on;$('sh_fr').value=SH.frost_c!=null?num(SH.frost_c,1):''}
+function shCheck(){run(async()=>{SH=await api('shade/check',{method:'POST',body:{}});await loadShade()})}
+function shPause(id,on){run(async()=>{await api('shade/'+id+'/pause',{method:'POST',body:{on}});await loadShade()})}
+function shSet(){run(async()=>{await api('shade/settings',{method:'POST',body:{weather_on:$('sh_wx').checked,frost_c:$('sh_fr').value.trim()===''?null:$('sh_fr').value}});await loadShade()},'Gespeichert')}
+function srcOpts(sel,withNone){const o=[['wx:temp','Außentemperatur (Wetter)'],['wx:tmax','Höchstwert heute (Wetter)']].concat(SH.sensors.filter(x=>x.unit=='°C').map(x=>[x.src,x.label+' ('+num(x.value,1)+' °C)']));
+return (withNone?`<option value="">– nicht verwenden –</option>`:'')+o.map(([v,t])=>`<option value="${esc(v)}" ${v==sel?'selected':''}>${esc(t)}</option>`).join('')}
+function shDlg(id){const r=(SH.rules.find(x=>x.id==id))||{name:'',enabled:true,cfg:{covers:[],azimuth:180,width:70,elev_min:10,elev_max:90,pos:20,temp_src:'wx:temp',temp_on:24,temp_off:21,in_src:'',in_on:23,fc_on:null,rad_min:0,delay_on:5,delay_off:15,from:'',to:'',days:127,end:'open'}},c=r.cfg;
+dlg(`<h2>${id?'Beschattung bearbeiten':'Neue Beschattung'}</h2><div class="f">
+<label>Name</label><input id="sd_n" value="${esc(r.name)}" placeholder="z. B. Südseite Wohnzimmer">
+<label>Rollläden</label><div class="days" id="sd_c">${SH.covers.map(x=>`<label><input type="checkbox" value="${esc(x.id)}" ${c.covers.includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="l">keine Rollläden verbunden</span>'}</div>
+<label>Fassade zeigt nach</label><div class="row"><select id="sd_dir" onchange="$('sd_az').value=this.value">${DIRS.map((d,i)=>`<option value="${i*45}" ${Math.round(c.azimuth/45)%8==i?'selected':''}>${d}</option>`).join('')}</select><input id="sd_az" style="width:70px" value="${num(c.azimuth,0)}"> ° <span class="l">±</span><input id="sd_w" style="width:60px" value="${num(c.width,0)}"> °</div>
+<label>Sonnenhöhe</label><div class="row"><input id="sd_e1" style="width:60px" value="${num(c.elev_min,0)}"> bis <input id="sd_e2" style="width:60px" value="${num(c.elev_max,0)}"> ° <span class="l">(tief stehende Sonne verdeckt oft ein Nachbarhaus)</span></div>
+<label>Beschatten auf</label><div class="row"><input id="sd_p" type="range" min="0" max="100" value="${c.pos}" oninput="$('sd_pv').textContent=this.value+' % offen'" style="flex:1"><b id="sd_pv">${c.pos} % offen</b></div>
+<label>Temperatur</label><select id="sd_ts">${srcOpts(c.temp_src,true)}</select>
+<label>ab / bis unter</label><div class="row"><input id="sd_t1" style="width:70px" value="${num(c.temp_on,1)}"> °C an, aus unter <input id="sd_t0" style="width:70px" value="${num(c.temp_off,1)}"> °C</div>
+<label>Innentemperatur</label><div class="row"><select id="sd_is" style="flex:1">${srcOpts(c.in_src,true)}</select> ≥ <input id="sd_i1" style="width:60px" value="${num(c.in_on,1)}"> °C</div>
+<label>Höchstwert heute</label><div class="row"><input id="sd_fc" style="width:70px" value="${c.fc_on!=null?num(c.fc_on,0):''}" placeholder="egal"> °C <span class="l">(Vorhersage – schon morgens beschatten, wenn es heiß wird)</span></div>
+<label>Nur bei Sonne</label><div class="row"><input id="sd_rad" style="width:70px" value="${c.rad_min?num(c.rad_min,0):''}" placeholder="egal"> W/m² Einstrahlung <span class="l">(klar ≈ 500–900, bedeckt &lt; 150)</span></div>
+<label>Verzögerung</label><div class="row"><input id="sd_d1" style="width:60px" value="${num(c.delay_on,0)}"> min bis zum Beschatten, <input id="sd_d0" style="width:60px" value="${num(c.delay_off,0)}"> min bis zum Öffnen</div>
+<label>Zeitfenster</label><div class="row"><input id="sd_f" type="time" value="${c.from||''}"> – <input id="sd_to" type="time" value="${c.to||''}"> <span class="l">leer = immer</span></div>
+<label>Tage</label>${daysHtml(c.days,'sd_dy')}
+<label>Danach</label><select id="sd_end"><option value="open" ${c.end=='open'?'selected':''}>ganz öffnen</option><option value="restore" ${c.end=='restore'?'selected':''}>vorige Position</option><option value="none" ${c.end=='none'?'selected':''}>stehen lassen</option></select>
+<label>Aktiv</label><div><input type="checkbox" id="sd_on" ${r.enabled?'checked':''}></div></div>
+<div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="shDel(${id})">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="shSave(${id||0})">Speichern</button></div></div>`)}
+function shSave(id){const v=i=>$(i).value.trim();run(async()=>{await api('shade',{method:'POST',body:{id,name:v('sd_n'),enabled:$('sd_on').checked,covers:[...document.querySelectorAll('#sd_c input:checked')].map(x=>x.value),
+azimuth:v('sd_az'),width:v('sd_w'),elev_min:v('sd_e1'),elev_max:v('sd_e2'),pos:+$('sd_p').value,temp_src:$('sd_ts').value,temp_on:v('sd_t1'),temp_off:v('sd_t0'),in_src:$('sd_is').value,in_on:v('sd_i1'),
+fc_on:v('sd_fc')||null,rad_min:v('sd_rad')||0,delay_on:v('sd_d1'),delay_off:v('sd_d0'),from:v('sd_f'),to:v('sd_to'),days:daysVal('sd_dy'),end:$('sd_end').value}});closeDlg();await loadShade()},'Gespeichert')}
+function shDel(id){if(!confirm('Beschattungsregel löschen?'))return;run(async()=>{await api('shade/'+id,{method:'DELETE'});closeDlg();await loadShade()})}
+// ---------- Gen2+ anbinden ----------
+let G2=[];
+function g2Scan(){run(async()=>{$('g2tab').innerHTML='<tr><td class="l">Suche …</td></tr>';G2=await api('gen2/scan',{method:'POST',body:{net:$('g2_net').value}});
+$('g2tab').innerHTML=G2.length?'<tr><th>Gerät</th><th>IP</th><th></th></tr>'+G2.map((d,i)=>`<tr><td><b>${esc(d.name||d.id)}</b><div class="l">${esc(d.model||'')} · Gen${d.gen}${d.auth?' · Passwort':''}${d.hermit?' · Hermit OS':''}</div></td><td>${esc(d.ip)}</td><td class="n">${d.hermit?'<span class="l">unter System → Cloud / MQTT einstellen</span>':d.known?'<span class="tag g">verbunden</span> <a class="lk" onclick="g2Con('+i+')">erneut</a>':'<button class="bt s" onclick="g2Con('+i+')">Verbinden</button>'}</td></tr>`).join(''):'<tr><td class="empty">Keine Gen2+-Geräte gefunden.</td></tr>'})}
+function g2Con(i,force){const d=G2[i];run(async()=>{try{const r=await api('gen2/connect',{method:'POST',body:{ip:d.ip,password:$('g2_pw').value,broker:$('g2_br').value,force:!!force}});d.known=true;toast(`${d.name||d.id} verbunden${r.restarted?' – startet neu':''}`);
+setTimeout(()=>{g2Scan();loadDevs()},8000)}catch(e){if(/schon auf/.test(e.message)&&confirm(e.message+'\n\nTrotzdem umstellen?'))return g2Con(i,true);throw e}})}
 </script></body></html>

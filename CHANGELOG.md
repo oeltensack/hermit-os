@@ -1,5 +1,17 @@
 # Änderungen
 
+## Hermit Cloud 1.6.0
+- **Beschattung:** neuer Reiter – Rollläden nach Sonnenstand (Azimut/Höhe je Fassade) und Temperatur
+  (Fühler oder Wetter von Open-Meteo), optional Innentemperatur, Höchstwert-Vorhersage, Einstrahlung;
+  Verzögerung, Zeitfenster, Tage, Frostschutz; nur nach unten, Handbedienung hat Vorrang, „heute pausieren“;
+  Kompass mit Sonnenstand und Fassaden
+- **Shelly Gen2+ mit Original-Firmware parallel zur Shelly Cloud:** Netz durchsuchen, mit einem Klick als
+  MQTT-Server eintragen (auch mit Gerätepasswort, Digest SHA-256), Warnung bei vorhandenem MQTT-Server
+- Mehrkanal-Geräte (Plus 2PM, Pro 4PM, Pro Dual Cover) je Kanal als eigenes Gerät
+- Fühler (Temperatur, Feuchte, Helligkeit) werden gesammelt
+- Zeitpläne und Regeln: Aktion „Rollladen auf Position“; Rollläden in der Zielauswahl
+
+
 ## 1.15.0
 - **Shelly 2.5** – zwei Firmwares:
   - `hermit-25`: zwei Schaltkanäle wie Shelly Plus 2PM (`switch:0`, `switch:1`), je Kanal Leistung, Spannung,
