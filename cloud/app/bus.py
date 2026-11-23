@@ -117,7 +117,7 @@ class Bus:
             self.wait.pop(rid, None)
 
     # ---- Schalten (fuer Oberflaeche, Zeitplaene, Regeln) ----
-    def switch(self, dev, on=None):
+    def switch(self, dev, on=None, brightness=None):
         r = q("SELECT comp, status FROM devices WHERE id=?", (dev,), one=True)
         if not r:
             raise RuntimeError(f"Unbekanntes Gerät {dev}")
@@ -126,7 +126,13 @@ class Bus:
         comp = r["comp"] or "switch:0"
         kind, cid = comp.split(":")
         m = {"switch": "Switch", "cct": "CCT", "light": "Light"}.get(kind, "Switch")
-        if on is None:
+        if brightness is not None and kind in ("light", "cct"):
+            b = max(0, min(100, int(round(float(brightness)))))
+            p = {"id": int(cid), "brightness": b} if b > 0 else {"id": int(cid), "on": False}
+            if b > 0:
+                p["on"] = True
+            res = self.rpc(dev, f"{m}.Set", p)
+        elif on is None:
             res = self.rpc(dev, f"{m}.Toggle", {"id": int(cid)})
         else:
             res = self.rpc(dev, f"{m}.Set", {"id": int(cid), "on": bool(on)})
@@ -218,9 +224,9 @@ def set_status(dev, comp, st, merge=False, live=True):
 
 
 EVENT_TEXT = {
-    "overpower": ("overpower", "Überlast – Relais abgeschaltet"),
-    "overtemperature": ("overtemp", "Übertemperatur – Relais abgeschaltet"),
-    "overtemp": ("overtemp", "Übertemperatur – Relais abgeschaltet"),
+    "overpower": ("overpower", "Überlast – abgeschaltet"),
+    "overtemperature": ("overtemp", "Übertemperatur – abgeschaltet"),
+    "overtemp": ("overtemp", "Übertemperatur – abgeschaltet"),
     "reset": ("reset", "Schutzabschaltung am Gerät zurückgesetzt"),
     "overvoltage": ("overvoltage", "Überspannung"),
 }

@@ -282,7 +282,7 @@ async def dev_switch(dev: str, request: Request):
     get_dev(dev)
     d = await request.json()
     try:
-        res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None)
+        res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None, d.get("brightness"))
     except Exception as e:
         raise HTTPException(502, str(e))
     return {"result": res}

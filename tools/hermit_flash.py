@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 D.Koch – Hermit OS
 """
-hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug / Plug S / Duo (Gen1) schreiben.
+hermit_flash.py – Hermit OS ueber WLAN auf einen Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 (Gen1) schreiben.
 
 Erkennt automatisch, was auf dem Geraet laeuft:
   * Original-Shelly-Firmware (Mongoose OS)  -> mg2hermit: angepasstes mg2tasmota laedt Hermit OS
@@ -36,7 +36,8 @@ MG2X_OLD = b"https://ota.tasmota.com/tasmota/release/tasmota.bin"   # in mg2tasm
 GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "hermit-1pm"),
                "SHPLG-S": ("ShellyPlugS", "hermit-plugs"),
                "SHPLG-1": ("ShellyPlug2", "hermit-plug"), "SHPLG2-1": ("ShellyPlug2", "hermit-plug"),
-               "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo")}
+               "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo"),
+               "SHDM-2": ("ShellyDimmer2", "hermit-dimmer2")}
 
 
 def log(msg):
@@ -146,6 +147,8 @@ def variant_from(dev, kind, info, addon, meter=False):
             v = "hermit-plugs"
         elif "plug" in name and "us" not in name.split():
             v = "hermit-plug"
+        elif "dimmer 2" in name:
+            v = "hermit-dimmer2"
         elif "duo" in name and "rgbw" not in name:
             v = "hermit-duo"
         elif "1pm" in name:
@@ -153,8 +156,8 @@ def variant_from(dev, kind, info, addon, meter=False):
         elif "shelly 1" in name:
             v = "hermit-1"
     if v and addon:
-        if v in ("hermit-plugs", "hermit-plug", "hermit-duo"):
-            die("Plug / Plug S / Duo haben keinen Add-on-Anschluss")
+        if v in ("hermit-plugs", "hermit-plug", "hermit-duo", "hermit-dimmer2"):
+            die("Plug / Plug S / Duo / Dimmer 2 haben keinen Add-on-Anschluss")
         v += "-addon"
     if v and meter:
         if v not in ("hermit-1pm", "hermit-plugs", "hermit-plug"):
@@ -441,7 +444,7 @@ def flash_hermit(dev, args, variant, fw):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM (Gen1) schreiben")
+    ap = argparse.ArgumentParser(description="Hermit OS auf Shelly 1 / 1PM / Plug / Plug S / Duo / Dimmer 2 (Gen1) schreiben")
     ap.add_argument("ip", help="IP-Adresse des Shelly")
     ap.add_argument("--addon", action="store_true", help="Variante mit Add-on-Taster installieren")
     ap.add_argument("--meter", action="store_true", help="Messfirmware (1PM / Plug S / Plug): nur Energiemessung, Reset nur am Taster/SW")
@@ -458,7 +461,7 @@ def main():
     dev = Dev(args.ip, args.user, args.password)
     kind, info = detect(dev)
     if not kind:
-        die(f"Unter {args.ip} kein Shelly 1/1PM (Original, Tasmota, Loader oder Hermit) gefunden")
+        die(f"Unter {args.ip} kein unterstützter Shelly (Original, Tasmota, Loader oder Hermit) gefunden")
     names = {"stock": "Original-Shelly-Firmware", "tasmota": "Tasmota", "loader": "Hermit Loader", "hermit": "Hermit OS"}
     variant = args.variant or variant_from(dev, kind, info, args.addon, args.meter)
     if not variant:
@@ -466,7 +469,9 @@ def main():
     log(f"Gefunden: {names[kind]}  →  installiere {variant}")
     if kind == "stock":
         log("Hinweis: mg2hermit überschreibt den Bootloader per OTA. Bricht der Vorgang ab, hilft im Zweifel nur")
-        log("Flashen per Kabel." + (" Lampe während des Vorgangs nicht ausschalten." if "duo" in variant else " Relais bleibt während des Vorgangs aus."))
+        log("Flashen per Kabel." + (" Lampe während des Vorgangs nicht ausschalten." if "duo" in variant
+                                    else " Das Licht kann während des Vorgangs kurz ausgehen." if "dimmer" in variant
+                                    else " Relais bleibt während des Vorgangs aus."))
     if not args.yes and input("Fortfahren? [j/N] ").strip().lower() not in ("j", "ja", "y", "yes"):
         sys.exit(0)
     fw = load_bin(args, variant)

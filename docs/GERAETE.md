@@ -2,22 +2,22 @@
 
 ## Übersicht
 
-| | Shelly 1 | Shelly 1PM | Plug S | Plug (16 A) | Duo (E27/GU10) |
-|---|---|---|---|---|---|
-| Firmware | `hermit-1` | `hermit-1pm` | `hermit-plugs` | `hermit-plug` | `hermit-duo` |
-| Add-on-Variante | `hermit-1-addon` | `hermit-1pm-addon` | – | – | – |
-| Messfirmware | – | `hermit-1pm-meter` | `hermit-plugs-meter` | `hermit-plug-meter` | – |
-| Gen1-Typ | `SHSW-1` | `SHSW-PM` | `SHPLG-S` | `SHPLG-1` / `SHPLG2-1` | `SHBDUO-1` |
-| Hermit-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-PLUG` | `HERMIT-DUO` |
-| Gen2-Komponente | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `cct:0` |
-| Relais | GPIO4 | GPIO15 | GPIO15 | GPIO4 | – |
-| Eingang | SW, GPIO5 | SW, GPIO4 | Taster, GPIO13 (Pull-up) | Taster, GPIO12 (gedrückt = HIGH) | – |
-| LED | – | GPIO0 (invertiert) | GPIO0 Relais, GPIO2 WLAN | GPIO14 rot Relais, GPIO16 blau WLAN, GPIO13 grün aus | – |
-| Messchip | – | BL0937 (CF GPIO5) | BL0937 (CF GPIO5, CF1 GPIO14, SEL GPIO12) | HLW8012 (nur CF GPIO5) | – |
-| Temperatur | – | NTC am ADC | NTC am ADC | – | – |
-| Licht | – | – | – | – | PWM kalt GPIO5, warm GPIO4 |
-| Abschaltleistung ab Werk | – | 3500 W | 2500 W | 3500 W | – |
-| Nach Stromausfall ab Werk | aus | aus | aus | aus | **an** |
+| | Shelly 1 | Shelly 1PM | Plug S | Plug (16 A) | Duo (E27/GU10) | Dimmer 2 |
+|---|---|---|---|---|---|---|
+| Firmware | `hermit-1` | `hermit-1pm` | `hermit-plugs` | `hermit-plug` | `hermit-duo` | `hermit-dimmer2` |
+| Add-on-Variante | `hermit-1-addon` | `hermit-1pm-addon` | – | – | – | – |
+| Messfirmware | – | `hermit-1pm-meter` | `hermit-plugs-meter` | `hermit-plug-meter` | – | – |
+| Gen1-Typ | `SHSW-1` | `SHSW-PM` | `SHPLG-S` | `SHPLG-1` / `SHPLG2-1` | `SHBDUO-1` | `SHDM-2` |
+| Hermit-Modell | `HERMIT-1` | `HERMIT-1PM` | `HERMIT-PLUGS` | `HERMIT-PLUG` | `HERMIT-DUO` | `HERMIT-DIMMER2` |
+| Gen2-Komponente | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `switch:0`, `input:0` | `cct:0` | `light:0`, `input:0`, `input:1` |
+| Relais | GPIO4 | GPIO15 | GPIO15 | GPIO4 | – | – (STM32, Reset GPIO5, BOOT0 GPIO4) |
+| Eingang | SW, GPIO5 | SW, GPIO4 | Taster, GPIO13 (Pull-up) | Taster, GPIO12 (gedrückt = HIGH) | – | SW1 GPIO14, SW2 GPIO12 |
+| LED | – | GPIO0 (invertiert) | GPIO0 Relais, GPIO2 WLAN | GPIO14 rot Relais, GPIO16 blau WLAN, GPIO13 grün aus | – | GPIO16 (invertiert) |
+| Messchip | – | BL0937 (CF GPIO5) | BL0937 (CF GPIO5, CF1 GPIO14, SEL GPIO12) | HLW8012 (nur CF GPIO5) | – | im STM32 (UART GPIO1/3) |
+| Temperatur | – | NTC am ADC | NTC am ADC | – | – | NTC am ADC |
+| Licht | – | – | – | – | PWM kalt GPIO5, warm GPIO4 | Phasenabschnitt/-anschnitt über STM32 |
+| Abschaltleistung ab Werk | – | 3500 W | 2500 W | 3500 W | – | 250 W |
+| Nach Stromausfall ab Werk | aus | aus | aus | aus | **an** | letzter Zustand |
 
 Alle Geräte: ESP8266, 2 MB Flash. Die Oberfläche zeigt unter Status → Flash die echte Chipgröße.
 
@@ -54,7 +54,7 @@ welchem AP (BSSID) und Kanal das Gerät verbunden ist.
 
 | Gerät | Vorgehen |
 |---|---|
-| Shelly 1 / 1PM / Plug S | innerhalb der ersten 60 s nach dem Einschalten den Eingang bzw. Taster 5× ein und aus (10 Flanken) |
+| Shelly 1 / 1PM / Plug S / Dimmer 2 | innerhalb der ersten 60 s nach dem Einschalten den Eingang bzw. Taster (beim Dimmer SW1) 5× ein und aus (10 Flanken) |
 | Duo | Lampe 5× kurz hintereinander aus- und einschalten, jeweils unter 6 s an. Es zählen nur echte Stromunterbrechungen, keine Neustarts nach Updates |
 | alle | Weboberfläche → System → Werkseinstellungen |
 
@@ -163,12 +163,35 @@ gleich bleibt – 2700 K nur warm, 6500 K nur kalt, dazwischen gemischt. Gamma 2
 
 ---
 
+## Shelly Dimmer 2
+
+Der Dimmer 2 (`SHDM-2`) hat neben dem ESP8266 einen **STM32**, der den Phasenan- bzw. -abschnitt und die
+Leistungsmessung macht. Hermit OS spricht mit ihm über UART (GPIO1/3, 115200 Baud) und spielt **keine**
+STM32-Firmware auf – die Original-STM32-Firmware bleibt, der Weg zurück zur Shelly-Firmware bleibt offen.
+War vorher Tasmota oder ESPHome drauf (quelloffene STM32-Firmware v51.x), wird das erkannt und ebenfalls bedient.
+
+- **Bedienung** wie Shelly Dimmer Gen3 über `Light.Set` (siehe [API.md](API.md#light-dimmer-2))
+- **Taster** (Standard „Ein Taster“): kurz = an/aus, halten = dimmen, die Richtung wechselt bei jedem Halten;
+  aus und gehalten = ab Minimum heller. „Zwei Taster“: SW1 kurz an / halten heller, SW2 kurz aus / halten dunkler.
+  Für Schalter: „Licht folgt SW1“ oder „jede Flanke schaltet um“
+- **Minimale Helligkeit** gegen Flackern bei LED-Lampen, **maximale Helligkeit** zum Begrenzen
+- **Dimmart:** Phasenabschnitt (Standard, für LED und elektronische Trafos), Phasenanschnitt (Halogen, Wickeltrafo)
+- **Überblendzeit** (Standard 1 s) und **Dimmgeschwindigkeit** der Taster einstellbar
+- **Update und Neustart:** Der STM32 läuft weiter, das Licht bleibt in Helligkeit und Zustand
+- **Schutz:** Abschaltung über 250 W bzw. 85 °C (einstellbar)
+- **Leistung:** kommt vom STM32. Ab STM32-Firmware 2.63 meldet er Watt, ältere Stände eine Periodendauer –
+  beides wird ausgewertet. Mit `Light.Calibrate` (Referenzlast) lässt sich der Wert korrigieren.
+  Ohne Neutralleiter misst der Dimmer ungenau.
+- **Diagnose:** `Hermit.Stm` zeigt Protokoll, STM32-Version, Rohwerte und Rahmenzähler
+
+---
+
 ## Weboberfläche
 
 | Reiter | Inhalt |
 |---|---|
-| Status | Schalten, Messwerte, WLAN, Laufzeit, Flash; bei der Duo Regler für Helligkeit und Farbtemperatur |
-| Schalter / Licht | Name, Eingangsmodus, Verhalten nach Stromausfall, Auto-An/Aus, Abschaltgrenzen, Eingang, Add-on, bei der Duo Überblendzeit |
+| Status | Schalten, Messwerte, WLAN, Laufzeit, Flash; bei Duo und Dimmer Helligkeitsregler (Duo auch Farbtemperatur) |
+| Schalter / Licht | Name, Eingangsmodus, Verhalten nach Stromausfall, Auto-An/Aus, Abschaltgrenzen, Eingang, Add-on, bei Duo und Dimmer Überblendzeit, beim Dimmer Bereich, Dimmart, SW2 |
 | Aktionen | Webhooks anlegen, aktivieren, löschen |
 | WLAN | Netzsuche, DHCP/statisch, Passwort des Zugangspunkts |
 | System | Name, Zeitzone, NTP, LED, Passwort, Kalibrierung, Auto-Update, Firmware, Neustart, Werkseinstellungen |

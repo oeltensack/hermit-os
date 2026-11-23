@@ -81,6 +81,31 @@
   #define HAS_LED      0
   #define DEF_INITIAL  "on"   // Lampe am Wandschalter: nach Strom an
   #define PWR_CAL_DEFAULT 1.0f
+#elif defined(DEVICE_DIMMER2)
+  // Shelly Dimmer 2 (SHDM-2): ESP8266 + STM32-Koprozessor (Phasenan-/abschnitt, Leistungsmessung).
+  // Tasmota-Template {"NAME":"Shelly Dimmer 2","GPIO":[0,3200,0,3232,5568,5600,0,0,193,0,192,0,320,4736]}
+  // UART0 (GPIO1/3, 115200) gehoert dem STM32 – keine Debug-Ausgaben ueber Serial!
+  #define DEV_PREFIX   "hermit-dimmer2"
+  #define DEV_MODEL    "HERMIT-DIMMER2"
+  #define DEV_APP      "Dimmer2"
+  #define GEN1_TYPE    "SHDM-2"
+  #define HAS_DIM      1
+  #define HAS_RELAY    0
+  #define PIN_STM_BOOT0 4     // LOW = Anwendung starten
+  #define PIN_STM_NRST  5     // LOW = STM32 im Reset
+  #define PIN_INPUT    14     // SW1
+  #define PIN_INPUT2   12     // SW2
+  #define PIN_LED      16     // invertiert
+  #define HAS_PM       1
+  #define PM_STM       1      // Leistung kommt vom STM32 (kein CF-Pin)
+  #define PWR_CAL_DEFAULT 1.0f   // Korrekturfaktor auf den STM32-Messwert
+  #define HAS_TEMP     1      // NTC am ADC (wie 1PM)
+  #define HAS_LED      1
+  #define DEF_IN_TYPE   "button"
+  #define DEF_IN_MODE   "dim"
+  #define DEF_INITIAL   "restore_last"
+  #define DEF_POWER_LIMIT 250      // Dimmer 2: 220 W bei 230 V
+  #define DEF_TEMP_LIMIT  85
 #elif defined(DEVICE_SHELLY1)
   #define DEV_PREFIX   "hermit-1"
   #define DEV_MODEL    "HERMIT-1"
@@ -99,8 +124,8 @@
 // Variante mit Shelly-Temperatur-Add-on (Gen1), genutzt als externer Tastereingang input:100.
 // Das Add-on fuehrt die Datenleitung ueber Optokoppler: GPIO0 = Ausgang (Leitung freigeben),
 // GPIO3 = Eingang. Taster zwischen DATA und GND des Add-ons.
-#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_PLUG) || defined(DEVICE_DUO))
-  #error "Plug / Plug S / Duo haben keinen Add-on-Anschluss"
+#if defined(WITH_ADDON) && (defined(DEVICE_PLUGS) || defined(DEVICE_PLUG) || defined(DEVICE_DUO) || defined(DEVICE_DIMMER2))
+  #error "Plug / Plug S / Duo / Dimmer 2 haben keinen Add-on-Anschluss"
 #endif
 // Messfirmware: nur Energiemessung, Relais bleibt an. Abschaltung bei Ueberlast/Uebertemperatur,
 // Wiedereinschalten nur von Hand am Taster bzw. SW-Eingang. Kein Schalten per RPC/HTTP.
@@ -164,6 +189,20 @@
 #ifndef DEF_POWER_LIMIT
   #define DEF_POWER_LIMIT 3500
 #endif
+#ifndef DEF_TEMP_LIMIT
+  #define DEF_TEMP_LIMIT 95
+#endif
+#ifndef HAS_DIM
+  #define HAS_DIM 0
+#endif
+#ifndef PM_STM
+  #define PM_STM 0
+#endif
+#ifdef PIN_INPUT2
+  #define HAS_IN2 1
+#else
+  #define HAS_IN2 0
+#endif
 #define V_CAL_DEFAULT 0.16029f      // Tasmota BL0937: 822 * 1950 / 10 / T_us  -> V pro Hz
 #define I_CAL_DEFAULT 0.01155f      // Tasmota BL0937: 3300 * 3500 / 1000 / T_us -> A pro Hz
 #ifndef HAS_LIGHT
@@ -182,8 +221,16 @@
   #define COMP     "cct"        // Gen2-Komponente wie Shelly Duo Bulb Gen3
   #define EV_ON    "cct.on"
   #define EV_OFF   "cct.off"
+#elif HAS_DIM
+  #define COMP     "light"      // Gen2-Komponente wie Shelly Dimmer Gen3 / Plus Wall Dimmer
+  #define EV_ON    "light.on"
+  #define EV_OFF   "light.off"
 #else
   #define COMP     "switch"
   #define EV_ON    "switch.on"
   #define EV_OFF   "switch.off"
 #endif
+#define EV_OVERPOWER COMP ".overpower"
+#define EV_OVERTEMP  COMP ".overtemperature"
+#define EV_PABOVE    COMP ".power_above"
+#define EV_PBELOW    COMP ".power_below"

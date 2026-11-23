@@ -14,6 +14,7 @@ Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Hermit Clou
 | **Shelly Plug S** | `hermit-plugs` | Shelly Plus Plug S | Leistung, **Spannung, Strom, cos φ**, Gerätetaster, zwei LEDs, optional **Messfirmware** |
 | **Shelly Plug** (16 A, `SHPLG-1`/`SHPLG2-1`) | `hermit-plug` | Shelly Plus Plug S | Wirkleistung, Energie, Gerätetaster, LEDs, optional **Messfirmware** |
 | **Shelly Duo** (E27/GU10, weiß) | `hermit-duo` | Shelly Duo Bulb Gen3 (`cct:0`) | Helligkeit, Farbtemperatur 2700–6500 K, Überblenden |
+| **Shelly Dimmer 2** (`SHDM-2`) | `hermit-dimmer2` | Shelly Dimmer Gen3 (`light:0`) | Dimmen per Taster (1 oder 2), Leistung, Energie, Temperatur, Licht bleibt beim Update an |
 
 > Shelly ist eine Marke der Shelly Group. Hermit OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.
@@ -98,7 +99,7 @@ Einrichtung: **[cloud/README.md](cloud/README.md)**
 | Dokument | Inhalt |
 |---|---|
 | **[docs/FLASHEN.md](docs/FLASHEN.md)** | Flasher (grafisch, Konsole, EXE), Wege von Original-Firmware und Tasmota, Hermit Loader, serielles Flashen, Updates, Fehlersuche |
-| **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo |
+| **[docs/GERAETE.md](docs/GERAETE.md)** | Pinbelegung, Eingänge, Messung und Kalibrierung, LEDs, WLAN-Reset, Add-on, Plug S, Duo, Dimmer 2 |
 | **[docs/API.md](docs/API.md)** | Alle RPC-Methoden, Statusfelder, Aktionen und Platzhalter, Gen1-Endpunkte, Diagnose, Unterschiede zu Gen2 |
 | **[docs/SCANNER.md](docs/SCANNER.md)** | Hermit Scanner: findet Shelly Gen1/Gen2+, Tasmota und Hermit OS im Netz (Windows) |
 | **[cloud/](cloud/README.md)** | Hermit Cloud: Heim-Cloud mit Übersicht, Schalten, Energieverlauf und Meldungen (Docker) |
@@ -139,7 +140,7 @@ committen und pushen. Die Geräte finden die neue Version über `update.json`.
   erwartet bei Gen2 einen WebSocket und funktioniert deshalb nicht – dort MQTT oder REST nutzen.
 - MQTT ohne TLS (zu wenig RAM) – im eigenen Netz oder über VPN betreiben.
 - Keine Scripte auf dem Gerät selbst (der ESP8266 hat dafür zu wenig RAM). Die Logik liegt auf dem Gen2/Gen3.
-- Shelly Duo RGBW und andere Gen1-Modelle werden noch nicht unterstützt.
+- Shelly Duo RGBW, Dimmer 1 und andere Gen1-Modelle werden noch nicht unterstützt.
 
 ## Lizenz
 

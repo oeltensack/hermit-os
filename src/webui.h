@@ -27,7 +27,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 5px;bord
 .ck{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--fg);font-size:14px}.ck input{width:auto}
 pre{background:var(--bg);padding:10px;border-radius:6px;overflow:auto;font-size:12px;max-height:340px;white-space:pre-wrap}
 nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:var(--fg);text-decoration:none;padding:7px 11px;border-radius:6px;background:var(--c);font-size:13px;cursor:pointer}
-nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.lt{display:none}
+nav a.a{background:var(--a)}.tab{display:none}.ao{display:none}.lt{display:none}.dm{display:none}
 input[type=range]{padding:0;height:28px;accent-color:var(--a)}
 #ctr{background:linear-gradient(90deg,#ffb15a,#fff,#cfe3ff);border-radius:6px}.vi{display:none}.tab.a{display:block}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;border-radius:6px;display:none;color:#fff}
@@ -45,7 +45,8 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="pm"><div class="v" id="tc">–</div><div class="l">Temperatur</div></div>
 <div class="vi"><div class="v" id="vo">–</div><div class="l">Spannung</div></div>
 <div class="vi"><div class="v" id="cu">–</div><div class="l">Strom · cos φ</div></div>
-<div id="inw"><div class="v" id="in">–</div><div class="l">Eingang SW</div></div>
+<div id="inw"><div class="v" id="in">–</div><div class="l" id="inl">Eingang SW</div></div>
+<div class="dm"><div class="v" id="in2">–</div><div class="l">Eingang SW2</div></div>
 <div class="ao"><div class="v" id="ex">–</div><div class="l" id="exl">Add-on-Taster</div></div>
 <div><div class="v" id="rs">–</div><div class="l">WLAN</div></div>
 <div><div class="v" id="ip">–</div><div class="l">IP</div></div>
@@ -54,8 +55,10 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 </div></div><div class="l" id="src" style="margin-top:12px"></div></div>
 <div class="card lt"><h2>Licht</h2>
 <label>Helligkeit: <b id="brv">–</b></label><input type="range" id="bri" min="1" max="100" onchange="setL({brightness:+this.value})" oninput="$('brv').textContent=this.value+' %'">
-<label>Farbtemperatur: <b id="ctv">–</b></label><input type="range" id="ctr" min="2700" max="6500" step="50" onchange="setL({ct:+this.value})" oninput="$('ctv').textContent=this.value+' K'">
+<div class="cto"><label>Farbtemperatur: <b id="ctv">–</b></label><input type="range" id="ctr" min="2700" max="6500" step="50" onchange="setL({ct:+this.value})" oninput="$('ctv').textContent=this.value+' K'">
 <div class="row"><button class="bt g" onclick="setL({ct:2700})">Warmweiß</button><button class="bt g" onclick="setL({ct:4000})">Neutral</button><button class="bt g" onclick="setL({ct:6500})">Tageslicht</button></div></div>
+<div class="dm"><div class="row"><button class="bt g" onclick="setL({brightness:10,on:true})">10 %</button><button class="bt g" onclick="setL({brightness:50,on:true})">50 %</button><button class="bt g" onclick="setL({brightness:100,on:true})">100 %</button></div>
+<div class="l" id="stm" style="margin-top:10px"></div></div></div>
 <div class="card nm"><h2>Zeitschaltung</h2><div class="row">
 <div><label>Einschalten für (s)</label><input id="ta" type="number" min="1" value="60"></div></div>
 <button class="bt" onclick="pulse()">Für Dauer einschalten</button></div>
@@ -74,13 +77,25 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="row"><div class="pm"><label>Abschaltleistung (W, 0 = aus)</label><input id="s_power_limit" type="number"></div>
 <div class="pm"><label>Abschalttemperatur (°C)</label><input id="s_temp_limit" type="number"></div></div>
 <div class="lt"><div class="row"><div><label>Überblendzeit (s)</label><input id="l_tr" type="number" step="0.1" min="0"></div>
-<div><label class="ck" style="margin-top:34px"><input type="checkbox" id="l_ctinv">Warm-/Kaltkanal tauschen</label></div></div>
-<div class="l">WLAN-Reset: Lampe 5× kurz hintereinander aus- und einschalten (jeweils unter 6 s an).</div></div>
-<div class="io"><h2 style="margin-top:20px">Eingang SW</h2>
+<div class="cto"><label class="ck" style="margin-top:34px"><input type="checkbox" id="l_ctinv">Warm-/Kaltkanal tauschen</label></div></div>
+<div class="l cto">WLAN-Reset: Lampe 5× kurz hintereinander aus- und einschalten (jeweils unter 6 s an).</div></div>
+<div class="dm"><h2 style="margin-top:20px">Dimmen</h2>
+<div class="row"><div><label>Minimale Helligkeit (%, gegen Flackern)</label><input id="d_min" type="number" min="0" max="99"></div>
+<div><label>Maximale Helligkeit (%)</label><input id="d_max" type="number" min="1" max="100"></div></div>
+<div class="row"><div><label>Dimmart</label><select id="d_edge"><option value="0">Phasenabschnitt (LED, Standard)</option><option value="1">Phasenanschnitt (Halogen, Trafo)</option></select></div>
+<div><label>Glättung im Dimmer (1–5)</label><input id="d_fade" type="number" min="1" max="5"></div>
+<div><label>Dimmgeschwindigkeit Taster (1–5)</label><input id="d_bfade" type="number" min="1" max="5"></div></div>
+<div class="l">Taster: kurz drücken = an/aus, gedrückt halten = dimmen (Richtung wechselt jedes Mal). Zwei Taster: SW1 an/heller, SW2 aus/dunkler.</div></div>
+<div class="io"><h2 style="margin-top:20px" id="ioh">Eingang SW</h2>
 <div class="row"><div><label>Typ</label><select id="i_type"><option value="switch">Schalter</option><option value="button">Taster</option></select></div>
 <div><label class="ck" style="margin-top:34px"><input type="checkbox" id="i_invert">Eingang invertieren</label></div></div>
 <label>Eingangsfilter</label><select id="i_filter"><option value="ac">Wechselspannung (50-Hz-Halbwellen überbrücken)</option><option value="dc">Nur Pegel (Gleichspannung / feste Pegel)</option></select>
-<button class="bt g" onclick="diag()">Eingang messen (roh)</button><pre id="i_diag" style="display:none"></pre></div>
+<button class="bt g" onclick="diag(0)">Eingang messen (roh)</button><pre id="i_diag" style="display:none"></pre>
+<div class="dm"><h2 style="margin-top:20px">Eingang SW2</h2>
+<div class="row"><div><label>Name</label><input id="i2_name"></div><div><label>Typ</label><select id="i2_type"><option value="button">Taster</option><option value="switch">Schalter</option></select></div>
+<div><label class="ck" style="margin-top:34px"><input type="checkbox" id="i2_invert">Eingang invertieren</label></div></div>
+<div class="l">Der Eingangsfilter gilt für SW1 und SW2.</div>
+<button class="bt g" onclick="diag(1)">SW2 messen (roh)</button></div></div>
 <button class="bt" onclick="saveSw()">Speichern</button></div>
 <div class="card ao"><h2>Add-on-Taster (input:100)</h2>
 <div class="l">Taster zwischen DATA und GND des Add-ons.</div>
@@ -95,7 +110,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <table id="hooks"></table></div>
 <div class="card"><h2>Neue Aktion</h2>
 <div class="row"><div><label>Ereignis</label><select id="h_ev"></select></div><div><label>Name</label><input id="h_name"></div>
-<div id="h_cidw" style="display:none"><label>Eingang</label><select id="h_cid"><option value="0">SW (input:0)</option><option value="100">Add-on (input:100)</option></select></div>
+<div id="h_cidw" style="display:none"><label>Eingang</label><select id="h_cid"></select></div>
 <div id="h_thrw" style="display:none"><label>Schwelle (W)</label><input id="h_thr" type="number"></div></div>
 <label>URLs (eine pro Zeile, max. 5)</label><textarea id="h_urls" placeholder="http://192.168.0.60/rpc/Switch.Set?id=0&on=true"></textarea>
 <div class="l" style="margin-top:6px">Platzhalter: <code>${event}</code> <code>${output}</code> <code>${input}</code> <code>${apower}</code> <code>${aenergy}</code> <code>${tC}</code> <code>${id}</code> <code>${name}</code> <code>${ip}</code></div>
@@ -122,16 +137,16 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <label>Passwort für Benutzer <code>admin</code></label><input id="y_auth" type="password">
 <div class="row"><button class="bt" onclick="setAuth(0)">Passwort setzen</button><button class="bt g" onclick="setAuth(1)">Passwort entfernen</button></div></div>
 <div class="card pm"><h2>Leistung kalibrieren</h2>
-<div class="v" id="y_cf" style="font-size:16px">–</div>
+<div class="v" id="y_cf" style="font-size:16px">–</div><div class="l dm">Der Dimmer misst über seinen STM32. Der Faktor korrigiert diesen Messwert.</div>
 <div class="l">Der Faktor bleibt auch bei Werkseinstellungen und Firmware-Updates erhalten.</div>
 <label>a) Referenzlast: Relais an, gemessene Wirkleistung (W)</label><input id="y_cal" type="number" step="0.1">
 <button class="bt" onclick="calib({apower:+$('y_cal').value})">Mit Referenz kalibrieren</button>
 <div class="vi"><label>Spannung mit Messgerät (V)</label><input id="y_vr" type="number" step="0.1">
 <label>Strom mit Messgerät (A) – Last an, Relais an</label><input id="y_ir" type="number" step="0.001">
 <button class="bt" onclick="calVI()">Spannung/Strom kalibrieren</button></div>
-<label>b) Wert aus Tasmota übernehmen (Konsole: <code>PowerCal</code>)</label><input id="y_tpc" type="number" placeholder="12530">
-<button class="bt" onclick="calib({tasmota_powercal:+$('y_tpc').value})">Tasmota-Wert übernehmen</button>
-<label>c) Faktor direkt (W/Hz)</label><input id="y_fac" type="number" step="0.0001">
+<div class="tpc"><label>b) Wert aus Tasmota übernehmen (Konsole: <code>PowerCal</code>)</label><input id="y_tpc" type="number" placeholder="12530">
+<button class="bt" onclick="calib({tasmota_powercal:+$('y_tpc').value})">Tasmota-Wert übernehmen</button></div>
+<label>c) Faktor direkt</label><input id="y_fac" type="number" step="0.0001">
 <div class="row"><button class="bt" onclick="calib({factor:+$('y_fac').value})">Faktor setzen</button>
 <button class="bt g" onclick="calib({reset:true})">Standard wiederherstellen</button>
 <button class="bt g" onclick="rstc()">Energiezähler nullen</button></div></div>
@@ -173,10 +188,15 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function fmt(v,d,u){return v==null||isNaN(v)?'–':(+v).toFixed(d)+' '+u}
 function upt(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+h+'h '+m+'m'}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a,.tab').forEach(x=>x.classList.remove('a'));a.classList.add('a');$(a.dataset.t).classList.add('a');if(a.dataset.t=='wh')loadHooks()});
-let LT=false,LS=null,MT=false;
-function showLT(){document.querySelectorAll('.lt').forEach(e=>e.style.display=LT?'block':'none');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');$('swh').textContent=LT?'Licht':'Schalter';$('swtab').textContent=LT?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=LT?'z. B. Deckenlampe Bad':'';if(MT)document.querySelectorAll('.nm').forEach(e=>e.style.display='none')}
-function setL(p){run(async()=>{p.id=0;await rpc('CCT.Set',p);poll()})}
-async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0'];LT=!!s['cct:0'];LS=s['cct:0']||null;showLT();
+let LT=false,LS=null,MT=false,DM=false;
+const IM_SW='<option value="follow">Folgen (Schalter = Relais)</option><option value="flip">Umschalten bei jeder Flanke</option><option value="momentary">Taster (toggle bei Druck)</option><option value="detached">Getrennt (nur Ereignis)</option>';
+const IM_DM='<option value="dim">Ein Taster: kurz an/aus, halten = dimmen</option><option value="dual_dim">Zwei Taster: SW1 an/heller, SW2 aus/dunkler</option><option value="follow">Schalter: Licht folgt SW1</option><option value="flip">Schalter: jede Flanke an SW1 schaltet um</option><option value="detached">Getrennt (nur Ereignisse)</option>';
+function cmp(){return LT?'CCT':DM?'Light':'Switch'}
+function showLT(){const L=LT||DM;document.querySelectorAll('.lt').forEach(e=>e.style.display=L?'block':'none');document.querySelectorAll('.dm').forEach(e=>e.style.display=DM?'block':'none');document.querySelectorAll('.cto').forEach(e=>e.style.display=DM?'none':'');document.querySelectorAll('.tpc').forEach(e=>e.style.display=DM?'none':'');document.querySelectorAll('.so,.io').forEach(e=>e.style.display=LT?'none':'');document.querySelectorAll('option.so').forEach(e=>e.style.display=(LT||DM)?'none':'');$('inl').textContent=$('ioh').textContent=DM?'Eingang SW1':'Eingang SW';
+if(DM&&!$('s_in_mode').dataset.dm){$('s_in_mode').innerHTML=IM_DM;$('s_in_mode').dataset.dm=1}$('swh').textContent=L?'Licht':'Schalter';$('swtab').textContent=L?'Licht':'Schalter';$('s_isl').textContent=LT?'Nach Einschalten am Wandschalter':'Zustand nach Stromausfall';$('s_name').placeholder=L?'z. B. Deckenlampe Bad':'';if(MT)document.querySelectorAll('.nm').forEach(e=>e.style.display='none')}
+function setL(p){run(async()=>{p.id=0;await rpc(cmp()+'.Set',p);poll()})}
+async function poll(){try{const s=await rpc('Shelly.GetStatus'),sw=s['switch:0']||s['cct:0']||s['light:0'];LT=!!s['cct:0'];DM=!!s['light:0'];LS=s['cct:0']||s['light:0']||null;showLT();
+if(DM){$('in2').textContent=s['input:1']?(s['input:1'].state?'AN':'AUS'):'–';if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}}
 if(LT){if(document.activeElement!==$('bri')){$('bri').value=sw.brightness;$('brv').textContent=sw.brightness+' %'}if(document.activeElement!==$('ctr')){$('ctr').value=sw.ct;$('ctv').textContent=sw.ct+' K'}}
 MT=!!sw.meter_only;$('btn').className=sw.output?'on':'';$('btn').textContent=sw.output?'AN':(MT?'AUSGELÖST':'AUS');$('btn').title=MT?'Reset nur am Taster/SW des Geräts':'';document.querySelectorAll('.nm').forEach(e=>e.style.display=MT?'none':'');document.querySelectorAll('.mt').forEach(e=>e.style.display=MT?'':'none');PM='apower' in sw;
 $('pw').textContent=fmt(sw.apower,1,'W');$('en').textContent=sw.aenergy?fmt(sw.aenergy.total/1000,3,'kWh'):'–';
@@ -185,10 +205,12 @@ if(s.mqtt)$('q_st').textContent=$('q_en').checked?(s.mqtt.connected?'verbunden':
 const fr=s.sys.flash_real,fh=s.sys.flash_size;$('fl').textContent=(fr/1048576)+' MB'+(fr<fh?' ⚠':'');$('fl').title='Header '+(fh/1048576)+' MB, Chip-ID '+s.sys.flash_id+', OTA frei '+Math.round(s.sys.ota_free/1024)+' KB';
 $('src').textContent='Quelle: '+sw.source+(sw.timer_duration?' · Timer '+sw.timer_duration+' s':'')+(sw.errors?' · Fehler: '+sw.errors.join(', '):'')+(s.sys.time?' · '+s.sys.time:'');
 document.querySelectorAll('.pm').forEach(e=>e.style.display=PM?'':'none');const VI='voltage' in sw;if(VI){$('vo').textContent=fmt(sw.voltage,1,'V');$('cu').textContent=sw.current==null?'–':fmt(sw.current,3,'A')+(sw.pf!=null?' · '+sw.pf.toFixed(2):'')}document.querySelectorAll('.vi').forEach(e=>e.style.display=VI?'block':'none')}catch(e){}}
-$('btn').onclick=()=>MT||run(async()=>{await rpc(LT?'CCT.Toggle':'Switch.Toggle',{id:0});poll()});
-function pulse(){run(async()=>{await rpc(LT?'CCT.Set':'Switch.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
+$('btn').onclick=()=>MT||run(async()=>{await rpc(cmp()+'.Toggle',{id:0});poll()});
+function pulse(){run(async()=>{await rpc(cmp()+'.Set',{id:0,on:true,toggle_after:+$('ta').value});poll()})}
 function stat(){$('w_static').style.display=$('w_mode').value=='static'?'':'none'}
-async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0'],inp=c['input:0']||{};LT=!!c['cct:0'];MT=!!sw.meter_only;showLT();if(LT){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=sw.ct_invert}
+async function loadCfg(){const c=await rpc('Shelly.GetConfig'),sw=c['switch:0']||c['cct:0']||c['light:0'],inp=c['input:0']||{};LT=!!c['cct:0'];DM=!!c['light:0'];MT=!!sw.meter_only;showLT();if(LT||DM){$('l_tr').value=sw.transition_duration;$('l_ctinv').checked=!!sw.ct_invert}
+if(DM){$('d_min').value=sw.range_map[0];$('d_max').value=sw.range_map[1];$('d_edge').value=sw.leading_edge?1:0;$('d_fade').value=sw.fade_rate;$('d_bfade').value=sw.button_fade_rate;const i2=c['input:1']||{};$('i2_name').value=i2.name||'';$('i2_type').value=i2.type||'button';$('i2_invert').checked=!!i2.invert;
+stmLine()}
 ['in_mode','initial_state','auto_on_delay','auto_off_delay','power_limit','temp_limit'].forEach(k=>$('s_'+k).value=sw[k]??'');
 showCal(sw.pm_calibration);$('s_name').value=sw.name||'';$('s_auto_on').checked=sw.auto_on;$('s_auto_off').checked=sw.auto_off;$('i_type').value=inp.type;$('i_invert').checked=inp.invert;$('i_filter').value=inp.filter||'ac';
 $('y_name').value=c.sys.device.name||'';$('y_tz').value=c.sys.location.tz;$('y_sntp').value=c.sys.sntp.server;$('y_led').checked=c.sys.ui.led;
@@ -198,14 +220,17 @@ const d=await rpc('Shelly.GetDeviceInfo');$('t').textContent=d.name||d.id;$('ver
 showUpd(c.sys.updates,d.ver);showMq(c.mqtt);$('y_auth').placeholder=d.auth_en?'Passwort ist gesetzt':'kein Passwort gesetzt';
 const lm=await rpc('Shelly.ListMethods');$('r_list').innerHTML=lm.methods.map(m=>`<option>${m}</option>`).join('')}
 function saveEx(){run(()=>rpc('Input.SetConfig',{id:100,config:{name:$('x_name').value,type:$('x_type').value,relay_action:$('x_rel').value,invert:$('x_inv').checked,addon_out_invert:$('x_out').checked}}),'Gespeichert')}
-function diag(){run(async()=>{const r=await rpc('Input.Diag',{id:0});$('i_diag').style.display='block';$('i_diag').textContent='HIGH-Anteil: '+r.high_pct+' %\nFlanken in 200 ms: '+r.edges+'  (≈ '+r.approx_hz+' Hz)\nErkannter Zustand: '+(r.state?'AN':'AUS')+'  ·  Filter '+r.filter+(r.invert?' · invertiert':'')})}
-function saveSw(){if(LT)return run(()=>rpc('CCT.SetConfig',{id:0,config:{name:$('s_name').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:+$('s_auto_on_delay').value,auto_off:$('s_auto_off').checked,auto_off_delay:+$('s_auto_off_delay').value,transition_duration:+$('l_tr').value,ct_invert:$('l_ctinv').checked}}),'Gespeichert');
+async function stmLine(){try{const t=await rpc('Hermit.Stm');$('stm').textContent='STM32: '+(t.online?(t.proto=='stock'?'Original-Firmware ':'quelloffene Firmware ')+'v'+t.version:'keine Antwort')+' · Rohwert Helligkeit '+t.brightness_raw+'/1000'}catch(e){}}
+function diag(id){run(async()=>{const r=await rpc('Input.Diag',{id:id});$('i_diag').style.display='block';$('i_diag').textContent='HIGH-Anteil: '+r.high_pct+' %\nFlanken in 200 ms: '+r.edges+'  (≈ '+r.approx_hz+' Hz)\nErkannter Zustand: '+(r.state?'AN':'AUS')+'  ·  Filter '+r.filter+(r.invert?' · invertiert':'')})}
+function saveSw(){if(DM)return run(async()=>{const n=i=>+$(i).value;await rpc('Light.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),transition_duration:n('l_tr'),range_map:[n('d_min'),n('d_max')],leading_edge:$('d_edge').value=='1',fade_rate:n('d_fade'),button_fade_rate:n('d_bfade'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
+await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}});await rpc('Input.SetConfig',{id:1,config:{name:$('i2_name').value,type:$('i2_type').value,invert:$('i2_invert').checked}});stmLine()},'Gespeichert');
+if(LT)return run(()=>rpc('CCT.SetConfig',{id:0,config:{name:$('s_name').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:+$('s_auto_on_delay').value,auto_off:$('s_auto_off').checked,auto_off_delay:+$('s_auto_off_delay').value,transition_duration:+$('l_tr').value,ct_invert:$('l_ctinv').checked}}),'Gespeichert');
 run(async()=>{const n=i=>+$(i).value;await rpc('Switch.SetConfig',{id:0,config:{name:$('s_name').value,in_mode:$('s_in_mode').value,initial_state:$('s_initial_state').value,auto_on:$('s_auto_on').checked,auto_on_delay:n('s_auto_on_delay'),auto_off:$('s_auto_off').checked,auto_off_delay:n('s_auto_off_delay'),power_limit:n('s_power_limit'),temp_limit:n('s_temp_limit')}});
 await rpc('Input.SetConfig',{id:0,config:{type:$('i_type').value,invert:$('i_invert').checked,filter:$('i_filter').value}})},'Gespeichert')}
 async function loadHooks(){await run(async()=>{if(!SUP.length){const s=await rpc('Webhook.ListSupported');SUP=Object.keys(s.types);$('h_ev').innerHTML=SUP.map(e=>`<option>${e}</option>`).join('')}
-const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
-$('h_ev').onchange=()=>{const v=$('h_ev').value;$('h_thrw').style.display=v.includes('power_')?'':'none';$('h_cidw').style.display=AO&&v.startsWith('input.')?'':'none'};
-function addh(){run(async()=>{const p={event:$('h_ev').value,cid:AO&&$('h_ev').value.startsWith('input.')?+$('h_cid').value:0,name:$('h_name').value,enable:true,urls:$('h_urls').value.split('\n').map(s=>s.trim()).filter(Boolean)};const t=$('h_thr').value;if(t!=='')p.threshold=+t;await rpc('Webhook.Create',p);$('h_urls').value='';$('h_name').value='';loadHooks()},'Aktion angelegt')}
+const l=await rpc('Webhook.List');$('hooks').innerHTML=l.hooks.length?l.hooks.map(h=>`<tr><td><input type="checkbox" style="width:auto" ${h.enable?'checked':''} onchange="tgl(${h.id},this.checked)"></td><td><b>${esc(h.event)}</b>${h.event.startsWith('input.')&&AO?(h.cid==100?' · Add-on':' · SW'):''}${h.event.startsWith('input.')&&DM?(h.cid==1?' · SW2':' · SW1'):''}${h.threshold!=null?' ('+h.threshold+' W)':''}<div class="l">${esc(h.name||'')}</div></td><td style="word-break:break-all">${h.urls.map(esc).join('<br>')}</td><td><button class="bt r" style="margin:0" onclick="delh(${h.id})">✕</button></td></tr>`).join(''):'<tr><td class="l">Noch keine Aktionen</td></tr>'})}
+$('h_ev').onchange=()=>{const v=$('h_ev').value;$('h_thrw').style.display=v.includes('power_')?'':'none';$('h_cid').innerHTML=DM?'<option value="0">SW1 (input:0)</option><option value="1">SW2 (input:1)</option>':'<option value="0">SW (input:0)</option><option value="100">Add-on (input:100)</option>';$('h_cidw').style.display=(AO||DM)&&v.startsWith('input.')?'':'none'};
+function addh(){run(async()=>{const p={event:$('h_ev').value,cid:(AO||DM)&&$('h_ev').value.startsWith('input.')?+$('h_cid').value:0,name:$('h_name').value,enable:true,urls:$('h_urls').value.split('\n').map(s=>s.trim()).filter(Boolean)};const t=$('h_thr').value;if(t!=='')p.threshold=+t;await rpc('Webhook.Create',p);$('h_urls').value='';$('h_name').value='';loadHooks()},'Aktion angelegt')}
 function delh(id){run(async()=>{await rpc('Webhook.Delete',{id});loadHooks()})}
 function tgl(id,en){run(()=>rpc('Webhook.Update',{id,enable:en}))}
 function scan(){run(async()=>{$('scan').textContent='Suche …';try{const r=await rpc('WiFi.Scan');$('w_list').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(n=>`<option value="${esc(n.ssid)}">${n.rssi} dBm</option>`).join('');toast(r.results.length+' Netze gefunden')}finally{$('scan').textContent='Netze suchen'}})}
@@ -213,9 +238,9 @@ function saveWifi(){run(async()=>{const s={ssid:$('w_ssid').value,ipv4mode:$('w_
 function saveSys(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('y_name').value},location:{tz:$('y_tz').value},sntp:{server:$('y_sntp').value},ui:{led:$('y_led').checked}}});loadCfg()},'Gespeichert')}
 function setAuth(clear){run(async()=>{if(!clear&&!$('y_auth').value)throw new Error('Kein Passwort eingegeben');await rpc('Shelly.SetAuth',{pass:clear?null:$('y_auth').value});$('y_auth').value='';loadCfg()},clear?'Passwort entfernt':'Passwort gesetzt')}
 const CSRC={default:'Standard (wie Tasmota)',reference:'mit Referenzlast kalibriert',tasmota:'aus Tasmota übernommen',manual:'manuell gesetzt'};
-function showCal(c){if(!c)return;$('y_cf').textContent=c.factor.toFixed(4)+' W/Hz · '+(CSRC[c.source]||c.source)+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
+function showCal(c){if(!c)return;$('y_cf').textContent=(DM?'Faktor ':'')+c.factor.toFixed(4)+(DM?' · ':' W/Hz · ')+(DM&&c.source=='default'?'Standard':(CSRC[c.source]||c.source))+(c.source!='default'?' (Standard '+c.default.toFixed(4)+')':'');$('y_fac').value=c.factor.toFixed(4)}
 function calVI(){const p={};if($('y_vr').value)p.voltage=+$('y_vr').value;if($('y_ir').value)p.current=+$('y_ir').value;calib(p)}
-function calib(p){run(async()=>{p.id=0;const r=await rpc('Switch.Calibrate',p);if(r.factor!=null){showCal(r);toast('Faktor: '+r.factor.toFixed(4)+' W/Hz')}else toast('Spannung/Strom kalibriert')})}
+function calib(p){run(async()=>{p.id=0;const r=await rpc(cmp()+'.Calibrate',p);if(r.factor!=null){showCal(r);toast('Faktor: '+r.factor.toFixed(4)+(DM?'':' W/Hz'))}else toast('Spannung/Strom kalibriert')})}
 function showUpd(u,ver){if(!u)return;$('u_mode').value=u.mode;$('u_hour').value=u.hour;$('u_url').value=u.url;$('u_tok').placeholder=u.token_set?'gesetzt – leer lassen = unverändert':'kein Token';
 $('u_st').textContent=u.available?'Neue Version '+u.available+' verfügbar':'Aktuell ('+ver+')';$('u_inst').style.display=u.available?'':'none';
 $('u_info').textContent='Variante '+u.variant+(u.last_check?' · zuletzt geprüft '+new Date(u.last_check*1000).toLocaleString('de-DE'):'')+(u.last_error?' · '+u.last_error:'')+(u.state!='idle'?' · '+u.state:'')}
@@ -225,7 +250,7 @@ async function loadUpd(){const c=await rpc('Sys.GetConfig');const d=await rpc('S
 function saveUpd(){run(async()=>{const u={mode:$('u_mode').value,hour:+$('u_hour').value,url:$('u_url').value};if($('u_tok').value)u.token=$('u_tok').value;await rpc('Sys.SetConfig',{config:{updates:u}});$('u_tok').value='';await loadUpd()},'Gespeichert')}
 function chkUpd(){run(async()=>{const r=await rpc('Shelly.CheckForUpdate');await loadUpd();toast(r.stable?'Neue Version '+r.stable.version:'Firmware ist aktuell')})}
 function instUpd(){if(confirm('Update jetzt installieren? Das Gerät startet danach neu.'))run(async()=>{await rpc('Shelly.Update',{stage:'stable'});toast('Update läuft – Gerät startet gleich neu')})}
-function rstc(){if(confirm('Energiezähler nullen?'))run(()=>rpc('Switch.ResetCounters',{id:0}),'Zähler genullt')}
+function rstc(){if(confirm('Energiezähler nullen?'))run(()=>rpc(cmp()+'.ResetCounters',{id:0}),'Zähler genullt')}
 function sendRpc(){run(async()=>{const t=$('r_p').value.trim();const p=t?JSON.parse(t):{};try{$('r_o').textContent=JSON.stringify(await rpc($('r_m').value,p),null,2)}catch(e){$('r_o').textContent='Fehler: '+e.message}})}
 function init(){loadCfg().catch(()=>setTimeout(init,3000))}
 let pb=false;async function tick(){if(pb)return;pb=true;await poll();pb=false}

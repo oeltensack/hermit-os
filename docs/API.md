@@ -82,6 +82,22 @@ Wie die Shelly Duo Bulb Gen3.
 Ohne `on` ändert `CCT.Set` nur Helligkeit/Farbtemperatur – eine ausgeschaltete Lampe bleibt aus.
 `Switch.*` gibt es bei der Duo nicht.
 
+## Light (Dimmer 2)
+
+| Methode | Parameter |
+|---|---|
+| `Light.Set` | `id:0`, `on`, `brightness` (1–100, 0 = aus), `transition_duration` (s), `toggle_after` (s) |
+| `Light.Toggle` | `id:0` |
+| `Light.DimUp` / `Light.DimDown` | `id:0`, `fade_rate` (1–5) – dimmt, bis `Light.DimStop` kommt oder 1 % bzw. 100 % erreicht sind |
+| `Light.DimStop` | `id:0` |
+| `Light.GetStatus` | `{id, source, output, brightness, apower, aenergy, temperature, errors, timer_*}`; `voltage`/`current` nur mit quelloffener STM32-Firmware |
+| `Light.GetConfig` / `Light.SetConfig` | `name`, `in_mode` (`dim`, `dual_dim`, `follow`, `flip`, `detached`), `initial_state`, `auto_on(_delay)`, `auto_off(_delay)`, `transition_duration`, `range_map` ([min, max] in %), `leading_edge`, `fade_rate`, `button_fade_rate`, `power_limit`, `temp_limit` |
+| `Light.ResetCounters` / `Light.Calibrate` | wie bei `Switch` (`apower` als Referenz oder `factor`) |
+
+Ohne `on` ändert `Light.Set` nur die Helligkeit – ausgeschaltet bleibt aus. Ereignisse: `light.on`, `light.off`,
+`light.overpower`, `light.overtemperature`, `light.power_above`/`_below`; Eingänge `input:0` (SW1) und `input:1` (SW2).
+Fehler `stm_no_response`: Der STM32 antwortet nicht.
+
 ## Input
 
 | Methode | Parameter |
@@ -175,7 +191,7 @@ und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für 
 | `/status` | Gen1-Status mit `relays`, `meters`, `inputs`, `wifi_sta`, `temperature` |
 | `/relay/0?turn=on|off|toggle&timer=10` | schalten (Shelly 1/1PM/Plug S/Plug; bei der Duo Licht an/aus) |
 | `/meter/0` | `power`, `total` (Watt-Minuten wie Gen1) |
-| `/light/0?turn=on&brightness=50&temp=3000&transition=500` | Duo (`transition` in ms) |
+| `/light/0?turn=on&brightness=50&temp=3000&transition=500` | Duo und Dimmer 2 (`transition` in ms, `temp` nur Duo) |
 | `/update` | Firmware hochladen (Formularfeld beliebig) |
 
 ## Diagnose
@@ -184,7 +200,8 @@ und sonst alle 15 s (Geräte mit Messung) bzw. 60 s gesendet. Ohne TLS – für 
 |---|---|
 | `Hermit.TestImport` | Führt die WLAN-Übernahme erneut aus, ohne etwas zu ändern: `mgos` (Original-Firmware), `tasmota`, `sdk` (Loader) mit SSID, Passwortlänge und fester IP; `raw_ssid_hits` zeigt Fundstellen bis zum Ende des SSID-Werts. Passwörter werden nie ausgegeben. |
 | `Hermit.Gpio` | `{"pin":5,"value":512}` PWM 0–1023 ausgeben, `{"pin":5}` Pegel lesen, `{"scan":true}` alle freien Pins lesen. Nur zur Analyse unbekannter Hardware – ändert Pins bis zum nächsten Schaltvorgang bzw. Neustart. |
-| `Input.Diag` | Rohsignal des Eingangs |
+| `Input.Diag` | Rohsignal des Eingangs (`id:1` = SW2 beim Dimmer) |
+| `Hermit.Stm` | Dimmer 2: Protokoll (`stock`/`open`), STM32-Version, Rohwerte des letzten Zustands, Rahmenzähler |
 | `Sys.GetStatus` → `reset_reason` | Grund des letzten Neustarts |
 
 ---

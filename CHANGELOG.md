@@ -1,5 +1,19 @@
 # Änderungen
 
+## 1.14.0
+- **Shelly Dimmer 2** (`hermit-dimmer2`): verhält sich wie ein Shelly Dimmer Gen3 (`light:0`, `Light.Set`,
+  `Light.DimUp/DimDown/DimStop`), zwei Eingänge (`input:0` SW1, `input:1` SW2)
+  - Taster: kurz an/aus, halten dimmt (Richtung wechselt); oder zwei Taster (SW1 heller, SW2 dunkler); oder Schalter
+  - Mindest-/Höchsthelligkeit, Phasenab-/-anschnitt, Überblendzeit, Dimmgeschwindigkeit
+  - Leistung und Energie vom STM32, Temperatur, Abschaltung bei 250 W / 85 °C
+  - Licht bleibt bei Update und Neustart an; nach Stromausfall standardmäßig letzter Zustand
+  - Läuft mit der Original-STM32-Firmware (2.x) und der quelloffenen (51.x) – es wird nichts am STM32 geflasht
+- Flasher: Dimmer 2 von Original-Firmware (über mg2tasmota-ShellyDimmer2) und Tasmota
+
+## Hermit Cloud 1.4.1
+- Dimmer: Helligkeitsregler in der Gerätekarte (auch für die Duo), Fehler „Dimmer-Chip antwortet nicht“
+
+
 ## Hermit Scanner 1.0.0
 - Neues Windows-Programm `Hermit-Scanner` (tools/hermit_scanner.py): findet Shelly Gen1, Shelly Gen2/Gen3, Tasmota und
   Hermit OS in einem oder mehreren Netzen; Name, Modell, Firmware, MAC, Empfang, Zustand, Leistung, Update, Laufzeit;
