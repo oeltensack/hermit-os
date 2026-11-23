@@ -39,8 +39,12 @@ while true; do
     { do_update || echo "== FEHLER beim Update"; } > "$DATA/update.log" 2>&1
     rm -f "$DATA/update.request"
     cat "$DATA/update.log"
-    # zuletzt sich selbst erneuern (beendet diesen Prozess nur, wenn sich der Updater geändert hat)
-    cd "$CLOUD" && docker compose up -d --no-deps updater >/dev/null 2>&1
+    # Zuletzt den Updater selbst erneuern. Das muss ein Hilfscontainer ausserhalb dieses Containers tun:
+    # docker compose stoppt beim Neuanlegen zuerst den alten Container – und damit diesen Prozess.
+    docker run -d --rm --name hermit-cloud-updater-helper \
+      -v /var/run/docker.sock:/var/run/docker.sock -v "$REPO:$REPO" -w "$CLOUD" \
+      hermit-cloud-updater:latest sh -c "sleep 5; cd '$CLOUD' && docker compose up -d --no-deps updater" \
+      >/dev/null 2>&1 || echo "Hinweis: Updater konnte sich nicht selbst erneuern"
   fi
   sleep 15
 done

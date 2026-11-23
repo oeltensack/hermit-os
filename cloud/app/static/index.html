@@ -433,7 +433,7 @@ for(let h=0;h<24;h++)$('u_hour').insertAdjacentHTML('beforeend',`<option value="
 function showUpd(u){$('u_v').textContent='Version '+u.current+(u.available?' → '+u.available+' verfügbar':' – aktuell');
 $('u_s').textContent=u.running?'Update läuft … die Seite lädt danach neu.':(u.error||(u.last_check?'zuletzt geprüft '+dt(u.last_check):''));
 $('u_btn').style.display=u.available&&u.updater&&!u.running?'':'none';$('u_mode').value=u.mode;$('u_hour').value=u.hour;
-$('u_hint').textContent=u.updater?'':'Der Updater-Container läuft nicht – installieren geht dann nur von Hand (siehe cloud/README.md).';
+$('u_hint').textContent=u.updater?'':'Der Updater-Container läuft nicht. Auf dem Server im Ordner cloud/ einmal „docker compose up -d“ ausführen (siehe cloud/README.md).';
 $('u_log').textContent=u.log;$('u_log').style.display=u.log?'':'none';if(u.running&&!window._ur){window._ur=u.current;waitUpd()}}
 async function loadUpd(){showUpd(await api('update'))}
 function updCheck(){run(async()=>showUpd(await api('update/check',{method:'POST'})))}

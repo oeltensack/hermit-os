@@ -1,5 +1,9 @@
 # Änderungen
 
+## Hermit Cloud 1.2.1
+- Updater: erneuert sich jetzt über einen Hilfscontainer – vorher blieb er nach einem Update, das ihn selbst
+  betraf, gestoppt („Updater-Container läuft nicht“)
+
 ## Hermit Cloud 1.2.0
 - **Wäsche:** Fertig-Erkennung für Waschmaschine, Trockner, Spülmaschine und beliebige Geräte – Läufe mit Dauer,
   Energie, Kosten und Spitzenleistung, Restzeit-Schätzung, Push bei „fertig“ und Erinnerung

@@ -79,7 +79,7 @@ etwa eine Minute weg und lädt danach von selbst neu. Das Protokoll steht unter 
   `cd hermit-os && git pull && cd cloud && docker compose up -d --build`
 - Wer die Cloud aus dem ZIP installiert hat: in einem eigenen Ordner entpacken (z. B. `/opt/hermit/cloud`).
 
-**Von 1.0.x auf 1.1.0** einmal von Hand (danach geht es automatisch):
+**Von 1.0.x/1.1.x auf 1.2.1** einmal von Hand (danach geht es automatisch):
 ```bash
 cd hermit-os && git pull && cd cloud && docker compose up -d --build
 ```
