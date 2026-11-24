@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.17.1 / Pagurus Cloud 1.8.1
+- RF Bridge: Taste **„Leeren“** bei „Zuletzt empfangen“ (neue RPC `RF.ClearRecent`); gespeicherte Codes bleiben
+- Cloud: **„Alle löschen“** bei den Meldungen (mit Rückfrage), neben „Alle quittieren“
+
 ## 1.17.0 / Pagurus Cloud 1.8.0
 - **Neuer Name: Pagurus OS** (vorher Hermit OS – der Name gehört schon dem Rust-Unikernel HermitOS).
   Pagurus ist der Einsiedlerkrebs. Umbenannt sind Oberfläche, Doku, Flasher (`Pagurus-Flasher`, `pagurus-flash`),

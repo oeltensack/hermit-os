@@ -70,7 +70,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
 <div class="cvp"><label>Position: <b id="cvv">–</b></label><input type="range" id="cvpos" min="0" max="100" onchange="cvGo(+this.value)" oninput="$('cvv').textContent=this.value+' %'"></div>
 <div class="l" id="cvh" style="margin-top:10px"></div></div>
 <div class="card rf"><h2>Funk 433 MHz</h2><table class="rft" id="rfe"></table>
-<h2 style="margin-top:18px">Zuletzt empfangen</h2><table class="rft" id="rfr"></table><div class="l" id="rfi" style="margin-top:8px"></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px"><h2 style="margin:0">Zuletzt empfangen</h2><button class="bt g" style="margin:0" onclick="rfClr()">Leeren</button></div><table class="rft" id="rfr"></table><div class="l" id="rfi" style="margin-top:8px"></div></div>
 <div class="card nm"><h2>Zeitschaltung</h2><div class="row">
 <div><label>Einschalten für (s)</label><input id="ta" type="number" min="1" value="60"></div></div>
 <button class="bt" onclick="pulse()">Für Dauer einschalten</button></div>
@@ -240,6 +240,7 @@ function rfSw(id,on){run(async()=>{await rpc('Switch.Set',{id,on});poll()})}
 function rfSend(id){run(()=>rpc('RF.Send',{id}),'Gesendet')}
 function rfTxc(c){run(()=>rpc('RF.Send',{code:c}),'Gesendet')}
 function rfTx(){rfTxc($('r_tx').value.trim())}
+function rfClr(){run(async()=>{await rpc('RF.ClearRecent');poll()},'Geleert')}
 function rfLbl(){const t=$('r_type').value;$('r_l1').textContent=t=='contact'?'Code „offen“':t=='switch'?'Code „an“':'Code';$('r_l2').textContent=t=='contact'?'Code „geschlossen“ (leer, wenn der Melder nur „offen“ sendet)':'Code „aus“';$('r_w2').style.display=t=='button'?'none':''}
 function rfNew(){$('r_id').value='';['r_name','r_c1','r_c2'].forEach(k=>$(k).value='');$('r_h').textContent='Code speichern';rfLbl()}
 function rfTake(c){if($('r_c1').value&&$('r_type').value!='button')$('r_c2').value=c;else $('r_c1').value=c;document.querySelector('nav a[data-t=sw]').click();toast('Code übernommen')}

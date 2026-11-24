@@ -715,6 +715,17 @@ async def alerts_ack(request: Request):
     return {"ok": True}
 
 
+@app.delete("/api/alerts")
+def alerts_clear(request: Request, id: int = 0):
+    """Meldungen loeschen: eine (id) oder alle."""
+    need(request, "user")
+    if id:
+        q("DELETE FROM alerts WHERE id=?", (id,))
+    else:
+        q("DELETE FROM alerts")
+    return {"ok": True}
+
+
 # ======================= Beschattung =======================
 @app.get("/api/shade")
 def shade_get():

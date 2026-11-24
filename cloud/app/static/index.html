@@ -126,7 +126,7 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 </section>
 
 <section class="tab" id="al"><div class="card"><div class="row sp"><h2 style="margin:0">Meldungen</h2>
-<button class="bt g user-only" onclick="ackAll()">Alle quittieren</button></div><div class="scroll"><table id="atab" style="margin-top:10px"></table></div></div></section>
+<div class="user-only"><button class="bt g" onclick="ackAll()">Alle quittieren</button><button class="bt r" onclick="clrAl()">Alle löschen</button></div></div><div class="scroll"><table id="atab" style="margin-top:10px"></table></div></div></section>
 
 <section class="tab" id="se">
 <div class="card admin-only"><h2>Strom &amp; Standort</h2><div class="f">
@@ -508,6 +508,7 @@ if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><
 <td><span class="kind ${x.kind}">${KIND[x.kind]||esc(x.kind)}</span></td><td>${esc(x.text)}</td><td class="n user-only">${x.ack?'':`<a class="lk" onclick="ack(${x.id})">quittieren</a>`}</td></tr>`).join(''):'<tr><td class="empty">Keine Meldungen.</td></tr>'}
 function ack(id){run(async()=>{await api('alerts/ack',{method:'POST',body:{id}});await loadAl()})}
 function ackAll(){run(async()=>{await api('alerts/ack',{method:'POST',body:{}});await loadAl()})}
+function clrAl(){if(confirm('Alle Meldungen löschen?'))run(async()=>{await api('alerts',{method:'DELETE'});await loadAl()},'Gelöscht')}
 
 // ---------- Einstellungen ----------
 async function loadSet(){if(!isAdmin())return;const s=await api('settings');

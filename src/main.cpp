@@ -157,6 +157,7 @@ static const char* METHODS[] = {
   "Switch.Calibrate",
 #elif HAS_RF
   "RF.GetStatus", "RF.GetConfig", "RF.SetConfig", "RF.Send", "RF.Add", "RF.Update", "RF.Delete", "RF.Beep",
+  "RF.ClearRecent",
   "Switch.Set", "Switch.Toggle", "Switch.GetStatus",
 #elif HAS_DIM
   "Light.Set", "Light.Toggle", "Light.GetStatus", "Light.GetConfig", "Light.SetConfig",
@@ -2442,6 +2443,7 @@ int rpcCall(String m, JsonVariantConst p, JsonDocument& out, String& err, const 
     for (auto it = rfList.begin(); it != rfList.end(); ++it) if (it->id == id) { rfList.erase(it); rfSave(); out.set(nullptr); return 0; }
     ERR(-103, "id unbekannt");
   }
+  if (m == "rf.clearrecent") { rfRecent.clear(); out.set(nullptr); return 0; }   // Liste „Zuletzt empfangen“ leeren
   if (m == "rf.beep") { efm.beep(constrain((int)(p["ms"] | 200), 10, 2000)); out.set(nullptr); return 0; }
   if (m.startsWith("switch.")) {
     RfEntry* e = rfFind(pid);
