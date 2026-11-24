@@ -247,14 +247,13 @@ ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overte
 async function loadDevs(){DEVS=await api('devices');if(TAB!='dv')return;
 const groups={};DEVS.forEach(d=>(groups[d.room||'']=groups[d.room||'']||[]).push(d));
 const keys=Object.keys(groups).sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
-$('devs').innerHTML=DEVS.length?keys.map(k=>{const g=groups[k],sw=g.filter(d=>!d.status.meter_only&&d.online&&'output' in d.status&&!(d.comp||'').startsWith('cover:'));
-return `<h3><span>${k?esc(k):(keys.length>1?'Ohne Raum':'Alle Geräte')} <span class="l">${g.length}</span></span>${k&&sw.length>1?`<span class="row user-only"><button class="bt g s" onclick="roomSw('${esc(k)}',true)">alle an</button><button class="bt g s" onclick="roomSw('${esc(k)}',false)">alle aus</button></span>`:''}</h3><div class="devs">${g.map(devCard).join('')}</div>`}).join('')
+$('devs').innerHTML=DEVS.length?keys.map(k=>{const g=groups[k];
+return `<h3><span>${k?esc(k):(keys.length>1?'Ohne Raum':'Alle Geräte')} <span class="l">${g.length}</span></span></h3><div class="devs">${g.map(devCard).join('')}</div>`}).join('')
 :'<div class="empty">Noch keine Geräte. Unter „Einstellungen“ steht, wie sie sich verbinden.</div>'}
 function sw(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{}});await loadDevs()})}
 function cvAct(id,a){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{cover:a}});await loadDevs()})}
 function cvPos(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{pos:p}});await loadDevs()})}
 function setBri(id,b){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{brightness:b}});await loadDevs()})}
-function roomSw(r,on){run(async()=>{const x=await api('rooms/switch',{method:'POST',body:{room:r,on}});if(x.errors.length)toast(x.errors.join('; '));await loadDevs()})}
 function devDlg(id){const d=DEVS.find(x=>x.id==id),rooms=[...new Set(DEVS.map(x=>x.room).filter(Boolean))];
 dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="dd_n" value="${esc(d.name)}">
 <label>Raum</label><input id="dd_r" value="${esc(d.room)}" list="dd_rl" placeholder="z. B. Bad, Keller"><datalist id="dd_rl">${rooms.map(r=>`<option value="${esc(r)}">`).join('')}</datalist>

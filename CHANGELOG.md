@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.8.2
+- Geräteübersicht: Tasten „alle an“ / „alle aus“ bei den Räumen entfernt
+
 ## 1.17.2
 - Update-Prüfung: sporadisches „update.json ungültig“ behoben (v. a. RF Bridge). Die Datei wird nicht mehr
   komplett in den RAM geladen; das Gerät liest nur Version und den eigenen Eintrag direkt aus dem Datenstrom,
