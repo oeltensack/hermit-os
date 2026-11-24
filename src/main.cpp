@@ -1655,14 +1655,32 @@ bool updCheck() {
   updLastErr = "";
   if (!cfg.updUrl.length()) { updLastErr = "Keine Update-URL"; return false; }
   if (WiFi.status() != WL_CONNECTED) { updLastErr = "Kein WLAN"; return false; }
-  HTTPClient http; std::unique_ptr<WiFiClient> cl;
-  if (!updOpen(http, cl, cfg.updUrl)) { updLastErr = "URL ungültig"; return false; }
-  int code = http.GET();
-  if (code != 200) { updLastErr = "update.json: HTTP " + String(code); http.end(); return false; }
-  String body = http.getString();
-  http.end();
+  // Nur "version" und den eigenen Eintrag direkt aus dem Datenstrom lesen – die ganze Datei als String
+  // braucht neben dem TLS-Puffer zu viel zusammenhaengenden RAM (v. a. RF Bridge/1 MB) und kam dann
+  // abgeschnitten an ("update.json ungültig"). Bis zu 3 Versuche.
+  JsonDocument filter;
+  filter["version"] = true;
+  filter["files"][DEV_VARIANT] = true;
   JsonDocument d;
-  if (deserializeJson(d, body)) { updLastErr = "update.json ungültig"; return false; }
+  for (int attempt = 1; ; attempt++) {
+    HTTPClient http; std::unique_ptr<WiFiClient> cl;
+    if (!updOpen(http, cl, cfg.updUrl)) { updLastErr = "URL ungültig"; return false; }
+    http.useHTTP10(true);                       // kein Chunked-Encoding im Datenstrom
+    int code = http.GET();
+    if (code == 200) {
+      d.clear();
+      DeserializationError e = deserializeJson(d, http.getStream(), DeserializationOption::Filter(filter));
+      http.end();
+      if (!e) break;
+      updLastErr = String("update.json ungültig (") + e.c_str() + ", RAM " + String(ESP.getMaxFreeBlockSize()) + " B)";
+    } else {
+      http.end();
+      updLastErr = "update.json: HTTP " + String(code);
+    }
+    if (attempt >= 3) return false;
+    delay(500); yield();
+  }
+  updLastErr = "";
   JsonVariantConst f = d["files"][DEV_VARIANT];
   updLastCheck = time(nullptr);
   updAvailVer = ""; updAvailUrl = ""; updAvailSha = "";

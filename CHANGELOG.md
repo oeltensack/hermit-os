@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.17.2
+- Update-Prüfung: sporadisches „update.json ungültig“ behoben (v. a. RF Bridge). Die Datei wird nicht mehr
+  komplett in den RAM geladen; das Gerät liest nur Version und den eigenen Eintrag direkt aus dem Datenstrom,
+  mit bis zu 3 Versuchen. Schlägt es trotzdem fehl, steht der Grund und der freie RAM in der Meldung
+
 ## 1.17.1 / Pagurus Cloud 1.8.1
 - RF Bridge: Taste **„Leeren“** bei „Zuletzt empfangen“ (neue RPC `RF.ClearRecent`); gespeicherte Codes bleiben
 - Cloud: **„Alle löschen“** bei den Meldungen (mit Rückfrage), neben „Alle quittieren“
