@@ -18,6 +18,7 @@ Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Pagurus Clo
 | **Shelly 2.5 Rollladen** | `hermit-25-cover` | Shelly Plus 2PM im Rollladenbetrieb (`cover:0`) | Auf/Ab/Stopp, Position nach Kalibrierfahrt, Endlagen am Motorstrom, Hinderniserkennung |
 | **Shelly Dimmer 2** (`SHDM-2`) | `hermit-dimmer2` | Shelly Dimmer Gen3 (`light:0`) | Dimmen per Taster (1 oder 2), Leistung, Energie, Temperatur, Licht bleibt beim Update an |
 | **Sonoff RF Bridge 433** (R2 mit EFM8, 1 MB) | `hermit-rfbridge` | eigene Komponente `rf`, Funksteckdosen als `switch:<n>` | Codes empfangen, speichern (Taste, Kontakt, Schalter), senden; Aktionen je Code; Standard- und Portisch-Firmware |
+| **1-MB-Steckdose mit ESP8285** (Touch-Taste, ohne Messung) | `hermit-plug1m` | `switch:0` wie Plus Plug S ohne Messung | Relais, Touch-Taste, LED je Relais/WLAN; Wechsel von ESPHome/Tasmota über eigenen 1-MB-Loader |
 
 > Shelly ist eine Marke der Shelly Group. Pagurus OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.

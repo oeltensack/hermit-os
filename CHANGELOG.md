@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.17.4
+- **Neue Variante `hermit-plug1m`:** einfache WLAN-Steckdose mit ESP8285 (1 MB), Touch-Taste, ohne
+  Leistungsmessung (Relais GPIO12, Taste GPIO13, LEDs GPIO4/GPIO5). Updates wie bei der RF Bridge über einen
+  eigenen 1-MB-Loader (`hermit-loader-1m-plug1m`); Weg von ESPHome in docs/FLASHEN.md
+
 ## 1.17.3
 - Geräteseite: Zahlen mit deutschem Komma (0,0 W, 1,154 kWh, Faktor 1,0234); IP-Adressen bleiben mit Punkt
 

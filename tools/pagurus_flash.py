@@ -39,7 +39,7 @@ GEN1_MODELS = {"SHSW-1": ("Shelly1", "hermit-1"), "SHSW-PM": ("Shelly1PM", "herm
                "SHBDUO-1": ("ShellyBulbDuo", "hermit-duo"),
                "SHDM-2": ("ShellyDimmer2", "hermit-dimmer2"),
                "SHSW-25": ("Shelly25", "hermit-25")}
-ONE_MB = {"hermit-rfbridge"}                 # 1 MB Flash: Firmware als .bin.gz, Umweg ueber hermit-loader-1m
+ONE_MB = {"hermit-rfbridge": "hermit-loader-1m", "hermit-plug1m": "hermit-loader-1m-plug1m"}   # 1 MB: .bin.gz, Umweg ueber den 1-MB-Loader
 TASMOTA_MINIMAL = "http://ota.tasmota.com/tasmota/release/tasmota-minimal.bin.gz"
 
 
@@ -418,7 +418,7 @@ def flash_stock(dev, args, info, variant, fw):
 
 
 def loader_file(variant):
-    name = "hermit-loader-1m.bin.gz" if variant in ONE_MB else "hermit-loader.bin.gz"
+    name = ONE_MB[variant] + ".bin.gz" if variant in ONE_MB else "hermit-loader.bin.gz"
     f = BIN_DIR / name
     if not f.exists():
         die(f"{f} fehlt")

@@ -97,6 +97,27 @@ hochgeladen wurde; von Hand wird `hermit-rfbridge.bin.gz` hochgeladen (hier die 
 Tasmota-Vorlage „Sonoff Bridge“. Hat Tasmota zu wenig Platz, spielt der Flasher erst `tasmota-minimal` auf
 (Tasmota lädt es selbst von ota.tasmota.com) und danach den Loader. Der Funkchip (EFM8) bleibt, wie er ist.
 
+## 3b. Von ESPHome (1-MB-Steckdose mit ESP8285, „RowiSteckdose“)
+
+Der Flasher erkennt ESPHome nicht – von Hand:
+
+1. In der ESPHome-Konfiguration den Browser-Upload erlauben und einmal aus ESPHome flashen:
+   ```yaml
+   web_server:
+     port: 80
+   ota:
+     - platform: esphome
+     - platform: web_server
+   ```
+2. `http://<IP>` → „OTA Update“ → **`bin/hermit-loader-1m-plug1m.bin.gz`** hochladen (die `.gz`)
+3. ESPHome-WLAN-Daten kann der Loader nicht übernehmen: mit **`hermit-loader-xxxxxx`** verbinden →
+   `http://192.168.33.1` → WLAN eintragen
+4. Nach 60 s installiert der Loader `hermit-plug1m` selbst aus dem Netz – oder vorher
+   `bin/hermit-plug1m.bin.gz` im Loader hochladen
+
+Belegung: Relais GPIO12, Touch-Taste GPIO13 (gedrückt = LOW), grüne LED GPIO4 (Relais), rote LED GPIO5 (WLAN).
+Andere 1-MB-Steckdosen nur mit gleicher Belegung – sonst Variante anlegen (`src/device.h`).
+
 ## 4. Per Kabel (Notlösung)
 
 USB-UART-Adapter mit **3,3 V**, Gerät **nur über den Adapter** versorgen – niemals gleichzeitig am Netz.

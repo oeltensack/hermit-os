@@ -162,6 +162,28 @@
   #define PWR_CAL_DEFAULT 1.0f
   #define HAS_TEMP     0
   #define HAS_LED      0
+#elif defined(DEVICE_PLUG1M)
+  // Einfache WLAN-Steckdose mit ESP8285 (1 MB), Touch-Taste, ohne Leistungsmessung (z. B. „RowiSteckdose“)
+  // Belegung aus der ESPHome-Konfiguration: Relais GPIO12, Taste GPIO13 (Pull-up, gedrueckt = LOW),
+  // gruene LED GPIO4 (Relais), rote LED GPIO5 (WLAN), beide invertiert
+  #define DEV_PREFIX   "hermit-plug1m"
+  #define DEV_MODEL    "HERMIT-PLUG1M"
+  #define DEV_APP      "Plug1M"
+  #define GEN1_TYPE    "PLUG1M"
+  #define FLASH_1M     1
+  #define PIN_RELAY    12
+  #define PIN_INPUT    13
+  #define PIN_LED      4      // gruen = Relais
+  #define PIN_LED_LINK 5      // rot = WLAN
+  #define HAS_PM       0
+  #define HAS_TEMP     0
+  #define HAS_LED      1
+  #define INPUT_ACTIVE_LOW 1
+  #define DEF_IN_TYPE   "button"
+  #define DEF_IN_MODE   "momentary"
+  #define DEF_IN_FILTER "dc"
+  #define HAS_MGOS     0      // keine Shelly-Original-Firmware als Vorgaenger
+  #define PWR_CAL_DEFAULT 1.0f
 #else
   #error "DEVICE_SHELLY1 oder DEVICE_SHELLY1PM definieren"
 #endif

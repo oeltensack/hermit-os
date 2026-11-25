@@ -24,8 +24,10 @@ VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in up
     "plugs_meter": "hermit-plugs-meter",
     "plug_meter": "hermit-plug-meter",
     "rfbridge": "hermit-rfbridge",
+    "plug1m": "hermit-plug1m",
 }
-ONE_MB = {"hermit-rfbridge"}   # 1 MB Flash: Update ueber hermit-loader-1m, Datei gepackt
+# 1 MB Flash: Update ueber den passenden 1-MB-Loader, Datei gepackt
+ONE_MB = {"hermit-rfbridge": "hermit-loader-1m", "hermit-plug1m": "hermit-loader-1m-plug1m"}
 
 ini = (ROOT / "platformio.ini").read_text()
 version = re.search(r'FW_VERSION=\\"([0-9.]+)\\"', ini).group(1)
@@ -48,17 +50,17 @@ for env, name in VARIANTS.items():
     files[name] = {"url": f"bin/{name}.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
 
 # Pagurus Loader – fuer den Wechsel von Tasmota; der 1-MB-Loader zusaetzlich als Zwischenstufe beim Update
-for env, name in (("loader", "hermit-loader"), ("loader_1m", "hermit-loader-1m")):
+for env, name in (("loader", "hermit-loader"), ("loader_1m", "hermit-loader-1m"), ("loader_1m_plug1m", "hermit-loader-1m-plug1m")):
     shutil.copy(ROOT / ".pio" / "build" / env / "firmware.bin", bindir / f"{name}.bin")
     with gzip.open(bindir / f"{name}.bin.gz", "wb", compresslevel=9) as g:
         g.write((bindir / f"{name}.bin").read_bytes())
 
-ldr = (bindir / "hermit-loader-1m.bin.gz").read_bytes()
 # 1 MB (Layout 1m64): Sketch-Bereich 0x1000..0xEB000. Neue Datei muss neben die laufende passen.
 up = lambda n: (n + 4095) // 4096 * 4096
 AREA = 0xEB000 - 0x1000
-ldr_bin = (bindir / "hermit-loader-1m.bin").stat().st_size
-for name in ONE_MB:
+for name, lname in ONE_MB.items():
+    ldr = (bindir / f"{lname}.bin.gz").read_bytes()
+    ldr_bin = (bindir / f"{lname}.bin").stat().st_size
     gz = (bindir / f"{name}.bin.gz").read_bytes()
     fw_bin = (bindir / f"{name}.bin").stat().st_size
     if AREA - up(fw_bin) < up(len(ldr)) or AREA - up(ldr_bin) < up(len(gz)):
@@ -66,7 +68,7 @@ for name in ONE_MB:
                          f"{len(ldr) // 1024} KB, frei {(AREA - up(ldr_bin)) // 1024} KB für Firmware {len(gz) // 1024} KB)")
     print(f"   {name}: 1-MB-Reserve {(AREA - up(fw_bin) - up(len(ldr))) // 1024} KB")
     files[name] = {"url": f"bin/{name}.bin.gz", "sha256": hashlib.sha256(gz).hexdigest(), "size": len(gz),
-                   "loader": "bin/hermit-loader-1m.bin.gz", "loader_sha256": hashlib.sha256(ldr).hexdigest()}
+                   "loader": f"bin/{lname}.bin.gz", "loader_sha256": hashlib.sha256(ldr).hexdigest()}
 
 (ROOT / "update.json").write_text(json.dumps({"version": version, "files": files}, indent=2) + "\n")
 print(f"update.json fuer Version {version} geschrieben")
@@ -81,6 +83,7 @@ MODELS = {
     "Shelly-Dimmer-2": ["hermit-dimmer2"],
     "Shelly-2.5":    ["hermit-25", "hermit-25-cover"],
     "Sonoff-RF-Bridge": ["hermit-rfbridge"],
+    "Steckdose-1MB-ESP8285": ["hermit-plug1m"],
 }
 dist = ROOT / "dist"
 dist.mkdir(exist_ok=True)
@@ -93,7 +96,7 @@ for model, names in MODELS.items():
         for n in names:
             z.write(bindir / f"{n}.bin", f"{top}/bin/{n}.bin")
             z.write(bindir / f"{n}.bin.gz", f"{top}/bin/{n}.bin.gz")
-        ld = "hermit-loader-1m" if set(names) & ONE_MB else "hermit-loader"
+        ld = next((ONE_MB[n] for n in names if n in ONE_MB), "hermit-loader")
         z.write(bindir / f"{ld}.bin.gz", f"{top}/bin/{ld}.bin.gz")
         z.write(ROOT / "tools" / "pagurus_flash.py", f"{top}/tools/pagurus_flash.py")
         z.write(ROOT / "tools" / "pagurus_flash_gui.py", f"{top}/tools/pagurus_flash_gui.py")
