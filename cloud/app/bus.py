@@ -19,7 +19,7 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_USER = os.environ.get("MQTT_USER", "")
 MQTT_PASS = os.environ.get("MQTT_PASS", "")
 SRC = "hermit-cloud"
-MAIN_COMPS = ("switch:", "cct:", "light:", "cover:")
+MAIN_COMPS = ("switch:", "cct:", "light:", "cover:", "climate:")
 
 
 # Geraete mit mehreren Schaltkanaelen (Shelly 2.5): Kanal 2 wird als eigene Zeile "<id>~1" gefuehrt –
@@ -282,7 +282,7 @@ class Bus:
             except Exception:
                 pass
             return res
-        m = {"switch": "Switch", "cct": "CCT", "light": "Light"}.get(kind, "Switch")
+        m = {"switch": "Switch", "cct": "CCT", "light": "Light", "climate": "Climate"}.get(kind, "Switch")
         if brightness is not None and kind in ("light", "cct"):
             b = max(0, min(100, int(round(float(brightness)))))
             p = {"id": int(cid), "brightness": b} if b > 0 else {"id": int(cid), "on": False}

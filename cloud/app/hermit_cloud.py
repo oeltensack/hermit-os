@@ -31,7 +31,7 @@ import fridge
 import gen2
 import portal
 import shade
-from bus import BUS, check_offline, seen
+from bus import BUS, check_offline, seen, set_status
 from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
                   set_setting, setting, today)
 
@@ -310,6 +310,25 @@ async def dev_switch(dev: str, request: Request):
     try:
         res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None, d.get("brightness"),
                                       d.get("cover"), d.get("pos"))
+    except Exception as e:
+        raise HTTPException(502, str(e))
+    return {"result": res}
+
+
+@app.post("/api/devices/{dev}/climate")
+async def dev_climate(dev: str, request: Request):
+    """Klimaanlage (Pagurus OS ESP32): Modus, Solltemperatur, Luefter, Swing, Eco/Turbo/Leise."""
+    need(request, "user")
+    get_dev(dev)
+    d = await request.json()
+    p = {"id": 0}
+    for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute"):
+        if k in d:
+            p[k] = d[k]
+    try:
+        res = await asyncio.to_thread(BUS.rpc, dev, "Climate.Set", p)
+        st = await asyncio.to_thread(BUS.rpc, dev, "Climate.GetStatus", {"id": 0})
+        set_status(dev, "climate:0", st, merge=True)
     except Exception as e:
         raise HTTPException(502, str(e))
     return {"result": res}

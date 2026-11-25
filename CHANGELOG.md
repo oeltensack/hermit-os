@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.18.0 / Pagurus Cloud 1.13.0
+- **Pagurus OS für ESP32** (`esp32/`, Variante `hermit-tclac-esp32`): steuert TCL-/Kesser-Klimaanlagen
+  über den UART des WLAN-Moduls (eigene Protokollumsetzung), DHT22 für Raumtemperatur und Feuchte.
+  Weboberfläche, JSON-RPC, MQTT im Gen2-Format, Updates über update.json mit SHA-256; Umstieg von ESPHome
+  per Browser-Upload, Komplettabbild fürs Kabel
+- Cloud: Klimaanlagen (`climate:0`) mit Modus, Solltemperatur ±, Lüfter und Swing auf der Gerätekarte,
+  An/Aus wie ein Schalter (auch in Portal, App, Szenen und Regeln); DHT22 als Fühler für die Beschattung
+
 ## 1.17.4
 - **Neue Variante `hermit-plug1m`:** einfache WLAN-Steckdose mit ESP8285 (1 MB), Touch-Taste, ohne
   Leistungsmessung (Relais GPIO12, Taste GPIO13, LEDs GPIO4/GPIO5). Updates wie bei der RF Bridge über einen

@@ -6,7 +6,7 @@
 Aufruf im Projektverzeichnis:  python3 tools/make_release.py
 Danach committen und pushen – die Geraete finden die neue Version ueber update.json.
 """
-import gzip, hashlib, json, re, shutil, subprocess, pathlib, zipfile
+import gzip, hashlib, json, re, shutil, subprocess, pathlib, sys, zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VARIANTS = {               # PlatformIO-Env -> Name in bin/ und Schluessel in update.json
@@ -34,6 +34,12 @@ version = re.search(r'FW_VERSION=\\"([0-9.]+)\\"', ini).group(1)
 
 subprocess.run(["pio", "run"], cwd=ROOT, check=True)
 
+# ESP32 (Klimaanlage TCL): eigenes PlatformIO-Projekt in esp32/, gleiche Versionsnummer
+e32 = ROOT / "esp32"
+e32ini = (e32 / "platformio.ini").read_text()
+(e32 / "platformio.ini").write_text(re.sub(r'FW_VERSION=\\"[0-9.]+\\"', f'FW_VERSION=\\\\"{version}\\\\"', e32ini))
+subprocess.run(["pio", "run", "-d", str(e32)], check=True)
+
 bindir = ROOT / "bin"
 bindir.mkdir(exist_ok=True)
 for f in bindir.glob("*.bin*"):
@@ -48,6 +54,18 @@ for env, name in VARIANTS.items():
     with gzip.open(bindir / f"{name}.bin.gz", "wb", compresslevel=9) as g:
         g.write(data)
     files[name] = {"url": f"bin/{name}.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+
+# ESP32: Programm fuer OTA (update.json) und Komplettabbild fuer das erste Flashen per Kabel (ab 0x0)
+b32 = e32 / ".pio" / "build" / "tclac"
+shutil.copy(b32 / "firmware.bin", bindir / "hermit-tclac-esp32.bin")
+data = (bindir / "hermit-tclac-esp32.bin").read_bytes()
+files["hermit-tclac-esp32"] = {"url": "bin/hermit-tclac-esp32.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+boot_app0 = next(pathlib.Path.home().glob(".platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"))
+subprocess.run([sys.executable, str(next(pathlib.Path.home().glob(".platformio/packages/tool-esptoolpy/esptool.py"))),
+                "--chip", "esp32", "merge_bin", "-o", str(bindir / "hermit-tclac-esp32-factory.bin"),
+                "--flash_mode", "dio", "--flash_size", "4MB",
+                "0x1000", str(b32 / "bootloader.bin"), "0x8000", str(b32 / "partitions.bin"),
+                "0xe000", str(boot_app0), "0x10000", str(b32 / "firmware.bin")], check=True, stdout=subprocess.DEVNULL)
 
 # Pagurus Loader – fuer den Wechsel von Tasmota; der 1-MB-Loader zusaetzlich als Zwischenstufe beim Update
 for env, name in (("loader", "hermit-loader"), ("loader_1m", "hermit-loader-1m"), ("loader_1m_plug1m", "hermit-loader-1m-plug1m")):
@@ -85,6 +103,7 @@ MODELS = {
     "Sonoff-RF-Bridge": ["hermit-rfbridge"],
     "Steckdose-1MB-ESP8285": ["hermit-plug1m"],
 }
+EXTRA = {"Klima-TCL-ESP32": ["hermit-tclac-esp32.bin", "hermit-tclac-esp32-factory.bin"]}
 dist = ROOT / "dist"
 dist.mkdir(exist_ok=True)
 for f in dist.glob("*.zip"):
@@ -111,3 +130,14 @@ for model, names in MODELS.items():
             z.write(d, f"{top}/docs/{d.name}")
     print("  ", out.name)
 
+
+# ESP32-Klima: Programm (OTA) + Komplettabbild (Kabel) + Anleitung
+for model, fnames in EXTRA.items():
+    top = f"Pagurus-OS-{version}-{model}"
+    out = dist / f"{top}.zip"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for n in fnames:
+            z.write(bindir / n, f"{top}/bin/{n}")
+        z.write(ROOT / "esp32" / "README.md", f"{top}/README.md")
+        z.write(ROOT / "LICENSE", f"{top}/LICENSE")
+    print("  ", out.name)
