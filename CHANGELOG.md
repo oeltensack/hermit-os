@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.6
+- ESP32-Klima: Online-Update konnte beim Lesen hängen bleiben (Weboberfläche tot, Gerät nur noch per Ping erreichbar); Abbruch jetzt immer nach 20 s ohne Fortschritt
+
 ## 1.18.5
 - ESP32-Klima: Online-Update lädt per HTTP/1.0 (GitHub lieferte beim ersten Abruf in Chunks, dadurch falsche Prüfsumme und „Download abgebrochen“); Fehlermeldung zeigt geladene Bytes
 - Kleine `update/<variante>.json` je Gerät: alte Firmware (bis 1.17) scheiterte mit „update.json ungültig“ an der gewachsenen Gesamtdatei (zu wenig RAM); `update.json` kompakt geschrieben

@@ -313,14 +313,14 @@ String updInstall() {
   uint8_t buf[1024]; int got = 0; uint32_t last = millis();
   // weiterlesen, solange Daten im Puffer sind – GitHub schliesst die Verbindung oft vor dem letzten Lesen
   while ((len < 0 || got < len) && (http.connected() || s->available())) {
+    if (millis() - last > 20000) break;                       // 20 s ohne Fortschritt: abbrechen
     int n = s->available();
+    if (n > 0) n = s->read(buf, min(n, (int)sizeof buf));     // read() statt readBytes(): kehrt sofort zurueck
     if (n > 0) {
-      n = s->readBytes(buf, min(n, (int)sizeof buf));
       mbedtls_sha256_update(&ctx, buf, n);
       if (Update.write(buf, n) != (size_t)n) break;
       got += n; last = millis();
-    } else if (millis() - last > 20000) break;
-    else delay(1);
+    } else delay(2);
   }
   http.end();
   uint8_t h[32]; mbedtls_sha256_finish(&ctx, h); mbedtls_sha256_free(&ctx);
