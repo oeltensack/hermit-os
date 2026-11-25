@@ -302,7 +302,8 @@ String updInstall() {
   if (!updAvailVer.length()) return "Firmware ist aktuell";
   updState = "updating";
   WiFiClientSecure sec; WiFiClient plain; HTTPClient http;
-  if (!openUrl(http, sec, plain, updAvailUrl)) return "URL ungültig";
+  if (!openUrl(http, sec, plain, updAvailUrl)) { updState = "idle"; return "URL ungültig"; }
+  http.useHTTP10(true);   // kein Chunked-Encoding (GitHub-Cache liefert beim ersten Abruf sonst Chunks)
   int code = http.GET();
   if (code != 200) { http.end(); updState = "idle"; return "Download: HTTP " + String(code); }
   int len = http.getSize();
@@ -326,7 +327,8 @@ String updInstall() {
   char hex[65]; for (int i = 0; i < 32; i++) sprintf(hex + i * 2, "%02x", h[i]);
   if ((len > 0 && got != len) || (updAvailSha.length() && updAvailSha != hex)) {
     Update.abort(); updState = "idle";
-    return got != len ? "Download abgebrochen" : "SHA-256 stimmt nicht – Update verworfen";
+    return (len > 0 && got != len) ? "Download abgebrochen (" + String(got) + "/" + String(len) + ")"
+                                   : "SHA-256 stimmt nicht – Update verworfen";
   }
   if (!Update.end(true)) { updState = "idle"; return "Update fehlgeschlagen (" + String(Update.getError()) + ")"; }
   updState = "done"; rebootAt = millis() + 1500;

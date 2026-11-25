@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.5
+- ESP32-Klima: Online-Update lädt per HTTP/1.0 (GitHub lieferte beim ersten Abruf in Chunks, dadurch falsche Prüfsumme und „Download abgebrochen“); Fehlermeldung zeigt geladene Bytes
+
 ## 1.18.4
 - ESP32-Klima: Weboberfläche lädt deutlich schneller (WLAN-Modem-Sleep aus, Seite gepackt)
 
