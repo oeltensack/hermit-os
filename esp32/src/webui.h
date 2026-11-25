@@ -35,7 +35,7 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div><div class="v" id="ot">–</div><div class="l">Ausblasluft</div></div>
 <div><div class="v" id="cp">–</div><div class="l">Kompressor</div></div></div></div>
 <div id="lnk" class="warn" style="margin-top:10px;display:none">Keine Antwort von der Klimaanlage – UART-Verbindung prüfen</div>
-<div id="dg" class="l" style="margin-top:6px"></div>
+<div id="dg" class="l" style="margin-top:6px"></div><div id="lf" class="l" style="font-family:monospace;word-break:break-all;margin-top:4px"></div>
 <div class="chk"><input type="checkbox" id="sw" onchange="swp(this.checked)"><span>TX/RX zur Klimaanlage tauschen (ohne Umlöten)</span></div></div>
 <div class="card"><h2>Solltemperatur</h2><div class="set"><button class="bt rnd" onclick="tgt(-1)">−</button><div class="t" id="tg">–</div><button class="bt rnd" onclick="tgt(1)">+</button></div></div>
 <div class="card"><h2>Betriebsart</h2><div class="row" id="md"></div>
@@ -76,7 +76,7 @@ function render(){const c=S['climate:0']||{},on=!!c.output;
  const t=S['temperature:0']||{},h=S['humidity:0']||{};$('dt').textContent=f1(t.tC,'°C');$('dh').textContent=h.rh==null?'–':dez(h.rh,0)+' %';
  $('tg').textContent=pendT!=null?dez(pendT,0)+' °C':(c.target_C==null?'–':dez(c.target_C,c.target_C%1?1:0)+' °C');
  $('lnk').style.display=c.link?'none':'block';
- const g=c.diag||{};$('dg').textContent=`UART: TX GPIO${g.tx_pin}, RX GPIO${g.rx_pin} · gesendet ${g.tx_frames} Rahmen · empfangen ${g.rx_bytes} Bytes, ${g.frames} gültige Rahmen, ${g.bad} fehlerhaft · DHT22: ${t.reads_ok||0} ok, ${t.reads_failed||0} Fehler`;
+ const g=c.diag||{};$('lf').textContent=(g.last?'Letzter Rahmen: '+g.last+'  ':'')+(g.raw?'Rohdaten: '+g.raw:'');$('dg').textContent=`UART: TX GPIO${g.tx_pin}, RX GPIO${g.rx_pin} · gesendet ${g.tx_frames} Rahmen · empfangen ${g.rx_bytes} Bytes, ${g.frames} gültige Rahmen, ${g.bad} fehlerhaft, ${g.ignored} übergangen · DHT22: ${t.reads_ok||0} ok, ${t.reads_failed||0} Fehler`;
  $('md').innerHTML=MODES.map(([k,l])=>`<button class="bt ${c.mode==k?'sel':''}" onclick="set({mode:'${k}'})">${l}</button>`).join('');
  $('fn').innerHTML=FANS.map(([k,l])=>`<button class="bt ${c.fan==k?'sel':''}" onclick="set({fan:'${k}'})">${l}</button>`).join('');
  $('ex').innerHTML=[['swing_v','Swing ↕'],['swing_h','Swing ↔'],['eco','Eco'],['turbo','Turbo'],['mute','Leise']].map(([k,l])=>`<button class="bt ${c[k]?'sel':''}" onclick="set({${k}:${!c[k]}})">${l}</button>`).join('');

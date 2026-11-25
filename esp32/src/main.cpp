@@ -111,6 +111,7 @@ void climateStatus(JsonObject o) {
   o["link"] = ac.linkOk();
   JsonObject dg = o["diag"].to<JsonObject>();           // Fehlersuche UART
   dg["rx_bytes"] = ac.rxBytes; dg["tx_frames"] = ac.txFrames; dg["frames"] = ac.frames; dg["bad"] = ac.badFrames;
+  dg["ignored"] = ac.ignored; dg["last"] = ac.lastHex; dg["raw"] = ac.rawHex();
   dg["tx_pin"] = cfg.swap ? PIN_AC_RX : PIN_AC_TX; dg["rx_pin"] = cfg.swap ? PIN_AC_TX : PIN_AC_RX;
   if (!s.valid) return;
   o["mode"] = tcl::MODES[s.mode];

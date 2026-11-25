@@ -35,7 +35,15 @@ static const uint8_t SET_FAN[]  = {0, 2, 3, 5, 6, 7};
 class Ac {
  public:
   State st;
-  uint32_t lastRx = 0, frames = 0, badFrames = 0, rxBytes = 0, txFrames = 0;
+  uint32_t lastRx = 0, frames = 0, badFrames = 0, rxBytes = 0, txFrames = 0, ignored = 0;
+  char lastHex[200] = "";                    // zuletzt empfangener Rahmen (Diagnose)
+  uint8_t raw[48]; uint32_t rawPos = 0;       // letzte Rohbytes (Diagnose)
+  String rawHex() const {
+    String s; uint32_t n = rawPos < sizeof raw ? rawPos : sizeof raw;
+    char b[4];
+    for (uint32_t i = rawPos - n; i < rawPos; i++) { snprintf(b, sizeof b, "%02X ", raw[i % sizeof raw]); s += b; }
+    return s;
+  }
   bool beep = true;
 
   void begin(HardwareSerial& s, int rx, int tx) {
@@ -62,7 +70,7 @@ class Ac {
   }
 
   void loop() {
-    while (ser && ser->available()) { rxBytes++; feed(ser->read()); }
+    while (ser && ser->available()) { int c = ser->read(); raw[rawPos++ % sizeof raw] = c; rxBytes++; feed(c); }
     uint32_t now = millis();
     if ((int32_t)(now - nextPoll) >= 0) {
       static const uint8_t q[2] = {0x01, 0x00};
@@ -78,7 +86,12 @@ class Ac {
     uint8_t x = 0;
     for (int i = 0; i < n - 1; i++) x ^= f[i];
     if (x != f[n - 1] || f[4] != n - 6) { badFrames++; return false; }
-    handle(f[3], f + 5, f[4], f[1] == 0x01);
+    // eigene Rahmen (Echo auf der Leitung) nicht als Empfang zaehlen
+    if (!(f[1] == 0x00 && f[2] == 0x01 && n == lastTxLen && !memcmp(f, lastTx, n))) {
+      int k = 0;
+      for (int i = 0; i < n && k < (int)sizeof lastHex - 3; i++) k += snprintf(lastHex + k, sizeof lastHex - k, "%02X ", f[i]);
+    }
+    handle(f[3], f + 5, f[4], f[1] == 0x01 || f[2] == 0x00);
     return true;
   }
 
@@ -88,6 +101,7 @@ class Ac {
   int pos = 0, need = 0;
   uint32_t nextPoll = 2000;
   bool pendingSet = false;
+  uint8_t lastTx[40]; int lastTxLen = 0;
 
   void send(uint8_t cmd, const uint8_t* p, int len) {
     uint8_t f[40];
@@ -96,6 +110,7 @@ class Ac {
     uint8_t x = 0;
     for (int i = 0; i < 5 + len; i++) x ^= f[i];
     f[5 + len] = x;
+    memcpy(lastTx, f, 6 + len); lastTxLen = 6 + len;
     if (ser) { ser->write(f, 6 + len); txFrames++; }
   }
 
@@ -125,7 +140,10 @@ class Ac {
   }
 
   void handle(uint8_t cmd, const uint8_t* p, int len, bool fromAc) {
-    if (!fromAc || len < 0x23 || p[0] != 0x04 || (cmd != 0x03 && cmd != 0x04)) return;
+    // Zustand: Antwort auf 0x04/0x03 mit mind. 35 Byte. Richtungsbyte und Kennung 0x04 werden nicht
+    // verlangt – manche Anlagen setzen sie anders als in der Beschreibung.
+    if (len < 0x23 || (cmd != 0x03 && cmd != 0x04)) { ignored++; return; }
+    (void)fromAc;
     frames++;
     lastRx = millis();
     State& s = st;

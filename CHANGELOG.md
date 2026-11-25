@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.2
+- ESP32-Klima: Zustandsrahmen werden auch ohne Richtungsbyte `01 00` / Kennung `04` angenommen (Anlage antwortete, wurde aber verworfen); Diagnose zeigt letzten Rahmen und Rohdaten als Hex, eigenes Echo wird erkannt
+
 ## 1.18.1
 - ESP32-Klima: Diagnose auf der Seite (gesendete/empfangene UART-Rahmen und Bytes, DHT22-Lesungen), Schalter „TX/RX tauschen“ ohne Umlöten, DHT22 liest nach dem Start schneller nach
 
