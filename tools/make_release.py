@@ -88,8 +88,18 @@ for name, lname in ONE_MB.items():
     files[name] = {"url": f"bin/{name}.bin.gz", "sha256": hashlib.sha256(gz).hexdigest(), "size": len(gz),
                    "loader": f"bin/{lname}.bin.gz", "loader_sha256": hashlib.sha256(ldr).hexdigest()}
 
-(ROOT / "update.json").write_text(json.dumps({"version": version, "files": files}, indent=2) + "\n")
+(ROOT / "update.json").write_text(json.dumps({"version": version, "files": files}, separators=(",", ":")) + "\n")
 print(f"update.json fuer Version {version} geschrieben")
+
+# Kleine update.json pro Variante: alte Firmware (bis 1.17) liest die ganze Datei in den RAM und
+# scheitert an der grossen Gesamtdatei. Adressen absolut, weil die Datei in einem Unterordner liegt.
+RAW = "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/"
+udir = ROOT / "update"; udir.mkdir(exist_ok=True)
+for old in udir.glob("*.json"):
+    old.unlink()
+for name, f in files.items():
+    g = {k: (RAW + v if k in ("url", "loader") else v) for k, v in f.items()}
+    (udir / f"{name}.json").write_text(json.dumps({"version": version, "files": {name: g}}, separators=(",", ":")) + "\n")
 
 # Pro Modell eine Zip: Firmware (+Add-on-Variante), Loader, Flash-Tool, Anleitung
 MODELS = {

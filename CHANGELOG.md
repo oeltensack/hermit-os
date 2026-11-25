@@ -2,6 +2,7 @@
 
 ## 1.18.5
 - ESP32-Klima: Online-Update lädt per HTTP/1.0 (GitHub lieferte beim ersten Abruf in Chunks, dadurch falsche Prüfsumme und „Download abgebrochen“); Fehlermeldung zeigt geladene Bytes
+- Kleine `update/<variante>.json` je Gerät: alte Firmware (bis 1.17) scheiterte mit „update.json ungültig“ an der gewachsenen Gesamtdatei (zu wenig RAM); `update.json` kompakt geschrieben
 
 ## 1.18.4
 - ESP32-Klima: Weboberfläche lädt deutlich schneller (WLAN-Modem-Sleep aus, Seite gepackt)
