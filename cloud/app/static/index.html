@@ -237,7 +237,7 @@ const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
 <div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Batteriefühler · zuletzt '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
-<div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
+<div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.winopen&&d.winopen.paused?`<span class="tag y" title="${esc(d.winopen.reason||'')}">Pausiert: ${d.winopen.until?'Temperatursturz':'Fenster offen'}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
 <div class="dv">${cvr||sen?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canSw()||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>`}
 <div class="kv">${d.meter?`<div><div class="v">${d.meter.online&&d.meter.apower!=null?fmt(d.meter.apower,1,'W'):'–'}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.meter.today_wh)}</div><div class="l">heute · ${eur(d.meter.today_cost)}</div></div>`:''}${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
@@ -285,7 +285,7 @@ dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="d
 ${(d.comp||'').startsWith('climate:')?`<label>Energiemesser</label><select id="dd_m"><option value="">– keiner –</option>${DEVS.filter(x=>x.id!=d.id&&x.status&&'apower' in x.status).map(x=>`<option value="${esc(x.id)}" ${d.meter&&d.meter.id==x.id?'selected':''}>${esc(x.name||x.id)}${x.room?' · '+esc(x.room):''}</option>`).join('')}</select>
 <label class="ck"><input type="checkbox" id="dd_mh" ${!d.meter||d.meter.hide?'checked':''} style="width:auto"> Energiemesser nicht als eigenes Gerät anzeigen</label>`:''}
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
-<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}</div>
+<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
 function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs()},'Gespeichert')}
 function delDev(id){if(!confirm('Gerät mit allen gespeicherten Werten, Läufen und Sicherungen entfernen? Verbindet es sich wieder, erscheint es neu.'))return;run(async()=>{await api('devices/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadDevs()})}
@@ -357,6 +357,20 @@ $('fridges').innerHTML=FR.items.length?FR.items.map(frCard).join(''):`<div class
 document.querySelectorAll('#fridges .tl').forEach(box=>{const f=FR.items.find(x=>x.dev==box.dataset.dev),svg=box.querySelector('svg');
 svg.querySelectorAll('rect[data-i]').forEach(el=>{el.onmouseenter=()=>{const c=f.timeline[+el.dataset.i],k=svg.getBoundingClientRect().width/400,open=c[1]>=Date.now()/1000-30;
 tip(box,`<b>${hm(c[0])}–${open?'läuft':hm(c[1])}</b><br>${dur(c[1]-c[0])}`,(+el.getAttribute('x')+(+el.getAttribute('width'))/2)*k,4*k)};el.onmouseleave=()=>box.querySelector('.tt').style.display='none'})})}
+async function woDlg(id){const r=await api('devices/'+encodeURIComponent(id)+'/winopen'),c=r.cfg||r.default,on=!!r.cfg;
+const cs=DEVS.filter(x=>x.status&&'contact' in x.status);
+dlg(`<h2>Fenster/Tür offen</h2><p class="l">Steht ein Kontakt länger offen, schaltet die Cloud ${esc(devName(id))} aus und nach dem Schließen mit dem vorigen Modus wieder ein. Wer die Anlage in der Pause selbst einschaltet, beendet die Pause.</p><div class="f">
+<label>Kontakte</label><div>${cs.length?cs.map(x=>`<label style="display:block"><input type="checkbox" class="wo_s" value="${esc(x.id)}" ${c.sensors.includes(x.id)?'checked':''} style="width:auto"> ${esc(x.name||x.id)}${x.room?' · '+esc(x.room):''} <span class="l">(${x.status.contact?'offen':'zu'})</span></label>`).join(''):'<span class="l">Keine Tür-/Fensterkontakte verbunden (z. B. BLU Door/Window).</span>'}</div>
+<label>Ausschalten nach</label><div class="row"><input id="wo_d" style="width:70px" value="${c.delay}"> s offen</div>
+<label>Einschalten nach</label><div class="row"><input id="wo_c" style="width:70px" value="${c.close_delay}"> s zu</div>
+<label>Bei Betriebsart</label><div class="row">${Object.entries(CLM).map(([k,v])=>`<label><input type="checkbox" class="wo_m" value="${k}" ${c.modes.includes(k)?'checked':''} style="width:auto"> ${v}</label>`).join(' ')}</div>
+<label>Ohne Kontakt</label><label><input type="checkbox" id="wo_x" ${c.drop?'checked':''} style="width:auto"> Temperatursturz erkennen</label>
+<label></label><div class="row">fällt die Raumtemperatur um <input id="wo_k" style="width:55px" value="${num(c.drop_k,1)}"> K in <input id="wo_n" style="width:45px" value="${c.drop_min}"> min, <input id="wo_p" style="width:45px" value="${c.drop_pause}"> min pausieren</div></div>
+<p class="l">Der Temperatursturz nutzt den DHT22 am Klimagerät. Beim Abtauen im Winter kann die Temperatur am Gerät auch kurz fallen – Schwelle dann höher setzen.</p>
+<div class="row sp" style="margin-top:14px"><div>${on?`<button class="bt r" onclick="woDel('${esc(id)}')">Ausschalten</button>`:''}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="woSave('${esc(id)}')">Speichern</button></div></div>`)}
+function woSave(id){const n=v=>+String(v).replace(',','.');run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'POST',body:{sensors:[...document.querySelectorAll('.wo_s:checked')].map(c=>c.value),delay:n($('wo_d').value),close_delay:n($('wo_c').value),modes:[...document.querySelectorAll('.wo_m:checked')].map(c=>c.value),drop:$('wo_x').checked,drop_k:n($('wo_k').value),drop_min:n($('wo_n').value),drop_pause:n($('wo_p').value)}});closeDlg();await loadDevs()},'Gespeichert')}
+function woDel(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'DELETE'});closeDlg();await loadDevs()},'Ausgeschaltet')}
 async function frDlg(id){if(!Object.keys(FR.types).length)FR=await api('fridges');
 const f=FR.items.find(x=>x.dev==id),T=FR.types,t=f?f.type:'fridge',c=f?f.cfg:T[t];
 if(!DEVS.some(d=>'apower' in (d.status||{}))){toast('Kein Gerät mit Leistungsmessung verbunden');return}
@@ -539,7 +553,7 @@ function ruleDel(id){if(!confirm('Regel löschen?'))return;run(async()=>{await a
 function ruleRun(id){run(async()=>{await api('rules/'+id+'/run',{method:'POST'});setTimeout(loadAuto,800)},'Regel ausgeführt')}
 
 // ---------- Meldungen ----------
-const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel',fridge:'Kühlgerät'};
+const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel',fridge:'Kühlgerät',window:'Fenster offen'};
 const QUIET=['online','reset','update','rule','finished'];
 async function loadAl(){const a=await api('alerts');const n=a.filter(x=>!x.ack&&!QUIET.includes(x.kind)).length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
 if(TAB!='al')return;$('atab').innerHTML=a.length?'<tr><th>Zeit</th><th>Art</th><th>Meldung</th><th class="user-only"></th></tr>'+a.map(x=>`<tr class="${x.ack?'ack':''}"><td>${dt(x.ts)}</td>

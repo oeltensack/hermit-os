@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.16.0 / Pagurus Portal 1.6
+- Fenster/Tür offen an Klimaanlagen (Gerät bearbeiten → „Fenster offen …“): Steht ein gewählter Kontakt (z. B. BLU Door/Window) länger offen, wird die Anlage ausgeschaltet und nach dem Schließen mit dem vorigen Modus wieder eingeschaltet; wahlweise auch ohne Kontakt über einen Temperatursturz am DHT22 mit fester Pause. Gilt standardmäßig nur beim Heizen, Kühlen usw. zuschaltbar. Selbst einschalten beendet die Pause. Meldung „Fenster offen“ (auch als Push)
+- Portal zeigt die Pause auf der Klima-Karte
+
 ## 1.18.7
 - ESP32-Klima: Hex-Anzeige (letzter Rahmen, Rohdaten) und Schalter „TX/RX tauschen“ von der Seite entfernt, die Diagnosezeile bleibt; Status-Meldungen dadurch kleiner
 

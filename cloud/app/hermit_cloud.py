@@ -31,6 +31,7 @@ import fridge
 import gen2
 import portal
 import shade
+import winopen
 from bus import BUS, check_offline, seen, set_status
 from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
                   set_setting, setting, today)
@@ -207,16 +208,22 @@ def watchdog():
 def startup():
     core.init_db()
     blu.init_db()
+    winopen.init_db()
     blu.BUS = BUS
     ensure_admin()
     pk = setting("push_kinds")                 # neue Push-Art in bestehende Auswahl aufnehmen (einmalig)
     if pk is not None and "fridge" not in pk and not setting("mig_push_fridge"):
         set_setting("push_kinds", pk + ["fridge"])
     set_setting("mig_push_fridge", True)
+    pk = setting("push_kinds")
+    if pk is not None and "window" not in pk and not setting("mig_push_window"):
+        set_setting("push_kinds", pk + ["window"])
+    set_setting("mig_push_window", True)
     core.start_push()
     BUS.start()
     engine.start(BUS)
     shade.start(BUS)
+    winopen.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
     portal.start(devices)
@@ -284,6 +291,10 @@ def dev_row(r, latest=None):
             out["meter"] = {"id": m["id"], "name": m["name"] or m["id"], "online": bool(m["online"]),
                             "apower": ms.get("apower"), "today_wh": mwh,
                             "today_cost": round(mwh / 1000 * price_eur_kwh(), 2), "hide": bool(r["meter_hide"])}
+    if (r["comp"] or "").startswith("climate:"):
+        w = winopen.view(r["id"])
+        if w:
+            out["winopen"] = w
     p = q("SELECT id, meter_hide FROM devices WHERE meter=? LIMIT 1", (r["id"],), one=True)
     if p:                                          # ist selbst Energiemesser eines anderen Geraets
         out["meter_of"] = p["id"]
@@ -347,6 +358,31 @@ async def dev_climate(dev: str, request: Request):
     return {"result": res}
 
 
+@app.get("/api/devices/{dev}/winopen")
+def winopen_get(dev: str, request: Request):
+    get_dev(dev)
+    r = winopen.get(dev)
+    return {"cfg": r["cfg"] if r else None, "default": winopen.DEFAULT, "state": winopen.view(dev)}
+
+
+@app.post("/api/devices/{dev}/winopen")
+async def winopen_save(dev: str, request: Request):
+    """Fenster/Tuer offen: Klimaanlage pausieren (Kontakte und/oder Temperatursturz)."""
+    need(request, "admin")
+    get_dev(dev)
+    try:
+        return {"cfg": winopen.save(dev, await request.json())}
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/devices/{dev}/winopen")
+def winopen_delete(dev: str, request: Request):
+    need(request, "admin")
+    winopen.delete(dev)
+    return {"ok": True}
+
+
 @app.post("/api/devices/{dev}/meta")
 async def dev_meta(dev: str, request: Request):
     """Name und Raum (der Name wird auch am Geraet gesetzt, wenn es erreichbar ist)."""
@@ -385,7 +421,7 @@ def dev_delete(dev: str, request: Request):
     get_dev(dev)
     rows = [dev] + ([] if "~" in dev else [r["id"] for r in q("SELECT id FROM devices WHERE id LIKE ?", (dev + "~%",))])
     for d in rows:                               # mit zweitem Kanal (Shelly 2.5)
-        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles"):
+        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles", "winopen"):
             try:
                 q(f"DELETE FROM {t} WHERE dev=?", (d,))
             except Exception:

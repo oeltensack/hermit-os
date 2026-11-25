@@ -63,7 +63,7 @@ async function api(a,body){const o=body?{method:'POST',headers:{'Content-Type':'
  if(r.status==401){$('login').style.display='flex';throw new Error('login')}
  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j}
 let S=null,PEND={};
-const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel',fridge:'Kühlgerät'};
+const KIND={overpower:'Überlast',overtemp:'Übertemperatur',offline:'Offline',online:'Online',reset:'Reset',overvoltage:'Überspannung',update:'Update',finished:'Fertig',reminder:'Erinnerung',rule:'Regel',fridge:'Kühlgerät',window:'Fenster offen'};
 const QUIET=['online','reset','update','rule','finished'];
 function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('cover:'),sen=d.comp=='sensor:0';
  let kv='';
@@ -83,7 +83,7 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
   ${d.pos!=null?`<input type="range" min="0" max="100" value="${d.pos}" onchange="cmd('${esc(d.id)}','pos',+this.value)">`:''}`:'');}
  if(d.cl){const c=d.cl,id=esc(d.id),t=c.target_C||24;
   ctl=c.link===false?'<div class="l" style="color:var(--e,#e55)">Klimagerät antwortet nicht</div>':
-  `<div class="l">${d.output?esc(CLM[c.mode]||c.mode||'')+' · Soll '+fmt(t,t%1?1:0,'°C'):'aus'}${c.current_C!=null?' · Raum '+fmt(c.current_C,1,'°C'):''}${c.ext_humidity!=null?' · '+fmt(c.ext_humidity,0,'%'):''} · Lüfter ${esc(CLF[c.fan]||c.fan||'–')}${c.compressor?' · Kompressor läuft':''}</div>`+
+  (c.paused?`<div class="l" style="color:#e8b13a">Pausiert – ${esc(c.paused)}</div>`:'')+`<div class="l">${d.output?esc(CLM[c.mode]||c.mode||'')+' · Soll '+fmt(t,t%1?1:0,'°C'):'aus'}${c.current_C!=null?' · Raum '+fmt(c.current_C,1,'°C'):''}${c.ext_humidity!=null?' · '+fmt(c.ext_humidity,0,'%'):''} · Lüfter ${esc(CLF[c.fan]||c.fan||'–')}${c.compressor?' · Kompressor läuft':''}</div>`+
   (can?`<div class="row"><button class="bt g" onclick="cl('${id}',{target_C:${Math.max(16,Math.round(t)-1)}})">−</button><b style="min-width:3.5em;text-align:center">${fmt(t,t%1?1:0,'°C')}</b><button class="bt g" onclick="cl('${id}',{target_C:${Math.min(31,Math.round(t)+1)}})">+</button>
   <select onchange="cl('${id}',{mode:this.value})">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${c.mode==k?'selected':''}>${v}</option>`).join('')}</select>
   <select onchange="cl('${id}',{fan:this.value})">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${c.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>`:'');}

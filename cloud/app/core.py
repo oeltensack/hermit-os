@@ -155,8 +155,9 @@ PUSH_KINDS = {
     "overpower": "Überlast", "overtemp": "Übertemperatur", "offline": "Gerät offline",
     "online": "Gerät wieder online", "reset": "Reset am Gerät", "finished": "Gerät fertig",
     "reminder": "Erinnerung", "fridge": "Kühlgerät-Warnung", "rule": "Regel", "update": "Updates",
+    "window": "Fenster offen (Klima pausiert)",
 }
-DEFAULT_PUSH = ["overpower", "overtemp", "offline", "finished", "reminder", "fridge", "rule"]
+DEFAULT_PUSH = ["overpower", "overtemp", "offline", "finished", "reminder", "fridge", "rule", "window"]
 _pushq = queue.Queue()
 
 

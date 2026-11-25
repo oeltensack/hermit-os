@@ -46,6 +46,8 @@ def _compact(d):
                                              "ext_temperature_C", "ext_humidity") if s.get(k) is not None})
         if s.get("ext_temperature_C") is not None:
             out["tC"] = s["ext_temperature_C"]
+        if (d.get("winopen") or {}).get("paused"):
+            out["cl"]["paused"] = d["winopen"].get("reason") or "Fenster offen"
     m = d.get("meter")
     if m:                                          # gekoppelter Energiemesser
         out.update(apower=m.get("apower") if m.get("online") else None, wh=m.get("today_wh"))
