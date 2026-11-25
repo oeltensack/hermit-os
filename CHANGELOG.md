@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.7
+- ESP32-Klima: Hex-Anzeige (letzter Rahmen, Rohdaten) und Schalter „TX/RX tauschen“ von der Seite entfernt, die Diagnosezeile bleibt; Status-Meldungen dadurch kleiner
+
 ## Pagurus Cloud 1.15.0
 - Klimaanlagen lassen sich mit einem Energiemesser koppeln (Gerät bearbeiten → Energiemesser): Leistung, Verbrauch heute und Kosten erscheinen auf der Klima-Karte, auch im Portal und in der App (ab 1.4.0); der Messer kann als eigenes Gerät ausgeblendet werden
 
