@@ -21,7 +21,7 @@
 #include <DHT.h>
 #include <time.h>
 #include "tcl.h"
-#include "webui.h"
+#include "webui_gz.h"
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.0.0"
@@ -529,9 +529,14 @@ void setup() {
   if (cfg.ssid.length()) WiFi.begin(cfg.ssid.c_str(), cfg.pass.c_str());
   else startAP();
   WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);                     // kein Modem-Sleep: sonst antwortet die Weboberflaeche traege
   configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "pool.ntp.org", "time.cloudflare.com");
 
-  server.on("/", HTTP_GET, []() { server.sendHeader("Cache-Control", "no-store"); server.send_P(200, "text/html; charset=utf-8", INDEX_HTML); });
+  server.on("/", HTTP_GET, []() {             // Seite gepackt ausliefern (spart ~70 %)
+    server.sendHeader("Cache-Control", "no-store");
+    server.sendHeader("Content-Encoding", "gzip");
+    server.send_P(200, "text/html; charset=utf-8", (const char*)INDEX_HTML_GZ, INDEX_HTML_GZ_LEN);
+  });
   server.on("/rpc", HTTP_POST, handleRpcPost);
   // Firmware von Hand hochladen (System → Datei)
   server.on("/update", HTTP_POST, []() {

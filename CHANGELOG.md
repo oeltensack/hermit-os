@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.4
+- ESP32-Klima: Weboberfläche lädt deutlich schneller (WLAN-Modem-Sleep aus, Seite gepackt)
+
 ## 1.18.3
 - ESP32-Klima: Update brach ab, wenn GitHub die Verbindung vor dem letzten Lesen schloss; Firmware-Datei lässt sich zusätzlich im Reiter System hochladen
 
