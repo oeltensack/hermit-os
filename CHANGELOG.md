@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.1
+- ESP32-Klima: Diagnose auf der Seite (gesendete/empfangene UART-Rahmen und Bytes, DHT22-Lesungen), Schalter „TX/RX tauschen“ ohne Umlöten, DHT22 liest nach dem Start schneller nach
+
 ## 1.18.0 / Pagurus Cloud 1.13.0
 - **Pagurus OS für ESP32** (`esp32/`, Variante `hermit-tclac-esp32`): steuert TCL-/Kesser-Klimaanlagen
   über den UART des WLAN-Moduls (eigene Protokollumsetzung), DHT22 für Raumtemperatur und Feuchte.

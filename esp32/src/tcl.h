@@ -35,7 +35,7 @@ static const uint8_t SET_FAN[]  = {0, 2, 3, 5, 6, 7};
 class Ac {
  public:
   State st;
-  uint32_t lastRx = 0, frames = 0, badFrames = 0;
+  uint32_t lastRx = 0, frames = 0, badFrames = 0, rxBytes = 0, txFrames = 0;
   bool beep = true;
 
   void begin(HardwareSerial& s, int rx, int tx) {
@@ -62,7 +62,7 @@ class Ac {
   }
 
   void loop() {
-    while (ser && ser->available()) feed(ser->read());
+    while (ser && ser->available()) { rxBytes++; feed(ser->read()); }
     uint32_t now = millis();
     if ((int32_t)(now - nextPoll) >= 0) {
       static const uint8_t q[2] = {0x01, 0x00};
@@ -96,7 +96,7 @@ class Ac {
     uint8_t x = 0;
     for (int i = 0; i < 5 + len; i++) x ^= f[i];
     f[5 + len] = x;
-    if (ser) ser->write(f, 6 + len);
+    if (ser) { ser->write(f, 6 + len); txFrames++; }
   }
 
   // Byteweise einlesen; das Modul schreibt teils Text dazwischen – neu aufsetzen am naechsten 0xBB

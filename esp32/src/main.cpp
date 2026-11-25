@@ -54,10 +54,11 @@ struct Cfg {
   String updUrl = DEF_UPD_URL; String updMode = "check";   // check | auto | off
   bool beep = true;
   float tOffset = 0;                    // Korrektur DHT22
+  bool swap = false;                    // TX/RX zur Klimaanlage tauschen
 } cfg;
 
 float dhtT = NAN, dhtH = NAN;
-uint32_t dhtAt = 0;
+uint32_t dhtAt = 0, dhtOk = 0, dhtFail = 0;
 String updAvailVer, updAvailUrl, updAvailSha, updErr, updState = "idle";
 uint32_t updNextCheck = 120000;
 bool updPending = false;
@@ -77,6 +78,7 @@ void loadCfg() {
   cfg.updMode = prefs.getString("updMode", "check");
   cfg.beep = prefs.getBool("beep", true);
   cfg.tOffset = prefs.getFloat("tOff", 0);
+  cfg.swap = prefs.getBool("swap", false);
   prefs.end();
 }
 
@@ -94,6 +96,7 @@ void saveCfg() {
   prefs.putString("updMode", cfg.updMode);
   prefs.putBool("beep", cfg.beep);
   prefs.putFloat("tOff", cfg.tOffset);
+  prefs.putBool("swap", cfg.swap);
   prefs.end();
 }
 
@@ -106,6 +109,9 @@ void climateStatus(JsonObject o) {
   o["id"] = 0;
   o["output"] = s.power;
   o["link"] = ac.linkOk();
+  JsonObject dg = o["diag"].to<JsonObject>();           // Fehlersuche UART
+  dg["rx_bytes"] = ac.rxBytes; dg["tx_frames"] = ac.txFrames; dg["frames"] = ac.frames; dg["bad"] = ac.badFrames;
+  dg["tx_pin"] = cfg.swap ? PIN_AC_RX : PIN_AC_TX; dg["rx_pin"] = cfg.swap ? PIN_AC_TX : PIN_AC_RX;
   if (!s.valid) return;
   o["mode"] = tcl::MODES[s.mode];
   o["target_C"] = s.target;
@@ -118,7 +124,7 @@ void climateStatus(JsonObject o) {
   if (!isnan(dhtT)) o["ext_temperature_C"] = roundf((dhtT + cfg.tOffset) * 10) / 10;   // DHT22 fuer die Karte
   if (!isnan(dhtH)) o["ext_humidity"] = roundf(dhtH);
 }
-void tempStatus(JsonObject o) { o["id"] = 0; if (!isnan(dhtT)) o["tC"] = roundf((dhtT + cfg.tOffset) * 10) / 10; else o["errors"].add("read"); }
+void tempStatus(JsonObject o) { o["id"] = 0; o["reads_ok"] = dhtOk; o["reads_failed"] = dhtFail; if (!isnan(dhtT)) o["tC"] = roundf((dhtT + cfg.tOffset) * 10) / 10; else o["errors"].add("read"); }
 void humStatus(JsonObject o) { o["id"] = 0; if (!isnan(dhtH)) o["rh"] = roundf(dhtH * 10) / 10; else o["errors"].add("read"); }
 
 void deviceInfo(JsonObject o) {
@@ -165,6 +171,7 @@ void fullConfig(JsonObject o) {
   m["topic_prefix"] = cfg.mqPrefix.length() ? cfg.mqPrefix : devId;
   o["wifi"]["sta"]["ssid"] = cfg.ssid;
   o["climate:0"]["beep"] = cfg.beep;
+  o["climate:0"]["swap_pins"] = cfg.swap;
   o["temperature:0"]["offset_C"] = cfg.tOffset;
   o["update"]["url"] = cfg.updUrl; o["update"]["mode"] = cfg.updMode;
 }
@@ -431,6 +438,11 @@ int rpcCall(const String& method, JsonVariantConst p, JsonDocument& out, String&
   }
   if (m == "climate.setconfig") {
     if (p["config"]["beep"].is<bool>()) { cfg.beep = p["config"]["beep"]; saveCfg(); }
+    if (p["config"]["swap_pins"].is<bool>() && (bool)p["config"]["swap_pins"] != cfg.swap) {
+      cfg.swap = p["config"]["swap_pins"]; saveCfg();
+      Serial2.end();
+      ac.begin(Serial2, cfg.swap ? PIN_AC_TX : PIN_AC_RX, cfg.swap ? PIN_AC_RX : PIN_AC_TX);
+    }
     o["restart_required"] = false; return 0;
   }
   if (m == "temperature.getstatus") { tempStatus(o); return 0; }
@@ -506,7 +518,7 @@ void setup() {
   devId = String(DEV_PREFIX) + "-" + String(b);
   loadCfg();
   ac.beep = cfg.beep;
-  ac.begin(Serial2, PIN_AC_RX, PIN_AC_TX);
+  ac.begin(Serial2, cfg.swap ? PIN_AC_TX : PIN_AC_RX, cfg.swap ? PIN_AC_RX : PIN_AC_TX);
   dht.begin();
 
   WiFi.persistent(false);
@@ -540,11 +552,10 @@ void loop() {
   if (ac.linkOk() != lastLink || ac.st.power != lastPower || ac.st.mode != lastMode || ac.st.target != lastTarget) {
     lastLink = ac.linkOk(); lastPower = ac.st.power; lastMode = ac.st.mode; lastTarget = ac.st.target; mqDirty = true;
   }
-  if (millis() - dhtAt > 30000 || !dhtAt) {
+  if (millis() - dhtAt > (dhtOk ? 30000UL : 5000UL) && millis() > 3000) {   // DHT22 braucht ~2 s nach dem Start
     dhtAt = millis();
     float t = dht.readTemperature(), h = dht.readHumidity();
-    if (!isnan(t)) dhtT = t;
-    if (!isnan(h)) dhtH = h;
+    if (!isnan(t) && !isnan(h)) { dhtT = t; dhtH = h; dhtOk++; } else dhtFail++;
     mqDirty = true;
   }
   handleMqtt();

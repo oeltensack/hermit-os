@@ -34,7 +34,9 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div><div class="v" id="dh">–</div><div class="l">Feuchte</div></div>
 <div><div class="v" id="ot">–</div><div class="l">Ausblasluft</div></div>
 <div><div class="v" id="cp">–</div><div class="l">Kompressor</div></div></div></div>
-<div id="lnk" class="warn" style="margin-top:10px;display:none">Keine Antwort von der Klimaanlage – UART-Verbindung (GPIO16/17) prüfen</div></div>
+<div id="lnk" class="warn" style="margin-top:10px;display:none">Keine Antwort von der Klimaanlage – UART-Verbindung prüfen</div>
+<div id="dg" class="l" style="margin-top:6px"></div>
+<div class="chk"><input type="checkbox" id="sw" onchange="swp(this.checked)"><span>TX/RX zur Klimaanlage tauschen (ohne Umlöten)</span></div></div>
 <div class="card"><h2>Solltemperatur</h2><div class="set"><button class="bt rnd" onclick="tgt(-1)">−</button><div class="t" id="tg">–</div><button class="bt rnd" onclick="tgt(1)">+</button></div></div>
 <div class="card"><h2>Betriebsart</h2><div class="row" id="md"></div>
 <h2 style="margin-top:16px">Lüfter</h2><div class="row" id="fn"></div>
@@ -74,6 +76,7 @@ function render(){const c=S['climate:0']||{},on=!!c.output;
  const t=S['temperature:0']||{},h=S['humidity:0']||{};$('dt').textContent=f1(t.tC,'°C');$('dh').textContent=h.rh==null?'–':dez(h.rh,0)+' %';
  $('tg').textContent=pendT!=null?dez(pendT,0)+' °C':(c.target_C==null?'–':dez(c.target_C,c.target_C%1?1:0)+' °C');
  $('lnk').style.display=c.link?'none':'block';
+ const g=c.diag||{};$('dg').textContent=`UART: TX GPIO${g.tx_pin}, RX GPIO${g.rx_pin} · gesendet ${g.tx_frames} Rahmen · empfangen ${g.rx_bytes} Bytes, ${g.frames} gültige Rahmen, ${g.bad} fehlerhaft · DHT22: ${t.reads_ok||0} ok, ${t.reads_failed||0} Fehler`;
  $('md').innerHTML=MODES.map(([k,l])=>`<button class="bt ${c.mode==k?'sel':''}" onclick="set({mode:'${k}'})">${l}</button>`).join('');
  $('fn').innerHTML=FANS.map(([k,l])=>`<button class="bt ${c.fan==k?'sel':''}" onclick="set({fan:'${k}'})">${l}</button>`).join('');
  $('ex').innerHTML=[['swing_v','Swing ↕'],['swing_h','Swing ↔'],['eco','Eco'],['turbo','Turbo'],['mute','Leise']].map(([k,l])=>`<button class="bt ${c[k]?'sel':''}" onclick="set({${k}:${!c[k]}})">${l}</button>`).join('');
@@ -85,8 +88,9 @@ async function load(){if(busy)return;try{S=await rpc('Shelly.GetStatus');render(
 async function cfg(){C=await rpc('Shelly.GetConfig');const i=await rpc('Shelly.GetDeviceInfo');C._ver=i.ver;$('ti').textContent=i.name||'Pagurus Klima';
  $('s_n').value=C.sys.device.name||'';$('s_b').checked=C['climate:0'].beep;$('s_o').value=C['temperature:0'].offset_C||0;
  $('q_e').checked=C.mqtt.enable;$('q_s').value=C.mqtt.server||'';$('q_u').value=C.mqtt.user||'';$('q_t').value=C.mqtt.topic_prefix||'';
- $('u_m').value=C.update.mode;$('u_u').value=C.update.url;$('w_m').value=C.wifi.sta.ssid||''}
+ $('sw').checked=!!C['climate:0'].swap_pins;$('u_m').value=C.update.mode;$('u_u').value=C.update.url;$('w_m').value=C.wifi.sta.ssid||''}
 function set(p){busy=true;run(async()=>{await rpc('Climate.Set',p);busy=false;setTimeout(load,300)}).finally(()=>busy=false)}
+function swp(v){run(async()=>{await rpc('Climate.SetConfig',{config:{swap_pins:v}});await load()},v?'TX/RX getauscht':'TX/RX normal')}
 function tog(){const c=S['climate:0']||{};set({on:!c.output})}
 function tgt(d){const c=S['climate:0']||{};pendT=Math.max(16,Math.min(31,Math.round((pendT!=null?pendT:c.target_C||24)+d)));render();clearTimeout(tTimer);tTimer=setTimeout(()=>{const t=pendT;pendT=null;set({target_C:t})},700)}
 function scan(){run(async()=>{const r=await rpc('WiFi.Scan');$('w_s').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(x=>`<option>${x.ssid}</option>`).join('');$('w_m').value=''})}
