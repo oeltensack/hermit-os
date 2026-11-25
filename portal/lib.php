@@ -25,6 +25,8 @@ function db(): PDO {
     $db->exec('CREATE TABLE IF NOT EXISTS alerts (id INTEGER PRIMARY KEY, ts REAL, dev TEXT, name TEXT, kind TEXT, text TEXT, ack INTEGER)');
     $db->exec('CREATE TABLE IF NOT EXISTS cmds (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, dev TEXT, act TEXT, pos INTEGER,
                state TEXT DEFAULT \'new\', result TEXT, done REAL)');
+    $cols = array_column($db->query('PRAGMA table_info(cmds)')->fetchAll(), 'name');
+    if (!in_array('arg', $cols, true)) $db->exec('ALTER TABLE cmds ADD COLUMN arg TEXT');   // Klima-Parameter (JSON)
     $db->exec('CREATE TABLE IF NOT EXISTS fails (ip TEXT, ts REAL)');
     $db->exec('CREATE TABLE IF NOT EXISTS relay (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, method TEXT, path TEXT,
                body TEXT, ctype TEXT, role TEXT, state TEXT DEFAULT \'new\', status INTEGER, rctype TEXT, rbody TEXT)');

@@ -49,7 +49,7 @@ if ($a === 'sync') {
     $end = $now + $wait;
     $view0 = (float)kv_get('last_view', 0);
     while (true) {
-        $cmds = $db->query("SELECT id, dev, act, pos FROM cmds WHERE state='new' ORDER BY id")->fetchAll();
+        $cmds = $db->query("SELECT id, dev, act, pos, arg FROM cmds WHERE state='new' ORDER BY id")->fetchAll();
         $relay = $db->query("SELECT id, method, path, body, ctype, role FROM relay WHERE state='new' ORDER BY id LIMIT 20")->fetchAll();
         $view = (float)kv_get('last_view', 0);
         $active = (microtime(true) - $view) < ACTIVE_SECS;
@@ -162,12 +162,24 @@ if ($a === 'cmd' && $post) {
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $dev = (string)($in['dev'] ?? '');
     $act = (string)($in['act'] ?? '');
-    if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos', 'bri', 'scene'], true)) out(['error' => 'Unbekannte Aktion'], 400);
+    if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos', 'bri', 'scene', 'climate'], true)) out(['error' => 'Unbekannte Aktion'], 400);
     $known = $act === 'scene' ? array_map(fn($x) => 'scene:' . $x['id'], kv_get('scenes', []))
                               : array_column(kv_get('devices', []), 'id');
     if (!in_array($dev, $known, true)) out(['error' => 'Unbekanntes Gerät'], 400);
     $pos = ($act === 'pos' || $act === 'bri') ? max(0, min(100, (int)($in['pos'] ?? 0))) : null;
-    db()->prepare('INSERT INTO cmds(ts, dev, act, pos) VALUES(?,?,?,?)')->execute([microtime(true), $dev, $act, $pos]);
+    $arg = null;
+    if ($act === 'climate') {                          // nur bekannte Felder mit passenden Werten durchlassen
+        $c = is_array($in['arg'] ?? null) ? $in['arg'] : [];
+        $p = [];
+        if (isset($c['on'])) $p['on'] = (bool)$c['on'];
+        if (isset($c['target_C'])) $p['target_C'] = max(16, min(31, (int)$c['target_C']));
+        if (in_array($c['mode'] ?? null, ['cool', 'heat', 'dry', 'fan', 'auto'], true)) $p['mode'] = $c['mode'];
+        if (in_array($c['fan'] ?? null, ['auto', 'low', 'low_mid', 'mid', 'mid_high', 'high'], true)) $p['fan'] = $c['fan'];
+        foreach (['swing_v', 'swing_h', 'eco', 'turbo', 'mute'] as $k) if (isset($c[$k])) $p[$k] = (bool)$c[$k];
+        if (!$p) out(['error' => 'Keine Klima-Werte'], 400);
+        $arg = json_encode($p);
+    }
+    db()->prepare('INSERT INTO cmds(ts, dev, act, pos, arg) VALUES(?,?,?,?,?)')->execute([microtime(true), $dev, $act, $pos, $arg]);
     $id = (int)db()->lastInsertId();
     kv_set('last_view', microtime(true));
     out(['ok' => true, 'id' => $id]);

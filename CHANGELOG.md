@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.14.0 / Pagurus Portal 1.5
+- Klimaanlage im Portal: Solltemperatur −/+, Modus und Lüfter, Raumtemperatur/Feuchte vom Fühler. Neue Spalte `arg` in der Befehlstabelle wird beim ersten Aufruf automatisch angelegt
+- Cloud führt Klima-Befehle aus dem Portal aus (Climate.Set, danach frischer Status)
+
 ## 1.18.6
 - ESP32-Klima: Online-Update konnte beim Lesen hängen bleiben (Weboberfläche tot, Gerät nur noch per Ping erreichbar); Abbruch jetzt immer nach 20 s ohne Fortschritt
 

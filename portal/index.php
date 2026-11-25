@@ -34,6 +34,7 @@ h3{font-size:15px;margin:18px 0 6px}
 .tag{font-size:11px;padding:1px 7px;border-radius:9px;background:#3a444f}.tag.r{background:#5a1d1d}.tag.g{background:#1d4a2a}
 input{padding:9px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--fg);font:inherit;width:100%}
 input[type=range]{padding:0;accent-color:var(--a)}
+select{padding:7px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--fg);font:inherit}
 table{width:100%;border-collapse:collapse;font-size:13px}td{padding:7px 6px;border-bottom:1px solid var(--b);vertical-align:top}
 tr.ack{color:var(--m)}.kind{font-size:11px;padding:1px 6px;border-radius:4px;background:#3a444f;white-space:nowrap}
 .kind.overpower,.kind.overtemp,.kind.offline,.kind.fridge{background:#5a1d1d}.kind.online,.kind.reset,.kind.finished{background:#1d4a2a}
@@ -80,6 +81,12 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
  if(cov){const st={open:'offen',closed:'geschlossen',opening:'öffnet',closing:'schließt',stopped:'gestoppt'}[d.state]||d.state||'';
   ctl=`<div class="v">${esc(st)}${d.pos!=null?' · '+d.pos+' %':''}</div>`+(can?`<div class="row"><button class="bt g" onclick="cmd('${esc(d.id)}','open')">▲ Auf</button><button class="bt g" onclick="cmd('${esc(d.id)}','stop')">■ Stopp</button><button class="bt g" onclick="cmd('${esc(d.id)}','close')">▼ Zu</button></div>
   ${d.pos!=null?`<input type="range" min="0" max="100" value="${d.pos}" onchange="cmd('${esc(d.id)}','pos',+this.value)">`:''}`:'');}
+ if(d.cl){const c=d.cl,id=esc(d.id),t=c.target_C||24;
+  ctl=c.link===false?'<div class="l" style="color:var(--e,#e55)">Klimagerät antwortet nicht</div>':
+  `<div class="l">${d.output?esc(CLM[c.mode]||c.mode||'')+' · Soll '+fmt(t,t%1?1:0,'°C'):'aus'}${c.current_C!=null?' · Raum '+fmt(c.current_C,1,'°C'):''}${c.ext_humidity!=null?' · '+fmt(c.ext_humidity,0,'%'):''} · Lüfter ${esc(CLF[c.fan]||c.fan||'–')}${c.compressor?' · Kompressor läuft':''}</div>`+
+  (can?`<div class="row"><button class="bt g" onclick="cl('${id}',{target_C:${Math.max(16,Math.round(t)-1)}})">−</button><b style="min-width:3.5em;text-align:center">${fmt(t,t%1?1:0,'°C')}</b><button class="bt g" onclick="cl('${id}',{target_C:${Math.min(31,Math.round(t)+1)}})">+</button>
+  <select onchange="cl('${id}',{mode:this.value})">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${c.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+  <select onchange="cl('${id}',{fan:this.value})">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${c.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>`:'');}
  const btn=cov||sen||d.output==null?'':`<button class="sw ${d.output?'on':''} ${w?'wait':''}" ${can?'':'disabled'} onclick="cmd('${esc(d.id)}','toggle')">${w?'…':d.meter_only?'MESS':d.output?'AN':'AUS'}</button>`;
  const tags=[d.appliance?`<span class="tag ${d.appliance.state=='finished'?'g':''}">${esc(d.appliance.label)}</span>`:'',d.fridge_alarm?'<span class="tag r">Kühlgerät-Alarm</span>':''].join('');
  return `<div class="dev ${d.online||sen?'':'off'}"><div><div class="dn">${esc(d.name||d.id)}</div>
@@ -98,7 +105,9 @@ function render(){const ok=S.now-S.last_sync<30;$('stat').className=ok?'':'bad';
  for(const c of S.cmds||[]){if(PEND[c.dev]===c.id&&c.state!='new'&&c.state!='sent'){delete PEND[c.dev];if(c.state=='error')toast(c.result||'Fehler');else if(c.state=='expired')toast('Cloud hat den Befehl nicht abgeholt');else if(c.dev.startsWith('scene:'))toast('Szene ausgeführt',1)}}}
 let busy=false;
 async function load(){if(busy||document.hidden)return;busy=true;try{S=await api('state');$('login').style.display='none';render()}catch(e){if(e.message!='login')$('stat').textContent='Portal nicht erreichbar'}finally{busy=false}}
-async function cmd(dev,act,pos){try{const r=await api('cmd',{dev,act,pos});PEND[dev]=r.id;render();setTimeout(load,800)}catch(e){if(e.message!='login')toast(e.message)}}
+const CLM={cool:'Kühlen',heat:'Heizen',dry:'Entfeuchten',fan:'Lüften',auto:'Automatik'},CLF={auto:'Auto',low:'1',low_mid:'2',mid:'3',mid_high:'4',high:'5'};
+function cl(dev,arg){cmd(dev,'climate',null,arg)}
+async function cmd(dev,act,pos,arg){try{const r=await api('cmd',{dev,act,pos,arg});PEND[dev]=r.id;render();setTimeout(load,800)}catch(e){if(e.message!='login')toast(e.message)}}
 $('lf').onsubmit=async e=>{e.preventDefault();try{await api('login',{password:$('pw').value});$('pw').value='';$('login').style.display='none';load()}catch(x){toast(x.message)}};
 $('lo').onclick=async()=>{await api('logout',{}).catch(()=>{});location.reload()};
 document.querySelectorAll('nav a[data-t]').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a[data-t]').forEach(x=>x.classList.toggle('a',x===a));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('a',t.id==a.dataset.t))});
