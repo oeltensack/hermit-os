@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.18.3
+- ESP32-Klima: Update brach ab, wenn GitHub die Verbindung vor dem letzten Lesen schloss; Firmware-Datei lässt sich zusätzlich im Reiter System hochladen
+
 ## 1.18.2
 - ESP32-Klima: Zustandsrahmen werden auch ohne Richtungsbyte `01 00` / Kennung `04` angenommen (Anlage antwortete, wurde aber verworfen); Diagnose zeigt letzten Rahmen und Rohdaten als Hex, eigenes Echo wird erkannt
 

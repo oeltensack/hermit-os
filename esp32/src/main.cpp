@@ -310,7 +310,8 @@ String updInstall() {
   mbedtls_sha256_context ctx; mbedtls_sha256_init(&ctx); mbedtls_sha256_starts(&ctx, 0);
   WiFiClient* s = http.getStreamPtr();
   uint8_t buf[1024]; int got = 0; uint32_t last = millis();
-  while (http.connected() && (len < 0 || got < len)) {
+  // weiterlesen, solange Daten im Puffer sind – GitHub schliesst die Verbindung oft vor dem letzten Lesen
+  while ((len < 0 || got < len) && (http.connected() || s->available())) {
     int n = s->available();
     if (n > 0) {
       n = s->readBytes(buf, min(n, (int)sizeof buf));
@@ -532,6 +533,18 @@ void setup() {
 
   server.on("/", HTTP_GET, []() { server.sendHeader("Cache-Control", "no-store"); server.send_P(200, "text/html; charset=utf-8", INDEX_HTML); });
   server.on("/rpc", HTTP_POST, handleRpcPost);
+  // Firmware von Hand hochladen (System → Datei)
+  server.on("/update", HTTP_POST, []() {
+    bool ok = !Update.hasError();
+    server.send(ok ? 200 : 500, "text/plain", ok ? "OK – Neustart" : "Fehler " + String(Update.getError()));
+    if (ok) rebootAt = millis() + 1000;
+  }, []() {
+    HTTPUpload& u = server.upload();
+    if (u.status == UPLOAD_FILE_START) Update.begin(UPDATE_SIZE_UNKNOWN);
+    else if (u.status == UPLOAD_FILE_WRITE) Update.write(u.buf, u.currentSize);
+    else if (u.status == UPLOAD_FILE_END) Update.end(true);
+    else if (u.status == UPLOAD_FILE_ABORTED) Update.abort();
+  });
   server.on("/shelly", HTTP_GET, []() { JsonDocument d; deviceInfo(d.to<JsonObject>()); sendJson(200, d); });
   server.onNotFound([]() {
     String u = server.uri();

@@ -58,7 +58,8 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div class="card"><h2>Firmware</h2><div id="fv" class="l"></div>
 <label>Update-Modus</label><select id="u_m"><option value="check">Nur prüfen und anzeigen</option><option value="auto">Automatisch installieren</option><option value="off">Aus</option></select>
 <label>Update-Quelle (update.json)</label><input id="u_u">
-<div class="row"><button class="bt" onclick="saveU()">Speichern</button><button class="bt" onclick="chk()">Jetzt prüfen</button><button class="bt p" id="ui" style="display:none" onclick="inst()">Installieren</button><button class="bt" onclick="if(confirm('Neu starten?'))rpc('Shelly.Reboot')">Neu starten</button></div></div></section>
+<div class="row"><button class="bt" onclick="saveU()">Speichern</button><button class="bt" onclick="chk()">Jetzt prüfen</button><button class="bt p" id="ui" style="display:none" onclick="inst()">Installieren</button><button class="bt" onclick="if(confirm('Neu starten?'))rpc('Shelly.Reboot')">Neu starten</button></div>
+<label>Firmware-Datei hochladen (hermit-tclac-esp32.bin)</label><input type="file" id="u_f" accept=".bin"><div class="row"><button class="bt" onclick="upl()">Hochladen</button></div></div></section>
 </main><div id="toast"></div>
 <script>
 const $=i=>document.getElementById(i);
@@ -99,6 +100,8 @@ function saveQ(){const c={enable:$('q_e').checked,server:$('q_s').value,user:$('
 function saveS(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('s_n').value}}});await rpc('Climate.SetConfig',{config:{beep:$('s_b').checked}});await rpc('Temperature.SetConfig',{config:{offset_C:+$('s_o').value||0}});await cfg()},'Gespeichert')}
 function saveU(){run(()=>rpc('Sys.SetConfig',{config:{update:{mode:$('u_m').value,url:$('u_u').value}}}),'Gespeichert')}
 function chk(){run(async()=>{const r=await rpc('Shelly.CheckForUpdate');await load();toast(r.stable?'Neu: '+r.stable.version:'Firmware ist aktuell',1)})}
+function upl(){const f=$('u_f').files[0];if(!f)return toast('Datei wählen');const fd=new FormData();fd.append('f',f);toast('Lade hoch …',1);
+ fetch('/update',{method:'POST',body:fd}).then(r=>r.text().then(t=>toast(t,r.ok))).catch(e=>toast(e.message))}
 function inst(){if(confirm('Update installieren? Das Gerät startet danach neu.'))run(()=>rpc('Shelly.Update'),'Update läuft …')}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('a',x===a));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('a',t.id==a.dataset.t));if(a.dataset.t=='w'&&!$('w_s').options.length)scan()});
 cfg().then(load);setInterval(load,3000);
