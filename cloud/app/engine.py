@@ -165,12 +165,39 @@ def resolve(target):
 
 def target_label(target):
     kind, _, val = (target or "").partition(":")
+    if kind == "scene":
+        r = q("SELECT name FROM scenes WHERE id=?", (int(val or 0),), one=True)
+        return f"Szene {r['name'] if r else val}"
     return f"Raum {val}" if kind == "room" else dev_name(val)
 
 
+def run_scene(sid):
+    """Szene ausfuehren: alle Aktionen gleichzeitig. Liefert Fehlerliste."""
+    r = q("SELECT * FROM scenes WHERE id=?", (int(sid),), one=True)
+    if not r:
+        return [f"Szene {sid} gibt es nicht"]
+    q("UPDATE scenes SET last_run=? WHERE id=?", (time.time(), r["id"]))
+    acts = [a for a in json.loads(r["actions"] or "[]") if not str(a.get("target", "")).startswith("scene:")]
+    errs, lock = [], threading.Lock()
+
+    def one(a):
+        e = do_switch(a.get("target"), a.get("mode") or "on")
+        with lock:
+            errs.extend(e)
+    th = [threading.Thread(target=one, args=(a,), daemon=True) for a in acts]
+    for t in th:
+        t.start()
+    for t in th:
+        t.join(30)
+    return errs
+
+
 def do_switch(target, mode):
-    """mode: 'on' | 'off' | 'toggle' | 'pos:NN' (Rollladen). Liefert Fehlerliste."""
+    """mode: 'on' | 'off' | 'toggle' | 'pos:NN' (Rollladen). Ziel scene:ID fuehrt die Szene aus.
+    Liefert Fehlerliste."""
     import shade
+    if (target or "").startswith("scene:"):
+        return run_scene(int(target[6:] or 0))
     errs = []
     for dev in resolve(target):
         try:
@@ -291,7 +318,7 @@ def _run_step(name, step, why):
             errs = do_switch(step.get("target"), mode)
             if errs:
                 alert("cloud", "rule", f"Regel „{name}“: " + "; ".join(errs))
-            if mode == "on" and float(step.get("auto_off_s") or 0) > 0:
+            if mode == "on" and float(step.get("auto_off_s") or 0) > 0 and not str(step.get("target")).startswith("scene:"):
                 threading.Timer(float(step["auto_off_s"]), do_switch, args=(step.get("target"), "off")).start()
         elif step.get("type") == "notify":
             text = step.get("text") or f"Regel „{name}“ ausgelöst"

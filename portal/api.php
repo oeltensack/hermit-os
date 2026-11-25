@@ -22,6 +22,7 @@ if ($a === 'sync') {
     kv_set('last_sync', $now);
     if (isset($in['cloud'])) kv_set('cloud', $in['cloud']);
     if (isset($in['devices']) && is_array($in['devices'])) kv_set('devices', $in['devices']);
+    if (isset($in['scenes']) && is_array($in['scenes'])) kv_set('scenes', $in['scenes']);
     if (!empty($in['alerts_reset'])) $db->exec('DELETE FROM alerts');
     if (isset($in['alerts']) && is_array($in['alerts'])) {
         $ins = $db->prepare('INSERT OR REPLACE INTO alerts(id, ts, dev, name, kind, text, ack) VALUES(?,?,?,?,?,?,?)');
@@ -90,7 +91,7 @@ if ($a === 'state') {
     $cmds = db()->prepare('SELECT id, dev, act, state, result FROM cmds WHERE ts>? ORDER BY id DESC LIMIT 20');
     $cmds->execute([$now - 120]);
     out(['now' => $now, 'last_sync' => kv_get('last_sync', 0), 'cloud' => kv_get('cloud', []),
-         'devices' => kv_get('devices', []), 'alerts' => $alerts, 'cmds' => $cmds->fetchAll(),
+         'devices' => kv_get('devices', []), 'scenes' => kv_get('scenes', []), 'alerts' => $alerts, 'cmds' => $cmds->fetchAll(),
          'read_only' => READ_ONLY]);
 }
 
@@ -99,13 +100,15 @@ if ($a === 'cmd' && $post) {
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $dev = (string)($in['dev'] ?? '');
     $act = (string)($in['act'] ?? '');
-    if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos'], true)) out(['error' => 'Unbekannte Aktion'], 400);
-    $known = array_column(kv_get('devices', []), 'id');
+    if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos', 'scene'], true)) out(['error' => 'Unbekannte Aktion'], 400);
+    $known = $act === 'scene' ? array_map(fn($x) => 'scene:' . $x['id'], kv_get('scenes', []))
+                              : array_column(kv_get('devices', []), 'id');
     if (!in_array($dev, $known, true)) out(['error' => 'Unbekanntes Gerät'], 400);
     $pos = $act === 'pos' ? max(0, min(100, (int)($in['pos'] ?? 0))) : null;
     db()->prepare('INSERT INTO cmds(ts, dev, act, pos) VALUES(?,?,?,?)')->execute([microtime(true), $dev, $act, $pos]);
+    $id = (int)db()->lastInsertId();
     kv_set('last_view', microtime(true));
-    out(['ok' => true, 'id' => (int)db()->lastInsertId()]);
+    out(['ok' => true, 'id' => $id]);
 }
 
 out(['error' => 'Unbekannt'], 404);

@@ -4,7 +4,8 @@ Kleine PHP-Seite für ein normales Webhosting-Paket (z. B. netcup Webhosting). D
 meldet sich dort von sich aus per HTTPS: Sie überträgt Gerätezustand und Meldungen und holt die im Portal
 ausgelösten Befehle ab. Zu Hause muss **kein Port** geöffnet werden, es braucht keinen VPN-Tunnel.
 
-Im Portal: Geräte nach Räumen, Schalten, Rollläden (Auf/Stopp/Zu/Position), Fühlerwerte, Meldungen.
+Im Portal: Szenen, Geräte nach Räumen, Schalten, Rollläden (Auf/Stopp/Zu/Position), Fühlerwerte,
+Leistung jetzt und Energie heute, Meldungen.
 Einrichten, Regeln, Energieverlauf usw. bleiben in der Cloud zu Hause.
 
 ## Voraussetzungen
@@ -25,8 +26,12 @@ Einrichten, Regeln, Energieverlauf usw. bleiben in der Cloud zu Hause.
    vom Web aus gesperrt; `https://…/pagurus/data/portal.sqlite` muss „403“ liefern – einmal prüfen.
 4. In der Pagurus Cloud: *Einstellungen → Fernzugang-Portal* → Adresse (`https://deine-domain.de/pagurus/`)
    und denselben Schlüssel eintragen, speichern. Nach wenigen Sekunden steht dort „verbunden“.
-5. `https://deine-domain.de/pagurus/` aufrufen und anmelden. Lässt sich auch als App auf den
-   Startbildschirm legen.
+5. `https://deine-domain.de/pagurus/` aufrufen und anmelden.
+
+**Als App:** Android/Chrome: Menü → „App installieren“ bzw. „Zum Startbildschirm“. iPhone/Safari: Teilen →
+„Zum Home-Bildschirm“. Das Portal startet dann im Vollbild mit eigenem Symbol.
+
+**Update des Portals:** neue Dateien hochladen und überschreiben – `config.php` und `data/` bleiben.
 
 ## Wie es läuft
 

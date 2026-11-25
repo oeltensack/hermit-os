@@ -571,9 +571,57 @@ def fridge_delete(dev: str, request: Request):
 
 
 # ======================= Zeitplaene + Regeln =======================
-def _target_ok(t):
-    if not t or t.partition(":")[0] not in ("dev", "room") or not t.partition(":")[2]:
+def _target_ok(t, scene=True):
+    if not t or t.partition(":")[0] not in (("dev", "room", "scene") if scene else ("dev", "room")) \
+            or not t.partition(":")[2]:
         raise HTTPException(400, "Ziel fehlt")
+
+
+# ======================= Szenen =======================
+@app.get("/api/scenes")
+def scenes():
+    out = []
+    for r in q("SELECT * FROM scenes ORDER BY sort, name COLLATE NOCASE"):
+        d = dict(r)
+        d["actions"] = json.loads(r["actions"] or "[]")
+        out.append(d)
+    return out
+
+
+@app.post("/api/scenes")
+async def scene_save(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    name = str(d.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Name fehlt")
+    acts = []
+    for a in d.get("actions") or []:
+        _target_ok(a.get("target"), scene=False)
+        m = str(a.get("mode") or "on")
+        if m not in ("on", "off", "toggle") and not (m.startswith("pos:") and m[4:].isdigit() and int(m[4:]) <= 100):
+            raise HTTPException(400, "Aktion fehlt")
+        acts.append({"target": a["target"], "mode": m})
+    if not acts:
+        raise HTTPException(400, "Mindestens eine Aktion")
+    vals = (name, int(d.get("sort") or 0), json.dumps(acts))
+    if d.get("id"):
+        q("UPDATE scenes SET name=?, sort=?, actions=? WHERE id=?", vals + (int(d["id"]),))
+        return {"id": int(d["id"])}
+    return {"id": qid("INSERT INTO scenes(name, sort, actions) VALUES(?,?,?)", vals)}
+
+
+@app.delete("/api/scenes/{sid}")
+def scene_delete(sid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM scenes WHERE id=?", (sid,))
+    return {"ok": True}
+
+
+@app.post("/api/scenes/{sid}/run")
+async def scene_run(sid: int, request: Request):
+    need(request, "user")
+    return {"errors": await asyncio.to_thread(engine.run_scene, sid)}
 
 
 @app.get("/api/schedules")
@@ -597,7 +645,9 @@ async def schedule_save(request: Request):
     d = await request.json()
     _target_ok(d.get("target"))
     act = str(d.get("action") or "")
-    if act not in ("on", "off", "toggle") and not (act.startswith("pos:") and act[4:].isdigit() and int(act[4:]) <= 100):
+    if d["target"].startswith("scene:"):
+        d["action"] = act = "run"
+    if act not in ("on", "off", "toggle", "run") and not (act.startswith("pos:") and act[4:].isdigit() and int(act[4:]) <= 100):
         raise HTTPException(400, "Aktion fehlt")
     try:
         engine.sched_time(d.get("time"), now_local().date())

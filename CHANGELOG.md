@@ -1,5 +1,13 @@
 # Änderungen
 
+## Pagurus Cloud 1.10.0 / Pagurus Portal 1.1
+- **Szenen:** mehrere Geräte/Räume/Rollläden mit einem Klick („Gute Nacht“: alles aus, Rollläden zu).
+  Anlegen unter *Automatik → Szenen*; Tasten oben in der Geräteübersicht; Szenen sind Ziel in Zeitplänen
+  und Regeln. Alle Aktionen einer Szene laufen gleichzeitig
+- Portal: Szenen-Tasten, Leistung jetzt und Energie heute oben, als App installierbar
+  (Startbildschirm, Vollbild, Symbol)
+- Portal: Fehler behoben – nach einem Befehl blieb der Schaltknopf auf „…“ stehen (falsche Befehlsnummer)
+
 ## Pagurus Cloud 1.9.0 / Pagurus Portal 1.0
 - **Pagurus Portal** (neu, Ordner `portal/`): Fernzugang als PHP-Seite für ein normales Webhosting.
   Die Cloud meldet sich dort von sich aus per HTTPS (kein offener Port, kein VPN), überträgt Geräte und

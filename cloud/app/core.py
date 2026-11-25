@@ -81,6 +81,8 @@ def init_db():
       days INTEGER DEFAULT 127, time TEXT, target TEXT, action TEXT, last_run TEXT);
     CREATE TABLE IF NOT EXISTS rules(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, enabled INTEGER DEFAULT 1,
       trig TEXT, action TEXT, last_fire REAL, active INTEGER DEFAULT 0, token TEXT);
+    CREATE TABLE IF NOT EXISTS scenes(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, sort INTEGER DEFAULT 0,
+      actions TEXT, last_run REAL);
     CREATE TABLE IF NOT EXISTS fridges(dev TEXT PRIMARY KEY, type TEXT, label TEXT, on_w REAL, max_run_min INTEGER,
       max_off_min INTEGER, dev_pct INTEGER, state TEXT, since REAL, alarm_run INTEGER DEFAULT 0,
       alarm_off INTEGER DEFAULT 0, last_dev_check TEXT);

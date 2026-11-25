@@ -8,6 +8,8 @@ header('Referrer-Policy: no-referrer');
 ?><!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Pagurus Portal</title>
 <meta name="theme-color" content="#1a2129"><meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Pagurus">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
 :root{--bg:#0f1419;--c:#1a2129;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--off:#56606b;--e:#f85149;--w:#d29922;--b:#2a333c}
@@ -46,7 +48,7 @@ tr.ack{color:var(--m)}.kind{font-size:11px;padding:1px 6px;border-radius:4px;bac
 <button class="bt" type="submit">Anmelden</button></form></div></div>
 <header><h1>Pagurus</h1><nav><a data-t="dv" class="a">Geräte</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a id="lo">Abmelden</a></nav>
 <div id="stat"></div></header>
-<main><section class="tab a" id="dv"><div id="devs"><div class="empty">Lade …</div></div></section>
+<main><section class="tab a" id="dv"><div id="sum" class="kv card" style="grid-template-columns:repeat(2,max-content);gap:6px 28px;padding:12px 16px"></div><div id="scbar" class="row" style="margin:6px 0 2px"></div><div id="devs"><div class="empty">Lade …</div></div></section>
 <section class="tab" id="al"><div class="card"><table id="atab"></table></div></section></main>
 <div id="toast"></div>
 <script>
@@ -82,13 +84,15 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
  ${tags?`<div class="row">${tags}</div>`:''}<div class="dv">${btn}<div class="kv">${kv}</div></div>${ctl}</div>`}
 function render(){const ok=S.now-S.last_sync<30;$('stat').className=ok?'':'bad';
  $('stat').textContent=S.last_sync?(ok?'Cloud verbunden':'Cloud nicht erreichbar seit '+ago(S.last_sync))+(S.read_only?' · nur Anzeige':''):'Cloud hat sich noch nicht gemeldet';
- const D=S.devices||[];if(!D.length){$('devs').innerHTML='<div class="empty">Noch keine Geräte – die Pagurus Cloud hat noch nichts übertragen.</div>';}
+ $('scbar').innerHTML=S.read_only?'':(S.scenes||[]).map(x=>`<button class="bt g" onclick="cmd('scene:${x.id}','scene')">${esc(x.name)}</button>`).join('');
+ const D=S.devices||[];{const pw=D.reduce((t,d)=>t+(d.apower||0),0),wh=D.reduce((t,d)=>t+(d.wh||0),0);$('sum').innerHTML=D.length?`<div><div class="v">${fmt(pw,0,'W')}</div><div class="l">Leistung jetzt</div></div><div><div class="v">${fmt(wh/1000,2,'kWh')}</div><div class="l">heute</div></div>`:''}
+ if(!D.length){$('devs').innerHTML='<div class="empty">Noch keine Geräte – die Pagurus Cloud hat noch nichts übertragen.</div>';}
  else{const g={};D.forEach(d=>(g[d.room||'']=g[d.room||'']||[]).push(d));
   const ks=Object.keys(g).sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
   $('devs').innerHTML=ks.map(k=>`<h3>${k?esc(k):(ks.length>1?'Ohne Raum':'Alle Geräte')} <span class="l">${g[k].length}</span></h3><div class="devs">${g[k].map(card).join('')}</div>`).join('');}
  const A=S.alerts||[],n=A.filter(x=>!x.ack&&!QUIET.includes(x.kind)).length;$('nb').textContent=n;$('nb').style.display=n?'':'none';
  $('atab').innerHTML=A.length?A.map(x=>`<tr class="${x.ack?'ack':''}"><td style="white-space:nowrap">${new Date(x.ts*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td><span class="kind ${esc(x.kind)}">${esc(KIND[x.kind]||x.kind)}</span></td><td><b>${esc(x.name||x.dev)}</b><br>${esc(x.text)}</td></tr>`).join(''):'<tr><td class="empty">Keine Meldungen</td></tr>';
- for(const c of S.cmds||[]){if(PEND[c.dev]===c.id&&c.state!='new'&&c.state!='sent'){delete PEND[c.dev];if(c.state=='error')toast(c.result||'Fehler');else if(c.state=='expired')toast('Cloud hat den Befehl nicht abgeholt')}}}
+ for(const c of S.cmds||[]){if(PEND[c.dev]===c.id&&c.state!='new'&&c.state!='sent'){delete PEND[c.dev];if(c.state=='error')toast(c.result||'Fehler');else if(c.state=='expired')toast('Cloud hat den Befehl nicht abgeholt');else if(c.dev.startsWith('scene:'))toast('Szene ausgeführt',1)}}}
 let busy=false;
 async function load(){if(busy||document.hidden)return;busy=true;try{S=await api('state');$('login').style.display='none';render()}catch(e){if(e.message!='login')$('stat').textContent='Portal nicht erreichbar'}finally{busy=false}}
 async function cmd(dev,act,pos){try{const r=await api('cmd',{dev,act,pos});PEND[dev]=r.id;render();setTimeout(load,800)}catch(e){if(e.message!='login')toast(e.message)}}

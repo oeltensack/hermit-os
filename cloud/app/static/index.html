@@ -72,7 +72,7 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 <nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
-<section class="tab a" id="dv"><div id="devs"></div></section>
+<section class="tab a" id="dv"><div id="scbar" class="row user-only" style="margin:6px 0 2px"></div><div id="devs"></div></section>
 
 <section class="tab" id="wa">
 <div class="row sp"><h3 style="margin:8px 0">Waschmaschine &amp; Trockner</h3><div class="row"><a class="lk" href="/api/export/runs.csv">Läufe als CSV</a><button class="bt admin-only" onclick="appDlg()">Gerät hinzufügen</button></div></div>
@@ -121,6 +121,7 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 </section>
 
 <section class="tab" id="au">
+<div class="card"><div class="row sp"><h2 style="margin:0">Szenen</h2><button class="bt admin-only" onclick="scnDlg()">Szene anlegen</button></div><p class="l">Mehrere Geräte mit einem Klick – auch als Ziel in Zeitplänen und Regeln, im Portal und für Sprachsteuerung.</p><div class="scroll"><table id="scntab" style="margin-top:8px"></table></div></div>
 <div class="card"><div class="row sp"><h2 style="margin:0">Zeitpläne</h2><button class="bt admin-only" onclick="schDlg()">Zeitplan anlegen</button></div><div class="scroll"><table id="stab" style="margin-top:8px"></table></div></div>
 <div class="card"><div class="row sp"><h2 style="margin:0">Regeln (Wenn – Dann)</h2><button class="bt admin-only" onclick="ruleDlg()">Regel anlegen</button></div><div class="scroll"><table id="ltab" style="margin-top:8px"></table></div></div>
 </section>
@@ -218,9 +219,11 @@ document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>{document.querySele
 function dlg(html){const d=$('dlg');d.innerHTML=html;d.showModal();return d}
 function closeDlg(){$('dlg').close()}
 function devOpts(sel,filter){return DEVS.filter(filter||(()=>true)).map(d=>`<option value="${esc(d.id)}" ${d.id==sel?'selected':''}>${esc(d.name||d.id)}${d.room?' · '+esc(d.room):''}</option>`).join('')}
-function targetOpts(sel){const rooms=[...new Set(DEVS.map(d=>d.room).filter(Boolean))];
+let SCN=[];
+function targetOpts(sel,scn){const rooms=[...new Set(DEVS.map(d=>d.room).filter(Boolean))];
 return '<optgroup label="Geräte">'+DEVS.filter(d=>!d.status.meter_only&&('output' in d.status||(d.comp||'').startsWith('cover:'))).map(d=>`<option value="dev:${esc(d.id)}" ${sel=='dev:'+d.id?'selected':''}>${esc(d.name||d.id)}${(d.comp||'').startsWith('cover:')?' (Rollladen)':''}</option>`).join('')+'</optgroup>'+
-(rooms.length?'<optgroup label="Räume">'+rooms.map(r=>`<option value="room:${esc(r)}" ${sel=='room:'+r?'selected':''}>Raum ${esc(r)}</option>`).join('')+'</optgroup>':'')}
+(rooms.length?'<optgroup label="Räume">'+rooms.map(r=>`<option value="room:${esc(r)}" ${sel=='room:'+r?'selected':''}>Raum ${esc(r)}</option>`).join('')+'</optgroup>':'')+
+(scn&&SCN.length?'<optgroup label="Szenen">'+SCN.map(x=>`<option value="scene:${x.id}" ${sel=='scene:'+x.id?'selected':''}>Szene ${esc(x.name)}</option>`).join('')+'</optgroup>':'')}
 const DAYN=['Mo','Di','Mi','Do','Fr','Sa','So'];
 function daysHtml(mask,id){return `<div class="days" id="${id}">`+DAYN.map((n,i)=>`<label><input type="checkbox" value="${i}" ${(mask>>i)&1?'checked':''}>${n}</label>`).join('')+'</div>'}
 function daysVal(id){let m=0;document.querySelectorAll('#'+id+' input:checked').forEach(c=>m|=1<<+c.value);return m}
@@ -252,6 +255,7 @@ ${s.brightness!=null&&d.online&&canSw()?`<input type="range" class="bri" min="1"
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur',stm_no_response:'Dimmer-Chip antwortet nicht',pm_no_response:'Messchip antwortet nicht',obstruction:'Hindernis'}[e]||e)).join(', ')}</div>`:''}
 <div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
 async function loadDevs(){DEVS=await api('devices');if(TAB!='dv')return;
+SCN=await api('scenes');$('scbar').innerHTML=SCN.map(x=>`<button class="bt g" onclick="scnRun(${x.id},this)">${esc(x.name)}</button>`).join('');
 const groups={};DEVS.forEach(d=>(groups[d.room||'']=groups[d.room||'']||[]).push(d));
 const keys=Object.keys(groups).sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
 $('devs').innerHTML=DEVS.length?keys.map(k=>{const g=groups[k];
@@ -448,16 +452,19 @@ $('btab').innerHTML=b.devices.length?'<tr><th>Gerät</th><th class="n">Grundlast
 
 // ---------- Automatik ----------
 const ACT={on:'einschalten (Rollladen: öffnen)',off:'ausschalten (Rollladen: schließen)',toggle:'umschalten',pos:'Rollladen auf Position'};
-const actName=a=>a&&a.startsWith('pos:')?'Rollladen auf '+a.slice(4)+' %':ACT[a]||a;
+const actName=a=>a&&a.startsWith('pos:')?'Rollladen auf '+a.slice(4)+' %':a=='run'?'ausführen':ACT[a]||a;
 const timeTxt=t=>t.startsWith('sunrise')?'Sonnenaufgang'+(t.slice(7)?' '+t.slice(7)+' min':''):t.startsWith('sunset')?'Sonnenuntergang'+(t.slice(6)?' '+t.slice(6)+' min':''):t;
-async function loadAuto(){const S=await api('schedules');window._S=S;
+async function loadAuto(){SCN=await api('scenes');
+$('scntab').innerHTML=SCN.length?'<tr><th>Szene</th><th>Was</th><th></th></tr>'+SCN.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${x.actions.map(a=>esc(a.target.startsWith('room:')?'Raum '+a.target.slice(5):devName(a.target.slice(4)))+' '+esc(actName(a.mode))).join('<br>')}</td><td class="n" style="white-space:nowrap"><a class="lk user-only" onclick="scnRun(${x.id})">Ausführen</a> <a class="lk admin-only" onclick="scnDlg(${x.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Noch keine Szenen.</td></tr>';
+const S=await api('schedules');window._S=S;
 $('stab').innerHTML=S.length?'<tr><th>Name</th><th>Wann</th><th>Was</th><th class="admin-only"></th></tr>'+S.map(s=>`<tr class="${s.enabled?'':'ack'}"><td>${esc(s.name||'–')}${s.enabled?'':' <span class="tag">aus</span>'}</td><td>${daysTxt(s.days)}, ${esc(timeTxt(s.time))}${s.today&&s.today!=s.time?` <span class="l">(heute ${s.today})</span>`:''}</td><td>${esc(s.target_label)} ${actName(s.action)}</td><td class="n admin-only"><a class="lk" onclick="schDlg(${s.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Zeitpläne.</td></tr>';
 const R=await api('rules');window._R=R;
 $('ltab').innerHTML=R.length?'<tr><th>Name</th><th>Wenn</th><th>Dann</th><th>Zuletzt</th><th class="admin-only"></th></tr>'+R.map(r=>`<tr class="${r.enabled?'':'ack'}"><td>${esc(r.name)}${r.enabled?'':' <span class="tag">aus</span>'}</td><td>${trigTxt(r.trig)}${r.hook_url?`<br><code>${esc(r.hook_url)}</code>`:''}</td><td>${r.action.map(actTxt).join('<br>')}</td><td>${r.last_fire?dt(r.last_fire):'–'}</td><td class="n admin-only" style="white-space:nowrap"><a class="lk" onclick="ruleRun(${r.id})">Test</a> · <a class="lk" onclick="ruleDlg(${r.id})">Bearbeiten</a></td></tr>`).join(''):'<tr><td class="empty">Keine Regeln.</td></tr>'}
 const TRIG={power:'Leistung',switch:'Schalter',event:'Ereignis am Gerät',offline:'Gerät geht offline',online:'Gerät kommt online',finished:'Gerät fertig (Fertig-Erkennung)',started:'Gerät startet (Fertig-Erkennung)',webhook:'URL-Aufruf (z. B. Tür-/Fensterkontakt)'};
 function trigTxt(t){const n=t.dev?esc(devName(t.dev)):'';let s={power:`${n}: Leistung ${t.op=='<'?'unter':'über'} ${fmt(t.w,0,'W')}${t.for_s?` für ${dur(t.for_s)}`:''}`,switch:`${n} wird ${t.state=='off'?'ausgeschaltet':'eingeschaltet'}`,event:`${n}: Ereignis „${esc(t.event)}“`,offline:`${n} geht offline`,online:`${n} kommt online`,finished:`${n} ist fertig`,started:`${n} startet`,webhook:'URL wird aufgerufen'}[t.type]||esc(t.type);
 if(t.window&&t.window.from)s+=` <span class="l">(${t.window.from}–${t.window.to})</span>`;if(t.days!=null&&t.days!=127)s+=` <span class="l">${daysTxt(t.days)}</span>`;return s}
-function actTxt(a){if(a.type=='notify')return `Push: „${esc(a.text||'')}“`;const tl=(a.target||'').startsWith('room:')?'Raum '+esc(a.target.slice(5)):esc(devName((a.target||'').slice(4)));
+function actTxt(a){if(a.type=='notify')return `Push: „${esc(a.text||'')}“`;const sc=(a.target||'').startsWith('scene:');if(sc){const x=SCN.find(y=>'scene:'+y.id==a.target);return `Szene ${esc(x?x.name:a.target.slice(6))} ausführen${a.delay_s?` nach ${dur(a.delay_s)}`:''}`}
+const tl=(a.target||'').startsWith('room:')?'Raum '+esc(a.target.slice(5)):esc(devName((a.target||'').slice(4)));
 return `${tl} ${esc(actName(a.mode))}${a.delay_s?` nach ${dur(a.delay_s)}`:''}${a.auto_off_s?`, nach ${dur(a.auto_off_s)} wieder aus`:''}`}
 function schDlg(id){const s=(window._S||[]).find(x=>x.id==id)||{name:'',enabled:1,days:127,time:'07:00',target:'',action:'on'};
 const sun=s.time.startsWith('sun'),kind=sun?(s.time.startsWith('sunrise')?'sunrise':'sunset'):'time',off=sun?(s.time.slice(kind.length)||'0'):'0';
@@ -465,18 +472,27 @@ dlg(`<h2>${id?'Zeitplan bearbeiten':'Neuer Zeitplan'}</h2><div class="f"><label>
 <label>Tage</label>${daysHtml(s.days,'sc_d')}
 <label>Zeit</label><div class="row"><select id="sc_k"><option value="time">Uhrzeit</option><option value="sunrise" ${kind=='sunrise'?'selected':''}>Sonnenaufgang</option><option value="sunset" ${kind=='sunset'?'selected':''}>Sonnenuntergang</option></select>
 <input id="sc_t" type="time" value="${sun?'07:00':esc(s.time)}" style="${sun?'display:none':''}"><span id="sc_ow" style="${sun?'':'display:none'}">± <input id="sc_o" style="width:60px" value="${off}"> min</span></div>
-<label>Ziel</label><select id="sc_g">${targetOpts(s.target)}</select>
-<label>Aktion</label><div class="row"><select id="sc_a" onchange="$('sc_pw').style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==s.action||(k=='pos'&&s.action.startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select>
-<span id="sc_pw" style="${s.action.startsWith('pos:')?'':'display:none'}"><input id="sc_p" style="width:60px" inputmode="numeric" value="${s.action.startsWith('pos:')?s.action.slice(4):'30'}"> % offen</span></div>
+<label>Ziel</label><select id="sc_g" onchange="$('sc_aw').style.display=this.value.startsWith('scene:')?'none':''">${targetOpts(s.target,1)}</select>
+<div id="sc_aw" style="display:${(s.target||'').startsWith('scene:')?'none':'contents'}"><label>Aktion</label><div class="row"><select id="sc_a" onchange="$('sc_pw').style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==s.action||(k=='pos'&&s.action.startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select>
+<span id="sc_pw" style="${s.action.startsWith('pos:')?'':'display:none'}"><input id="sc_p" style="width:60px" inputmode="numeric" value="${s.action.startsWith('pos:')?s.action.slice(4):'30'}"> % offen</span></div></div>
 <label>Aktiv</label><div><input type="checkbox" id="sc_e" ${s.enabled?'checked':''}></div></div>
 <p class="l">Sonnenzeiten brauchen den Standort unter Einstellungen.</p>
 <div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="schDel(${id})">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="schSave(${id||0})">Speichern</button></div></div>`);
 $('sc_k').onchange=()=>{const t=$('sc_k').value=='time';$('sc_t').style.display=t?'':'none';$('sc_ow').style.display=t?'none':''}}
 function schSave(id){const k=$('sc_k').value,o=parseInt($('sc_o').value||'0')||0;const time=k=='time'?$('sc_t').value:k+(o?(o>0?'+':'')+o:'');
 run(async()=>{await api('schedules',{method:'POST',body:{id,name:$('sc_n').value,days:daysVal('sc_d'),time,target:$('sc_g').value,action:$('sc_a').value=='pos'?'pos:'+Math.max(0,Math.min(100,parseInt($('sc_p').value)||0)):$('sc_a').value,enabled:$('sc_e').checked}});closeDlg();await loadAuto()},'Gespeichert')}
+function scnRun(id,b){if(b)b.disabled=true;run(async()=>{const r=await api('scenes/'+id+'/run',{method:'POST'});if(r.errors.length)toast(r.errors.join('; '));setTimeout(loadDevs,800)},'Szene ausgeführt').finally(()=>{if(b)b.disabled=false})}
+function scnRow(a){return `<div class="row" data-sa style="margin:6px 0"><select class="sa_g" style="flex:1">${targetOpts(a.target)}</select><select class="sa_m" onchange="this.nextElementSibling.style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==(a.mode||'on')||(k=='pos'&&(a.mode||'').startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select><span style="${(a.mode||'').startsWith('pos:')?'':'display:none'}"><input class="sa_p" style="width:56px" inputmode="numeric" value="${(a.mode||'').startsWith('pos:')?a.mode.slice(4):'30'}"> %</span><a class="lk" onclick="this.closest('[data-sa]').remove()">entfernen</a></div>`}
+function scnDlg(id){const x=SCN.find(y=>y.id==id)||{name:'',sort:0,actions:[{target:'',mode:'off'}]};
+dlg(`<h2>${id?'Szene bearbeiten':'Neue Szene'}</h2><div class="f"><label>Name</label><input id="sn_n" value="${esc(x.name)}" placeholder="z. B. Gute Nacht"><label>Reihenfolge</label><input id="sn_s" style="width:80px" inputmode="numeric" value="${x.sort||0}"></div>
+<h3>Aktionen</h3><div id="sn_a">${x.actions.map(scnRow).join('')}</div><a class="lk" onclick="$('sn_a').insertAdjacentHTML('beforeend',scnRow({mode:'on'}))">+ weitere Aktion</a>
+<div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="scnDel(${id})">Löschen</button>`:''}</div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="scnSave(${id||0})">Speichern</button></div></div>`)}
+function scnSave(id){const actions=[...document.querySelectorAll('#sn_a [data-sa]')].map(el=>({target:el.querySelector('.sa_g').value,mode:el.querySelector('.sa_m').value=='pos'?'pos:'+Math.max(0,Math.min(100,parseInt(el.querySelector('.sa_p').value)||0)):el.querySelector('.sa_m').value}));
+run(async()=>{await api('scenes',{method:'POST',body:{id,name:$('sn_n').value,sort:parseInt($('sn_s').value)||0,actions}});closeDlg();await loadAuto()},'Gespeichert')}
+function scnDel(id){if(!confirm('Szene löschen? Zeitpläne und Regeln mit dieser Szene laufen dann ins Leere.'))return;run(async()=>{await api('scenes/'+id,{method:'DELETE'});closeDlg();await loadAuto()})}
 function schDel(id){if(!confirm('Zeitplan löschen?'))return;run(async()=>{await api('schedules/'+id,{method:'DELETE'});closeDlg();await loadAuto()})}
 function stepHtml(a){return `<div class="card" style="background:var(--c2);margin:8px 0;padding:10px" data-step><div class="row sp"><select class="st_t"><option value="switch" ${a.type!='notify'?'selected':''}>Schalten</option><option value="notify" ${a.type=='notify'?'selected':''}>Push-Nachricht</option></select><a class="lk" onclick="this.closest('[data-step]').remove()">entfernen</a></div>
-<div class="st_sw" style="margin-top:8px;${a.type=='notify'?'display:none':''}"><div class="row"><select class="st_g">${targetOpts(a.target)}</select><select class="st_m" onchange="this.nextElementSibling.style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==(a.mode||'on')||(k=='pos'&&(a.mode||'').startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select><span style="${(a.mode||'').startsWith('pos:')?'':'display:none'}"><input class="st_p" style="width:56px" inputmode="numeric" value="${(a.mode||'').startsWith('pos:')?a.mode.slice(4):'30'}"> %</span></div>
+<div class="st_sw" style="margin-top:8px;${a.type=='notify'?'display:none':''}"><div class="row"><select class="st_g">${targetOpts(a.target,1)}</select><select class="st_m" onchange="this.nextElementSibling.style.display=this.value=='pos'?'':'none'">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${(k==(a.mode||'on')||(k=='pos'&&(a.mode||'').startsWith('pos:')))?'selected':''}>${v}</option>`).join('')}</select><span style="${(a.mode||'').startsWith('pos:')?'':'display:none'}"><input class="st_p" style="width:56px" inputmode="numeric" value="${(a.mode||'').startsWith('pos:')?a.mode.slice(4):'30'}"> %</span></div>
 <div class="row" style="margin-top:6px"><span class="l">nach</span><input class="st_dl" style="width:60px" value="${(a.delay_s||0)/60}"><span class="l">min · bei „einschalten“ wieder aus nach</span><input class="st_ao" style="width:60px" value="${(a.auto_off_s||0)/60}"><span class="l">min (0 = nie)</span></div></div>
 <div class="st_nt" style="margin-top:8px;${a.type=='notify'?'':'display:none'}"><input class="st_x" style="width:100%" value="${esc(a.text||'')}" placeholder="Text – {why} wird durch den Auslöser ersetzt"></div></div>`}
 function ruleDlg(id){const r=(window._R||[]).find(x=>x.id==id)||{name:'',enabled:1,trig:{type:'power',op:'>',w:100,for_s:0},action:[{type:'switch',mode:'off'}]};const t=r.trig,w=t.window||{};

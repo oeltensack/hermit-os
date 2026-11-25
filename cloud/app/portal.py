@@ -61,7 +61,9 @@ def _run(c):
     from bus import BUS
     dev, act = c.get("dev", ""), c.get("act", "")
     try:
-        if act == "stop":
+        if act == "scene":
+            errs = engine.run_scene(int(dev.partition(":")[2] or 0))
+        elif act == "stop":
             BUS.switch(dev, cover="stop")
             errs = []
         elif act == "pos":
@@ -104,9 +106,10 @@ def loop(snapshot):
         try:
             body = {"v": 1, "cloud": {"ver": _version()}}
             devs = [_compact(d) for d in snapshot()]
-            h = hashlib.sha1(json.dumps(devs, sort_keys=True, default=str).encode()).hexdigest()
+            scn = [{"id": r["id"], "name": r["name"]} for r in q("SELECT id, name FROM scenes ORDER BY sort, name COLLATE NOCASE")]
+            h = hashlib.sha1(json.dumps([devs, scn], sort_keys=True, default=str).encode()).hexdigest()
             if h != last_dev_hash or time.time() - last_full > FULL_EVERY:
-                body["devices"] = devs
+                body["devices"], body["scenes"] = devs, scn
             al = _alerts()
             ah = hashlib.sha1(json.dumps([(a["id"], a["ack"]) for a in al]).encode()).hexdigest()
             if ah != last_al_hash:
