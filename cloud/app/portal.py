@@ -17,6 +17,7 @@ import urllib.request
 
 from core import q, setting
 
+PORT = int(os.environ.get("PORT", "8080"))
 FAST, WAIT, RETRY, FULL_EVERY = 2, 20, 15, 60
 STATE = {"ok": None, "err": "", "last": 0, "active": False}
 
@@ -78,6 +79,38 @@ def _run(c):
         return {"id": c["id"], "error": str(e)}
 
 
+def _relay_one(url, tok, r):
+    """Vom Portal durchgereichte Anfrage (App unterwegs) an die eigene Schnittstelle stellen."""
+    import base64
+    import hermit_cloud
+    path = str(r.get("path") or "/")
+    out = {"id": r["id"], "status": 502, "ctype": "text/plain", "body": ""}
+    if not path.startswith("/") or path.startswith("//"):
+        out["body"] = base64.b64encode(b"Pfad ungueltig").decode()
+    else:
+        body = r.get("body")
+        req = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}", method=r.get("method") or "GET",
+                                     data=body.encode() if body else None,
+                                     headers={"Content-Type": r.get("ctype") or "application/json",
+                                              "X-Pagurus-Internal": hermit_cloud.INTERNAL_KEY,
+                                              "X-Pagurus-Role": r.get("role") or "viewer"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                out.update(status=resp.status, ctype=resp.headers.get("Content-Type", ""),
+                           body=base64.b64encode(resp.read()).decode())
+        except urllib.error.HTTPError as e:
+            out.update(status=e.code, ctype=e.headers.get("Content-Type", ""), body=base64.b64encode(e.read()).decode())
+        except Exception as e:
+            out["body"] = base64.b64encode(str(e).encode()).decode()
+    try:
+        rq = urllib.request.Request(url + "?a=relay_result", data=json.dumps(out).encode(), method="POST",
+                                    headers={"Content-Type": "application/json", "Authorization": "Bearer " + tok,
+                                             "X-Pagurus-Token": tok, "User-Agent": "PagurusCloud"})
+        urllib.request.urlopen(rq, timeout=30).read()
+    except Exception as e:
+        print("Portal: Antwort nicht zustellbar:", e, flush=True)
+
+
 def _post(url, tok, body, wait=0):
     req = urllib.request.Request(url + f"?a=sync&wait={wait}", data=json.dumps(body).encode(), method="POST",
                                  headers={"Content-Type": "application/json", "Authorization": "Bearer " + tok,
@@ -125,10 +158,12 @@ def loop(snapshot):
             if r.get("need_full"):
                 last_dev_hash = last_al_hash = None
             STATE.update(ok=True, err="", last=time.time(), active=bool(r.get("active")))
+            for rl in r.get("relay") or []:
+                threading.Thread(target=_relay_one, args=(url, tok, rl), daemon=True).start()
             cmds = r.get("commands") or []
             for c in cmds:
                 results.append(_run(c))
-            if cmds:
+            if cmds or r.get("relay"):
                 last_dev_hash = None              # neuen Zustand gleich mitschicken
                 time.sleep(0.7)
                 continue

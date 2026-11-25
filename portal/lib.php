@@ -26,6 +26,8 @@ function db(): PDO {
     $db->exec('CREATE TABLE IF NOT EXISTS cmds (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, dev TEXT, act TEXT, pos INTEGER,
                state TEXT DEFAULT \'new\', result TEXT, done REAL)');
     $db->exec('CREATE TABLE IF NOT EXISTS fails (ip TEXT, ts REAL)');
+    $db->exec('CREATE TABLE IF NOT EXISTS relay (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, method TEXT, path TEXT,
+               body TEXT, ctype TEXT, role TEXT, state TEXT DEFAULT \'new\', status INTEGER, rctype TEXT, rbody TEXT)');
     return $db;
 }
 

@@ -33,6 +33,10 @@ Einrichten, Regeln, Energieverlauf usw. bleiben in der Cloud zu Hause.
 
 **Update des Portals:** neue Dateien hochladen und überschreiben – `config.php` und `data/` bleiben.
 
+Die **Android-App** (`android/`) nutzt das Portal unterwegs ebenfalls: Es reicht ihre Anfragen an die Cloud
+durch, dadurch kann die App auch unterwegs alles, was die Cloud kann. Das Portal-Passwort gibt damit volle
+Rechte – bei `READ_ONLY = true` kann die App unterwegs nur anzeigen.
+
 ## Wie es läuft
 
 - Ist niemand im Portal, wartet die Cloud dort jeweils bis zu 20 s auf einen Befehl (Long-Polling) –

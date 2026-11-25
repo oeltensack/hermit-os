@@ -77,10 +77,20 @@ def ensure_admin():
         q("UPDATE users SET pw=? WHERE name='admin'", (pw_hash(PASSWORD),))
 
 
+# Interner Zugang fuer Anfragen, die das Fernzugang-Portal durchreicht (nur von diesem Rechner aus,
+# Schluessel wechselt bei jedem Start). Rolle legt das Portal fest (schreibgeschuetzt = viewer).
+INTERNAL_KEY = secrets.token_hex(24)
+
+
 def current_user(request: Request):
+    ik = request.headers.get("x-pagurus-internal", "")
+    if ik and hmac.compare_digest(ik, INTERNAL_KEY) and request.client and request.client.host in ("127.0.0.1", "::1"):
+        role = request.headers.get("x-pagurus-role", "viewer")
+        return {"name": "portal", "role": role if role in ROLES else "viewer"}
     if not users_exist():
         return {"name": "admin", "role": "admin", "open": True}
-    tok = request.cookies.get("hc", "")
+    auth_h = request.headers.get("authorization", "")
+    tok = auth_h[7:].strip() if auth_h.lower().startswith("bearer ") else request.cookies.get("hc", "")
     if tok:
         s = q("SELECT s.name, u.role FROM sessions s JOIN users u ON u.name=s.name WHERE s.token=?", (tok,), one=True)
         if s:
@@ -122,7 +132,7 @@ async def login(request: Request, response: Response):
     tok = secrets.token_urlsafe(24)
     q("INSERT INTO sessions(token, name, created, seen) VALUES(?,?,?,?)", (tok, name, time.time(), time.time()))
     response.set_cookie("hc", tok, max_age=365 * 86400, httponly=True, samesite="lax")
-    return {"ok": True}
+    return {"ok": True, "token": tok}         # Token fuer die App (Authorization: Bearer …)
 
 
 @app.post("/api/logout")
@@ -758,6 +768,19 @@ def alerts(limit: int = 200):
     rows = q("""SELECT a.*, COALESCE(NULLIF(d.name,''), a.dev) AS name FROM alerts a
                 LEFT JOIN devices d ON d.id=a.dev ORDER BY a.id DESC LIMIT ?""", (limit,))
     return [dict(r) for r in rows]
+
+
+@app.get("/api/alerts/wait")
+async def alerts_wait(after: int = 0, timeout: int = 25):
+    """Long-Polling fuer die App: wartet, bis es Meldungen mit id > after gibt (hoechstens timeout s)."""
+    end = time.time() + max(0, min(timeout, 55))
+    while True:
+        rows = q("""SELECT a.*, COALESCE(NULLIF(d.name,''), a.dev) AS name FROM alerts a
+                    LEFT JOIN devices d ON d.id=a.dev WHERE a.id>? ORDER BY a.id LIMIT 50""", (after,))
+        if rows or time.time() >= end:
+            last = q("SELECT MAX(id) AS m FROM alerts", one=True)["m"] or 0
+            return {"alerts": [dict(r) for r in rows], "last": last}
+        await asyncio.sleep(1)
 
 
 @app.post("/api/alerts/ack")

@@ -50,17 +50,31 @@ if ($a === 'sync') {
     $view0 = (float)kv_get('last_view', 0);
     while (true) {
         $cmds = $db->query("SELECT id, dev, act, pos FROM cmds WHERE state='new' ORDER BY id")->fetchAll();
+        $relay = $db->query("SELECT id, method, path, body, ctype, role FROM relay WHERE state='new' ORDER BY id LIMIT 20")->fetchAll();
         $view = (float)kv_get('last_view', 0);
         $active = (microtime(true) - $view) < ACTIVE_SECS;
-        if ($cmds || microtime(true) >= $end || ($wait && $view > $view0 && $active)) break;
-        usleep(500000);
+        if ($cmds || $relay || microtime(true) >= $end || ($wait && $view > $view0 && $active)) break;
+        usleep(250000);
     }
     if ($cmds) $db->exec("UPDATE cmds SET state='sent' WHERE state='new' AND id<=" . (int)end($cmds)['id']);
-    out(['ok' => true, 'commands' => $cmds, 'active' => $active,
+    if ($relay) $db->exec("UPDATE relay SET state='sent' WHERE state='new' AND id IN (" . implode(',', array_map('intval', array_column($relay, 'id'))) . ")");
+    $db->prepare('DELETE FROM relay WHERE ts<?')->execute([microtime(true) - 300]);
+    out(['ok' => true, 'commands' => $cmds, 'relay' => $relay, 'active' => $active,
          'need_full' => kv_get('devices') === null]);
 }
 
-// ---------------- Browser ----------------
+// Antwort der Cloud auf eine durchgereichte Anfrage
+if ($a === 'relay_result') {
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ($_SERVER['HTTP_X_PAGURUS_TOKEN'] ?? '');
+    $tok = preg_replace('/^Bearer\s+/i', '', $auth);
+    if (SYNC_TOKEN === '' || str_starts_with(SYNC_TOKEN, 'HIER-') || !hash_equals(SYNC_TOKEN, $tok)) out(['error' => 'Schlüssel falsch'], 403);
+    $in = json_decode(file_get_contents('php://input'), true) ?: [];
+    db()->prepare("UPDATE relay SET state='done', status=?, rctype=?, rbody=? WHERE id=?")
+        ->execute([(int)($in['status'] ?? 502), (string)($in['ctype'] ?? ''), (string)($in['body'] ?? ''), (int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+}
+
+// ---------------- Browser / App ----------------
 session_start_secure();
 $post = $_SERVER['REQUEST_METHOD'] === 'POST';
 if ($post && ($_SERVER['HTTP_X_PAGURUS'] ?? '') !== '1') out(['error' => 'Ungültige Anfrage'], 400);   // gegen fremde Formulare
@@ -93,6 +107,54 @@ if ($a === 'state') {
     out(['now' => $now, 'last_sync' => kv_get('last_sync', 0), 'cloud' => kv_get('cloud', []),
          'devices' => kv_get('devices', []), 'scenes' => kv_get('scenes', []), 'alerts' => $alerts, 'cmds' => $cmds->fetchAll(),
          'read_only' => READ_ONLY]);
+}
+
+// App unterwegs: beliebige Anfrage an die Cloud durchreichen und auf die Antwort warten
+if ($a === 'relay' && $post) {
+    session_write_close();
+    $in = json_decode(file_get_contents('php://input'), true) ?: [];
+    $method = strtoupper((string)($in['method'] ?? 'GET'));
+    $path = (string)($in['path'] ?? '/');
+    if (!in_array($method, ['GET', 'POST', 'PUT', 'DELETE'], true) || $path === '' || $path[0] !== '/') out(['error' => 'Ungültige Anfrage'], 400);
+    if (READ_ONLY && $method !== 'GET') out(['error' => 'Portal ist schreibgeschützt'], 403);
+    $db = db();
+    $db->prepare('INSERT INTO relay(ts, method, path, body, ctype, role) VALUES(?,?,?,?,?,?)')
+       ->execute([microtime(true), $method, $path, isset($in['body']) ? (string)$in['body'] : null,
+                  (string)($in['ctype'] ?? 'application/json'), READ_ONLY ? 'viewer' : 'admin']);
+    $id = (int)$db->lastInsertId();
+    kv_set('last_view', microtime(true));
+    set_time_limit(60);
+    $end = microtime(true) + 30;
+    $q = $db->prepare('SELECT state, status, rctype, rbody FROM relay WHERE id=?');
+    while (microtime(true) < $end) {
+        $q->execute([$id]);
+        $r = $q->fetch();
+        if ($r && $r['state'] === 'done') {
+            $db->prepare('DELETE FROM relay WHERE id=?')->execute([$id]);
+            out(['status' => (int)$r['status'], 'ctype' => $r['rctype'], 'body' => $r['rbody']]);
+        }
+        usleep(150000);
+    }
+    $db->prepare("DELETE FROM relay WHERE id=?")->execute([$id]);
+    out(['error' => 'Cloud antwortet nicht'], 504);
+}
+
+// App unterwegs: auf neue Meldungen warten (Push)
+if ($a === 'alerts_wait') {
+    session_write_close();
+    $after = (int)($_GET['after'] ?? 0);
+    $wait = max(0, min(50, (int)($_GET['timeout'] ?? 25)));
+    set_time_limit($wait + 20);
+    $end = microtime(true) + $wait;
+    $q = db()->prepare('SELECT * FROM alerts WHERE id>? ORDER BY id LIMIT 50');
+    while (true) {
+        $q->execute([$after]);
+        $rows = $q->fetchAll();
+        if ($rows || microtime(true) >= $end) break;
+        usleep(1000000);
+    }
+    $last = (int)db()->query('SELECT MAX(id) FROM alerts')->fetchColumn();
+    out(['alerts' => $rows, 'last' => $last, 'last_sync' => kv_get('last_sync', 0)]);
 }
 
 if ($a === 'cmd' && $post) {

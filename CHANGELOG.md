@@ -1,5 +1,14 @@
 # Änderungen
 
+## Pagurus App 1.0.0 (Android) / Pagurus Cloud 1.12.0 / Pagurus Portal 1.3
+- **Neue Android-App** (`android/`, APK in `android/release/`): zu Hause direkt zur Cloud, unterwegs
+  automatisch über das Portal. Geräte, Rollläden, Szenen, Fühler, Meldungen, die volle Cloud-Oberfläche,
+  Push-Meldungen ohne Google-Dienste, Widget mit Favoriten, drei Schnellkacheln
+- Portal: reicht Anfragen der App an die Cloud durch (Long-Polling, ~0,5 s) und wartet für den Push auf
+  neue Meldungen; bei `READ_ONLY` nur lesend
+- Cloud: Anmeldung per Token (`Authorization: Bearer …`, Login liefert `token`), Long-Polling
+  `/api/alerts/wait`, interner Zugang für das Portal
+
 ## Pagurus Cloud 1.11.0 / Pagurus Portal 1.2
 - **Shelly BLU** über Gen2+/Gen3-Shellys als Gateway (BTHome-Komponenten per MQTT, ohne Shelly Cloud):
   jedes BLU-Gerät eigenes Gerät, Temperatur/Feuchte/Helligkeit auch für die Beschattung, Fenster/Tür,
