@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.12.1 / Pagurus Portal 1.4
+- Portal: Dimmer zeigen die Helligkeit und haben einen Regler (vorher nur an/aus)
+
 ## Repo
 - Die Android-App liegt nicht mehr in diesem Repo
 

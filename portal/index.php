@@ -68,6 +68,7 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
  let kv='';
  if(d.apower!=null)kv+=`<div><div class="v">${fmt(d.apower,1,'W')}</div><div class="l">Leistung</div></div>`;
  if(d.wh!=null&&!sen)kv+=`<div><div class="v">${fmt(d.wh,0,'Wh')}</div><div class="l">heute</div></div>`;
+ if(d.bri!=null)kv+=`<div><div class="v">${d.bri} %</div><div class="l">Helligkeit</div></div>`;
  if(d.tC!=null)kv+=`<div><div class="v">${fmt(d.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`;
  if(d.rh!=null)kv+=`<div><div class="v">${fmt(d.rh,0,'%')}</div><div class="l">Feuchte</div></div>`;
  if(d.lux!=null)kv+=`<div><div class="v">${fmt(d.lux,0,'lx')}</div><div class="l">Helligkeit</div></div>`;
@@ -75,7 +76,7 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
  if(d.contact!=null)kv+=`<div><div class="v">${d.contact?'offen':'zu'}</div><div class="l">Kontakt</div></div>`;
  if(d.motion!=null)kv+=`<div><div class="v">${d.motion?'Bewegung':'ruhig'}</div><div class="l">Bewegung</div></div>`;
  const can=!ro&&d.online&&!d.meter_only&&!sen;
- let ctl='';
+ let ctl=d.bri!=null&&can?`<input type="range" min="1" max="100" value="${d.bri}" aria-label="Helligkeit" onchange="cmd('${esc(d.id)}','bri',+this.value)">`:'';
  if(cov){const st={open:'offen',closed:'geschlossen',opening:'öffnet',closing:'schließt',stopped:'gestoppt'}[d.state]||d.state||'';
   ctl=`<div class="v">${esc(st)}${d.pos!=null?' · '+d.pos+' %':''}</div>`+(can?`<div class="row"><button class="bt g" onclick="cmd('${esc(d.id)}','open')">▲ Auf</button><button class="bt g" onclick="cmd('${esc(d.id)}','stop')">■ Stopp</button><button class="bt g" onclick="cmd('${esc(d.id)}','close')">▼ Zu</button></div>
   ${d.pos!=null?`<input type="range" min="0" max="100" value="${d.pos}" onchange="cmd('${esc(d.id)}','pos',+this.value)">`:''}`:'');}

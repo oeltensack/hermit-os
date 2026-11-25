@@ -162,11 +162,11 @@ if ($a === 'cmd' && $post) {
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $dev = (string)($in['dev'] ?? '');
     $act = (string)($in['act'] ?? '');
-    if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos', 'scene'], true)) out(['error' => 'Unbekannte Aktion'], 400);
+    if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos', 'bri', 'scene'], true)) out(['error' => 'Unbekannte Aktion'], 400);
     $known = $act === 'scene' ? array_map(fn($x) => 'scene:' . $x['id'], kv_get('scenes', []))
                               : array_column(kv_get('devices', []), 'id');
     if (!in_array($dev, $known, true)) out(['error' => 'Unbekanntes Gerät'], 400);
-    $pos = $act === 'pos' ? max(0, min(100, (int)($in['pos'] ?? 0))) : null;
+    $pos = ($act === 'pos' || $act === 'bri') ? max(0, min(100, (int)($in['pos'] ?? 0))) : null;
     db()->prepare('INSERT INTO cmds(ts, dev, act, pos) VALUES(?,?,?,?)')->execute([microtime(true), $dev, $act, $pos]);
     $id = (int)db()->lastInsertId();
     kv_set('last_view', microtime(true));

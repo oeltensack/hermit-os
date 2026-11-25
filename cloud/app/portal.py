@@ -37,7 +37,8 @@ def _compact(d):
     out = {"id": d["id"], "name": d["name"] or d["id"], "room": d["room"], "model": d.get("model") or "",
            "online": d["online"], "last_seen": d.get("last_seen"), "comp": d.get("comp") or "",
            "output": s.get("output"), "apower": s.get("apower"), "wh": d.get("today_wh"),
-           "tC": t.get("tC") if isinstance(t, dict) else None, "meter_only": bool(s.get("meter_only"))}
+           "tC": t.get("tC") if isinstance(t, dict) else None, "meter_only": bool(s.get("meter_only")),
+           "bri": s.get("brightness")}
     if (d.get("comp") or "").startswith("cover:"):
         out.update(state=s.get("state"), pos=s.get("current_pos"), output=None)
     if d.get("comp") == "sensor:0":
@@ -66,6 +67,9 @@ def _run(c):
             errs = engine.run_scene(int(dev.partition(":")[2] or 0))
         elif act == "stop":
             BUS.switch(dev, cover="stop")
+            errs = []
+        elif act == "bri":
+            BUS.switch(dev, brightness=int(c.get("pos") or 0))
             errs = []
         elif act == "pos":
             errs = engine.do_switch(f"dev:{dev}", f"pos:{int(c.get('pos') or 0)}")
