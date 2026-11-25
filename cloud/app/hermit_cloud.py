@@ -275,6 +275,19 @@ def dev_row(r, latest=None):
     f = fridge.get(r["id"])
     if f:
         out["fridge"] = {"label": f["label"], "state": f["state"], "alarm": bool(f["alarm_run"] or f["alarm_off"])}
+    if r["meter"]:                                 # gekoppelter Energiemesser: Leistung und Verbrauch uebernehmen
+        m = q("SELECT * FROM devices WHERE id=?", (r["meter"],), one=True)
+        if m:
+            ms = json.loads(m["status"] or "{}")
+            me = q("SELECT wh FROM energy WHERE dev=? AND day=?", (m["id"], today()), one=True)
+            mwh = round(me["wh"], 1) if me else 0.0
+            out["meter"] = {"id": m["id"], "name": m["name"] or m["id"], "online": bool(m["online"]),
+                            "apower": ms.get("apower"), "today_wh": mwh,
+                            "today_cost": round(mwh / 1000 * price_eur_kwh(), 2), "hide": bool(r["meter_hide"])}
+    p = q("SELECT id, meter_hide FROM devices WHERE meter=? LIMIT 1", (r["id"],), one=True)
+    if p:                                          # ist selbst Energiemesser eines anderen Geraets
+        out["meter_of"] = p["id"]
+        out["meter_hidden"] = bool(p["meter_hide"])
     return out
 
 
@@ -342,6 +355,11 @@ async def dev_meta(dev: str, request: Request):
     d = await request.json()
     if "room" in d:
         q("UPDATE devices SET room=? WHERE id=?", (str(d["room"]).strip(), dev))
+    if "meter" in d:
+        m = str(d["meter"] or "").strip()
+        if m and (m == dev or not q("SELECT id FROM devices WHERE id=?", (m,), one=True)):
+            raise HTTPException(400, "Unbekannter Energiemesser")
+        q("UPDATE devices SET meter=?, meter_hide=? WHERE id=?", (m or None, 1 if d.get("meter_hide", True) else 0, dev))
     if "name" in d:
         name = str(d["name"]).strip()
         q("UPDATE devices SET name=? WHERE id=?", (name, dev))
@@ -373,6 +391,7 @@ def dev_delete(dev: str, request: Request):
             except Exception:
                 pass
         q("DELETE FROM devices WHERE id=?", (d,))
+        q("UPDATE devices SET meter=NULL WHERE meter=?", (d,))
     if "~" not in dev:
         BUS.forget(dev)                          # sonst legt der Broker es beim naechsten Neustart wieder an
     return {"ok": True}

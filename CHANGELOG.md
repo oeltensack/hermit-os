@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.15.0
+- Klimaanlagen lassen sich mit einem Energiemesser koppeln (Gerät bearbeiten → Energiemesser): Leistung, Verbrauch heute und Kosten erscheinen auf der Klima-Karte, auch im Portal und in der App (ab 1.4.0); der Messer kann als eigenes Gerät ausgeblendet werden
+
 ## Pagurus Cloud 1.14.0 / Pagurus Portal 1.5
 - Klimaanlage im Portal: Solltemperatur −/+, Modus und Lüfter, Raumtemperatur/Feuchte vom Fühler. Neue Spalte `arg` in der Befehlstabelle wird beim ersten Aufruf automatisch angelegt
 - Cloud führt Klima-Befehle aus dem Portal aus (Climate.Set, danach frischer Status)

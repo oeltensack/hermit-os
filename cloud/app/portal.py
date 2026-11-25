@@ -46,6 +46,9 @@ def _compact(d):
                                              "ext_temperature_C", "ext_humidity") if s.get(k) is not None})
         if s.get("ext_temperature_C") is not None:
             out["tC"] = s["ext_temperature_C"]
+    m = d.get("meter")
+    if m:                                          # gekoppelter Energiemesser
+        out.update(apower=m.get("apower") if m.get("online") else None, wh=m.get("today_wh"))
     if d.get("comp") == "sensor:0":
         h = s.get("humidity")
         out.update(lux=s.get("lux"), battery=s.get("battery"), rh=h.get("rh") if isinstance(h, dict) else None,
@@ -155,7 +158,7 @@ def loop(snapshot):
             continue
         try:
             body = {"v": 1, "cloud": {"ver": _version()}}
-            devs = [_compact(d) for d in snapshot()]
+            devs = [_compact(d) for d in snapshot() if not d.get("meter_hidden")]
             scn = [{"id": r["id"], "name": r["name"]} for r in q("SELECT id, name FROM scenes ORDER BY sort, name COLLATE NOCASE")]
             h = hashlib.sha1(json.dumps([devs, scn], sort_keys=True, default=str).encode()).hexdigest()
             if h != last_dev_hash or time.time() - last_full > FULL_EVERY:

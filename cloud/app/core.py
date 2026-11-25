@@ -97,6 +97,8 @@ def init_db():
     _add_col("power", "wmax", "REAL")
     _add_col("devices", "off_since", "REAL")
     _add_col("devices", "off_alerted", "INTEGER DEFAULT 0")
+    _add_col("devices", "meter", "TEXT")                  # gekoppelter Energiemesser (z. B. Klimaanlage)
+    _add_col("devices", "meter_hide", "INTEGER DEFAULT 1")
     DB.commit()
 
 
