@@ -1,0 +1,10 @@
+-keep class androidx.core.app.CoreComponentFactory { <init>(); }
+-keep class androidx.profileinstaller.ProfileInstallReceiver { <init>(); }
+-keep class androidx.startup.InitializationProvider { <init>(); }
+-keep class de.pagurus.app.BootReceiver { <init>(); }
+-keep class de.pagurus.app.FavWidget { <init>(); }
+-keep class de.pagurus.app.MainActivity { <init>(); }
+-keep class de.pagurus.app.PushService { <init>(); }
+-keep class de.pagurus.app.Tile1 { <init>(); }
+-keep class de.pagurus.app.Tile2 { <init>(); }
+-keep class de.pagurus.app.Tile3 { <init>(); }

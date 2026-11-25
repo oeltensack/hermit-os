@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.7.3" type="conditional_incidents">
+
+    <incident
+        id="NotificationPermission"
+        severity="error"
+        message="When targeting Android 13 or higher, posting a permission requires holding the `POST_NOTIFICATIONS` permission">
+        <fix-data missing="android.permission.POST_NOTIFICATIONS"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/de/pagurus/app/Background.kt"
+            line="138"
+            column="13"
+            startOffset="6297"
+            endLine="138"
+            endColumn="55"
+            endOffset="6339"/>
+    </incident>
+
+    <incident
+        id="UnusedAttribute"
+        severity="warning"
+        message="">
+        <fix-data minSdk="fffffffffe000000" requiresApi="ffffffffc0000000"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/xml/fav_widget.xml"
+            line="4"
+            column="5"
+            startOffset="177"
+            endLine="4"
+            endColumn="32"
+            endOffset="204"/>
+        <map>
+            <entry
+                name="message"
+                string="Attribute `targetCellWidth` is only used in API level 31 and higher (current min is %1$s)"/>
+            <api-levels id="minSdk"
+                value="fffffffffe000000"/>
+            <api-levels id="requiresApi"
+                value="ffffffffc0000000"/>
+        </map>
+    </incident>
+
+    <incident
+        id="UnusedAttribute"
+        severity="warning"
+        message="">
+        <fix-data minSdk="fffffffffe000000" requiresApi="ffffffffc0000000"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/xml/fav_widget.xml"
+            line="4"
+            column="33"
+            startOffset="205"
+            endLine="4"
+            endColumn="61"
+            endOffset="233"/>
+        <map>
+            <entry
+                name="message"
+                string="Attribute `targetCellHeight` is only used in API level 31 and higher (current min is %1$s)"/>
+            <api-levels id="minSdk"
+                value="fffffffffe000000"/>
+            <api-levels id="requiresApi"
+                value="ffffffffc0000000"/>
+        </map>
+    </incident>
+
+</incidents>

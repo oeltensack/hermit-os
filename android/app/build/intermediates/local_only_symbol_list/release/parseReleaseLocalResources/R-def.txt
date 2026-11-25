@@ -1,0 +1,20 @@
+R_DEF: Internal format may change without notice
+local
+drawable btn_off
+drawable btn_on
+drawable ic_notify
+drawable ic_tile
+drawable widget_bg
+id f0
+id f1
+id f2
+id f3
+id f4
+id f5
+id root
+layout fav_widget
+mipmap ic_launcher
+string widget_desc
+style Theme.Pagurus
+xml fav_widget
+xml network

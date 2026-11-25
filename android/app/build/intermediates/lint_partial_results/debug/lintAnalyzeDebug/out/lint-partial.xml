@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.7.3" type="partial_results">
+    <map id="NotificationPermission">
+        <entry
+            name="source"
+            boolean="true"/>
+    </map>
+    <map id="UnsafeImplicitIntentLaunch">
+            <map id="actionsSent">
+                    <map id="android.intent.action.VIEW (used to start an activity)">
+                        <location id="0"
+                            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/de/pagurus/app/CloudWeb.kt"
+                            line="102"
+                            column="51"
+                            startOffset="5760"
+                            endLine="102"
+                            endColumn="118"
+                            endOffset="5827"/>
+                        <location id="1"
+                            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/de/pagurus/app/CloudWeb.kt"
+                            line="102"
+                            column="51"
+                            startOffset="5760"
+                            endLine="102"
+                            endColumn="118"
+                            endOffset="5827"/>
+                    </map>
+                    <map id="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS (used to start an activity)">
+                        <location id="0"
+                            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/de/pagurus/app/MainActivity.kt"
+                            line="341"
+                            column="50"
+                            startOffset="18418"
+                            endLine="341"
+                            endColumn="110"
+                            endOffset="18478"/>
+                    </map>
+            </map>
+    </map>
+    <map id="UnsafeIntentLaunch">
+            <map id="unprotected">
+                <entry
+                    name="de.pagurus.app.BootReceiver"
+                    boolean="true"/>
+                <entry
+                    name="de.pagurus.app.FavWidget"
+                    boolean="true"/>
+                <entry
+                    name="de.pagurus.app.MainActivity"
+                    boolean="true"/>
+            </map>
+    </map>
+    <map id="UnusedResources">
+        <entry
+            name="model"
+            string="drawable[ic_tile(U),btn_off(U),btn_on(U),ic_notify(U),widget_bg(U)],id[root(D),f0(U),f1(U),f2(U),f3(U),f4(U),f5(U)],layout[fav_widget(U)],mipmap[ic_launcher(U)],string[widget_desc(U)],style[Theme_Pagurus(U)],xml[network(U),fav_widget(U)];c^4^1,11^e^c;;;"/>
+    </map>
+
+</incidents>

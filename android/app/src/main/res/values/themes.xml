@@ -1,7 +1,0 @@
-<resources>
-    <style name="Theme.Pagurus" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0f1419</item>
-        <item name="android:statusBarColor">#1a2129</item>
-        <item name="android:navigationBarColor">#1a2129</item>
-    </style>
-</resources>

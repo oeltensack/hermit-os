@@ -1,0 +1,38 @@
+[
+    {
+        "merged": "de.pagurus.app-debug-4:/drawable_widget_bg.xml.flat",
+        "source": "de.pagurus.app-main-6:/drawable/widget_bg.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/drawable_ic_tile.xml.flat",
+        "source": "de.pagurus.app-main-6:/drawable/ic_tile.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/xml_fav_widget.xml.flat",
+        "source": "de.pagurus.app-main-6:/xml/fav_widget.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/drawable_btn_on.xml.flat",
+        "source": "de.pagurus.app-main-6:/drawable/btn_on.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/drawable_btn_off.xml.flat",
+        "source": "de.pagurus.app-main-6:/drawable/btn_off.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/xml_network.xml.flat",
+        "source": "de.pagurus.app-main-6:/xml/network.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/layout_fav_widget.xml.flat",
+        "source": "de.pagurus.app-main-6:/layout/fav_widget.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/drawable_ic_notify.xml.flat",
+        "source": "de.pagurus.app-main-6:/drawable/ic_notify.xml"
+    },
+    {
+        "merged": "de.pagurus.app-debug-4:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "de.pagurus.app-main-6:/mipmap-xxxhdpi/ic_launcher.png"
+    }
+]

@@ -1,5 +1,0 @@
--keepclassmembers class de.pagurus.app.WebBridge { @android.webkit.JavascriptInterface <methods>; }
--dontwarn okhttp3.internal.platform.**
--dontwarn org.conscrypt.**
--dontwarn org.bouncycastle.**
--dontwarn org.openjsse.**

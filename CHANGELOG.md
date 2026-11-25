@@ -1,7 +1,10 @@
 # Änderungen
 
+## Repo
+- Die Android-App liegt nicht mehr in diesem Repo
+
 ## Pagurus App 1.0.0 (Android) / Pagurus Cloud 1.12.0 / Pagurus Portal 1.3
-- **Neue Android-App** (`android/`, APK in `android/release/`): zu Hause direkt zur Cloud, unterwegs
+- **Neue Android-App** (liegt separat): zu Hause direkt zur Cloud, unterwegs
   automatisch über das Portal. Geräte, Rollläden, Szenen, Fühler, Meldungen, die volle Cloud-Oberfläche,
   Push-Meldungen ohne Google-Dienste, Widget mit Favoriten, drei Schnellkacheln
 - Portal: reicht Anfragen der App an die Cloud durch (Long-Polling, ~0,5 s) und wartet für den Push auf
