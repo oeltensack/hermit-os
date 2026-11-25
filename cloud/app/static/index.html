@@ -136,6 +136,13 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 <label>Adresse der Cloud</label><input id="s_pub" placeholder="http://192.168.0.50:8080 (für URL-Auslöser)">
 </div><p class="l">Standort nur für Zeitpläne mit Sonnenauf-/untergang. Kosten werden mit dem aktuellen Preis berechnet.</p><button class="bt" onclick="saveBase()">Speichern</button></div>
 
+<div class="card admin-only"><h2>Fernzugang-Portal</h2>
+<p class="l">PHP-Seite auf einem Webhosting (Ordner <code>portal/</code> im Repo). Die Cloud meldet sich dort von sich aus per HTTPS, holt Schaltbefehle ab und überträgt Zustand und Meldungen – kein offener Port nötig.</p>
+<div class="f"><label>Portal-Adresse</label><input id="po_url" placeholder="https://deine-domain.de/pagurus/">
+<label>Schlüssel</label><input id="po_tok" type="password" autocomplete="new-password" placeholder="SYNC_TOKEN aus config.php">
+<label>Status</label><div id="po_st" class="l">–</div></div>
+<button class="bt" onclick="savePortal()">Speichern</button></div>
+
 <div class="card admin-only"><h2>Shelly Gen2+ mit Original-Firmware anbinden</h2>
 <p class="l">Gen2/Gen3/Gen4 können Shelly Cloud und MQTT gleichzeitig: Die Pagurus Cloud trägt sich am Gerät als MQTT-Server ein, App und Shelly Cloud laufen weiter. Danach startet das Gerät kurz neu (Relais bleiben in ihrem Zustand). Ein Gerät kann nur einen MQTT-Server haben.</p>
 <p class="l">Gen1-Fühler (Door/Window 2, H&amp;T) mit Original-Firmware: vorher den Taster am Gerät kurz drücken, damit er wach ist und gefunden wird. Übernommen werden Temperatur, Helligkeit bzw. Feuchte und Batterie. Bei Gen1 schaltet MQTT die Shelly Cloud ab.</p>
@@ -512,9 +519,13 @@ function clrAl(){if(confirm('Alle Meldungen löschen?'))run(async()=>{await api(
 // ---------- Einstellungen ----------
 async function loadSet(){if(!isAdmin())return;const s=await api('settings');
 $('s_price').value=num(s.price_ct,2);$('s_lat').value=s.location.lat!=null?num(s.location.lat,4):'';$('s_lon').value=s.location.lon!=null?num(s.location.lon,4):'';$('s_pub').value=s.public_url||'';
+const po=s.portal||{};$('po_url').value=po.url||'';$('po_tok').placeholder=po.token_set?'gesetzt – leer = unverändert':'SYNC_TOKEN aus config.php';
+$('po_st').innerHTML=!po.url?'aus':po.ok===true?`<span style="color:var(--on)">verbunden</span> · zuletzt ${ago(po.last)}${po.active?' · Portal gerade offen':''}`:po.ok===false?`<span style="color:var(--e)">Fehler: ${esc(po.err)}</span>`:'wird verbunden …';
 $('p_ntfy').value=s.push.ntfy_url;$('p_tchat').value=s.push.tg_chat;$('p_ntok').placeholder=s.push.ntfy_token_set?'gesetzt – leer = unverändert':'optional';$('p_ttok').placeholder=s.push.tg_token_set?'gesetzt – leer = unverändert':'optional';
 $('p_kinds').innerHTML=Object.entries(s.push_all).map(([k,v])=>`<label><input type="checkbox" value="${k}" ${s.push_kinds.includes(k)?'checked':''}>${v}</label>`).join(' ');
 await Promise.all([loadFw(),loadBk(),loadUsers(),loadUpd()])}
+function savePortal(){const p={url:$('po_url').value};if($('po_tok').value)p.token=$('po_tok').value;
+run(async()=>{await api('settings',{method:'POST',body:{portal:p}});$('po_tok').value='';setTimeout(loadSet,3000);await loadSet()},'Gespeichert')}
 function saveBase(){run(async()=>{const s=await api('settings',{method:'POST',body:{price_ct:$('s_price').value,location:{lat:$('s_lat').value,lon:$('s_lon').value},public_url:$('s_pub').value}});PRICE=s.price_ct},'Gespeichert')}
 function savePush(){const p={ntfy_url:$('p_ntfy').value,tg_chat:$('p_tchat').value};if($('p_ntok').value)p.ntfy_token=$('p_ntok').value;if($('p_ttok').value)p.tg_token=$('p_ttok').value;
 run(async()=>{await api('settings',{method:'POST',body:{push:p,push_kinds:[...document.querySelectorAll('#p_kinds input:checked')].map(c=>c.value)}});$('p_ntok').value='';$('p_ttok').value='';await loadSet()},'Gespeichert')}

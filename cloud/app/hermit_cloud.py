@@ -28,6 +28,7 @@ import energy_view
 import engine
 import fridge
 import gen2
+import portal
 import shade
 from bus import BUS, check_offline, seen
 from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
@@ -204,6 +205,7 @@ def startup():
     shade.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
+    portal.start(devices)
 
 
 @app.get("/")
@@ -811,7 +813,9 @@ def settings_get():
             "push_all": core.PUSH_KINDS, "location": setting("location", {}) or {},
             "push": {"ntfy_url": p.get("ntfy_url", ""), "ntfy_token_set": bool(p.get("ntfy_token")),
                      "tg_chat": p.get("tg_chat", ""), "tg_token_set": bool(p.get("tg_token"))},
-            "public_url": setting("public_url", "")}
+            "public_url": setting("public_url", ""),
+            "portal": {"url": (setting("portal", {}) or {}).get("url", ""),
+                       "token_set": bool((setting("portal", {}) or {}).get("token")), **portal.STATE}}
 
 
 @app.post("/api/settings")
@@ -831,6 +835,14 @@ async def settings_set(request: Request):
         set_setting("push_kinds", [k for k in d["push_kinds"] if k in core.PUSH_KINDS])
     if "public_url" in d:
         set_setting("public_url", str(d["public_url"]).strip())
+    if "portal" in d:
+        p = dict(setting("portal", {}) or {})
+        if "url" in d["portal"]:
+            p["url"] = str(d["portal"]["url"]).strip()
+        if d["portal"].get("token") is not None:
+            p["token"] = str(d["portal"]["token"]).strip()
+        set_setting("portal", p)
+        portal.STATE.update(ok=None, err="")
     if "push" in d:
         p = core.push_cfg()
         for k in ("ntfy_url", "tg_chat"):

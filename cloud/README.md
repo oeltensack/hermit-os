@@ -189,6 +189,9 @@ URL am Kontakt unter *Actions → Open* eintragen. Beispiel: Fenster auf → Rau
 Nicht direkt ins Internet stellen. Am besten über den WireGuard-Tunnel ins Heimnetz
 oder über einen Reverse-Proxy mit HTTPS und gesetztem `CLOUD_PASSWORD`.
 
+Ohne offenen Port und ohne VPN: **Pagurus Portal** auf einem Webhosting (PHP). Die Cloud meldet sich dort
+von sich aus, im Portal kann man schalten und Meldungen sehen. Einrichtung: [`portal/README.md`](../portal/README.md).
+
 ## Schnittstelle
 
 | Methode | Pfad | |

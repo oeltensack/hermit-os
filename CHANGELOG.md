@@ -1,5 +1,12 @@
 # Änderungen
 
+## Pagurus Cloud 1.9.0 / Pagurus Portal 1.0
+- **Pagurus Portal** (neu, Ordner `portal/`): Fernzugang als PHP-Seite für ein normales Webhosting.
+  Die Cloud meldet sich dort von sich aus per HTTPS (kein offener Port, kein VPN), überträgt Geräte und
+  Meldungen und holt Schaltbefehle per Long-Polling ab – Befehle kommen sofort an. Schalten, Rollläden,
+  Fühlerwerte, Meldungen; Anmeldung mit Passwort und Sperre nach Fehlversuchen, optional nur Anzeige
+- Cloud: *Einstellungen → Fernzugang-Portal* (Adresse, Schlüssel, Verbindungsstatus)
+
 ## Pagurus Cloud 1.8.2
 - Geräteübersicht: Tasten „alle an“ / „alle aus“ bei den Räumen entfernt
 
