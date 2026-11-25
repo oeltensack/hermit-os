@@ -9,6 +9,7 @@ import time
 
 import paho.mqtt.client as mqtt
 
+import blu
 import engine
 import shade
 from core import OFFLINE_ALERT_AFTER, alert, dev_name, now_local, q, today
@@ -197,6 +198,10 @@ class Bus:
                 shade.sensor(dev, comp, d)
                 if live:
                     seen(dev)
+            elif comp.startswith("bthome"):
+                blu.status(dev, comp, d, live=live)
+                if live:
+                    seen(dev)
             elif live:
                 seen(dev)
         elif rest == "events/rpc" and live:
@@ -211,6 +216,8 @@ class Bus:
                         set_status(row_id(dev, k), k, v, merge=True)
                     elif isinstance(v, dict) and k.startswith(SENSOR_COMPS):
                         shade.sensor(dev, k, v)
+                    elif isinstance(v, dict) and k.startswith("bthome"):
+                        blu.status(dev, k, v)
                 seen(dev)
 
     def forget(self, dev):
@@ -391,6 +398,9 @@ EVENT_TEXT = {
 
 def on_event(dev, e):
     seen(dev)
+    if e.get("component", "").startswith("bthomesensor:"):
+        blu.event(dev, e["component"], e.get("event", ""))
+        return
     dev = row_id(dev, e.get("component", ""))
     ev = e.get("event", "")
     if ev in EVENT_TEXT:

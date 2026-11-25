@@ -1,5 +1,13 @@
 # Änderungen
 
+## Pagurus Cloud 1.11.0 / Pagurus Portal 1.2
+- **Shelly BLU** über Gen2+/Gen3-Shellys als Gateway (BTHome-Komponenten per MQTT, ohne Shelly Cloud):
+  jedes BLU-Gerät eigenes Gerät, Temperatur/Feuchte/Helligkeit auch für die Beschattung, Fenster/Tür,
+  Bewegung, Neigung, Wasser, Batterie, Tasten. Ereignisse `open`/`closed`, `motion`/`no_motion`,
+  `single_push` … als Regel-Auslöser; mehrere Gateways lösen nur einmal aus
+- Fehler behoben: Batteriefühler (DW2, H&T, BLU) wurden nach 3 Minuten Funkstille als „offline“ gemeldet
+- Portal: Kontakt und Bewegung auf den Fühler-Karten
+
 ## Pagurus Cloud 1.10.0 / Pagurus Portal 1.1
 - **Szenen:** mehrere Geräte/Räume/Rollläden mit einem Klick („Gute Nacht“: alles aus, Rollläden zu).
   Anlegen unter *Automatik → Szenen*; Tasten oben in der Geräteübersicht; Szenen sind Ziel in Zeitplänen

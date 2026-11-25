@@ -42,7 +42,7 @@ def _compact(d):
     if d.get("comp") == "sensor:0":
         h = s.get("humidity")
         out.update(lux=s.get("lux"), battery=s.get("battery"), rh=h.get("rh") if isinstance(h, dict) else None,
-                   apower=None, wh=None)
+                   contact=s.get("contact"), motion=s.get("motion"), apower=None, wh=None)
     if d.get("appliance"):
         out["appliance"] = {"label": d["appliance"]["label"], "state": d["appliance"]["state"]}
     if d.get("fridge") and d["fridge"].get("alarm"):

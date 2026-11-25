@@ -23,6 +23,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
+import blu
 import core
 import energy_view
 import engine
@@ -180,7 +181,8 @@ def watchdog():
         time.sleep(20)
         try:
             lim = time.time() - OFFLINE_AFTER
-            for r in q("SELECT id FROM devices WHERE online=1 AND last_seen<?", (lim,)):
+            # Batteriefuehler (BLU, Door/Window, H&T) schlafen zwischen den Meldungen – nicht als offline melden
+            for r in q("SELECT id FROM devices WHERE online=1 AND last_seen<? AND COALESCE(comp,'')!='sensor:0'", (lim,)):
                 seen(r["id"], online=False)
             check_offline()
             q("DELETE FROM power WHERE ts<?", (int(time.time()) - KEEP_POWER_DAYS * 86400,))
@@ -194,6 +196,8 @@ def watchdog():
 @app.on_event("startup")
 def startup():
     core.init_db()
+    blu.init_db()
+    blu.BUS = BUS
     ensure_admin()
     pk = setting("push_kinds")                 # neue Push-Art in bestehende Auswahl aufnehmen (einmalig)
     if pk is not None and "fridge" not in pk and not setting("mig_push_fridge"):

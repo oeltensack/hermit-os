@@ -85,6 +85,14 @@ Damit die Werte regelmäßig kommen, am Door/Window 2 unter *Settings* eine **Au
 (z. B. 30–60 min) – sonst meldet er nur bei Öffnen/Schließen. Die Beschattung nimmt Fühlerwerte bis 6 h
 Alter; längere Abstände gelten als „Fühler-Wert zu alt“. Jede Meldung kostet Batterie.
 
+**Shelly BLU (Bluetooth)** über Gen2+/Gen3-Shellys als Gateway, ohne Shelly Cloud: Die BLU-Geräte müssen
+auf dem Shelly selbst angelegt sein (Shelly-App bzw. Geräteoberfläche → *Bluetooth / BTHome-Geräte* →
+Gerät hinzufügen), und der Shelly muss per MQTT an der Cloud hängen. Die Cloud liest die Zuordnung einmal
+vom Shelly und legt jedes BLU-Gerät als eigenes Gerät `blu-<adresse>` an – hören es mehrere Shellys, bleibt
+es eines. Übernommen werden Temperatur, Feuchte, Helligkeit (auch für die Beschattung), Fenster/Tür,
+Bewegung, Neigung, Wasser, Batterie und Tasten. Für Regeln („Ereignis am Gerät“): `open` / `closed`,
+`motion` / `no_motion`, `single_push` / `double_push` / `long_push`, bei mehreren Tasten `button:2.single_push`.
+
 Mehrkanal-Geräte (Plus 2PM, Pro 4PM, Pro Dual Cover, Shelly 2.5 mit Pagurus OS) erscheinen je Kanal als
 eigenes Gerät. Temperatur-, Feuchte- und Helligkeitsfühler stehen unter *Beschattung → Fühler*.
 

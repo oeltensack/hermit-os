@@ -72,6 +72,8 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
  if(d.rh!=null)kv+=`<div><div class="v">${fmt(d.rh,0,'%')}</div><div class="l">Feuchte</div></div>`;
  if(d.lux!=null)kv+=`<div><div class="v">${fmt(d.lux,0,'lx')}</div><div class="l">Helligkeit</div></div>`;
  if(d.battery!=null)kv+=`<div><div class="v">${fmt(d.battery,0,'%')}</div><div class="l">Batterie</div></div>`;
+ if(d.contact!=null)kv+=`<div><div class="v">${d.contact?'offen':'zu'}</div><div class="l">Kontakt</div></div>`;
+ if(d.motion!=null)kv+=`<div><div class="v">${d.motion?'Bewegung':'ruhig'}</div><div class="l">Bewegung</div></div>`;
  const can=!ro&&d.online&&!d.meter_only&&!sen;
  let ctl='';
  if(cov){const st={open:'offen',closed:'geschlossen',opening:'öffnet',closing:'schließt',stopped:'gestoppt'}[d.state]||d.state||'';
