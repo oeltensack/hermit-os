@@ -1,4 +1,0 @@
-#Wed Nov 25 11:48:25 CET 2026
-base.0=/home/claude/hermit-os/android/app/build/intermediates/dex/release/minifyReleaseWithR8/classes.dex
-path.0=classes.dex
-renamed.0=classes.dex
