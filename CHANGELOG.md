@@ -1,5 +1,8 @@
 # Änderungen
 
+## 1.17.3
+- Geräteseite: Zahlen mit deutschem Komma (0,0 W, 1,154 kWh, Faktor 1,0234); IP-Adressen bleiben mit Punkt
+
 ## Pagurus Cloud 1.12.1 / Pagurus Portal 1.4
 - Portal: Dimmer zeigen die Helligkeit und haben einen Regler (vorher nur an/aus)
 
