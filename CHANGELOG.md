@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.21.0 / Pagurus Portal 1.9
+- Mehrkanalige Geräte (2PM, 2.5): Kanäle wahlweise in einer Karte zusammenfassen (Kanal 1 bearbeiten → Kanäle). Je Kanal eigener Schaltknopf mit Namen (z. B. Stufe 1/Stufe 2), Leistung und Verbrauch, dazu die Summe; auch im Portal und in der App (ab 1.7.0). Zeitpläne, Regeln und Energieauswertung behandeln die Kanäle weiter einzeln
+
 ## 1.19.0 / Pagurus Cloud 1.20.0 / Pagurus Portal 1.8
 - **Neue Variante `hermit-midea-esp32c3`:** Midea-Klimaanlagen (auch Dimstal, Comfee, Qlima, Electrolux, Artel …)
   an einem ESP32-C3 statt WLAN-Stick bzw. ESPHome, UART TX GPIO21 / RX GPIO20 (9600 8N1). Protokoll über die

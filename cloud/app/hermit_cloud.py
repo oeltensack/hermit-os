@@ -312,6 +312,17 @@ def devices():
     rows = q("SELECT * FROM devices WHERE hidden=0 ORDER BY COALESCE(NULLIF(room,''),'~'), COALESCE(NULLIF(name,''), id)")
     out = [dev_row(r, latest) for r in rows]
     out.sort(key=lambda d: (d["room"] == "", d["room"].lower(), (d["name"] or d["id"]).lower()))   # Kanal 2 neben Kanal 1
+    comb = {r["id"]: r for r in rows if r["combine"] and "~" not in r["id"]}
+    if comb:                                     # mehrkanalige Geraete: Kanaele in der Karte von Kanal 1
+        by = {d["id"]: d for d in out}
+        for base, r in comb.items():
+            kids = [d for d in out if d.get("channel_of") == base]
+            if base in by and kids:
+                by[base]["combined"] = True
+                by[base]["ch_label"] = r["ch_label"] or "Kanal 1"
+                by[base]["channels"] = kids
+                for k in kids:
+                    k["combined_into"] = base
     return out
 
 
@@ -435,6 +446,10 @@ async def dev_meta(dev: str, request: Request):
     d = await request.json()
     if "room" in d:
         q("UPDATE devices SET room=? WHERE id=?", (str(d["room"]).strip(), dev))
+    if "combine" in d and "~" not in dev:
+        q("UPDATE devices SET combine=? WHERE id=?", (1 if d["combine"] else 0, dev))
+    if "ch_label" in d:
+        q("UPDATE devices SET ch_label=? WHERE id=?", (str(d["ch_label"] or "").strip() or None, dev))
     if "locked" in d:
         q("UPDATE devices SET locked=? WHERE id=?", (1 if d["locked"] else 0, dev))
     if "meter" in d:

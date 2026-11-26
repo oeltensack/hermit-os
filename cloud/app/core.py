@@ -99,7 +99,9 @@ def init_db():
     _add_col("devices", "off_alerted", "INTEGER DEFAULT 0")
     _add_col("devices", "meter", "TEXT")                  # gekoppelter Energiemesser (z. B. Klimaanlage)
     _add_col("devices", "meter_hide", "INTEGER DEFAULT 1")
-    _add_col("devices", "locked", "INTEGER DEFAULT 0")     # nur Anzeige: kein Schalten von Hand (Automatik laeuft)
+    _add_col("devices", "locked", "INTEGER DEFAULT 0")
+    _add_col("devices", "combine", "INTEGER DEFAULT 0")    # Kanaele (2PM, 2.5) in einer Karte zusammenfassen
+    _add_col("devices", "ch_label", "TEXT")                # Name von Kanal 1 in der zusammengefassten Karte     # nur Anzeige: kein Schalten von Hand (Automatik laeuft)
     DB.commit()
 
 

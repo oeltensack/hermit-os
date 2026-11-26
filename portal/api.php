@@ -164,7 +164,8 @@ if ($a === 'cmd' && $post) {
     $act = (string)($in['act'] ?? '');
     if (!in_array($act, ['on', 'off', 'toggle', 'open', 'close', 'stop', 'pos', 'bri', 'scene', 'climate'], true)) out(['error' => 'Unbekannte Aktion'], 400);
     $known = $act === 'scene' ? array_map(fn($x) => 'scene:' . $x['id'], kv_get('scenes', []))
-                              : array_column(kv_get('devices', []), 'id');
+                              : array_merge(array_column(kv_get('devices', []), 'id'),
+                                            ...array_map(fn($d) => array_column($d['chs'] ?? [], 'id'), kv_get('devices', []) ?: [[]]));
     if (!in_array($dev, $known, true)) out(['error' => 'Unbekanntes Gerät'], 400);
     $pos = ($act === 'pos' || $act === 'bri') ? max(0, min(100, (int)($in['pos'] ?? 0))) : null;
     $arg = null;

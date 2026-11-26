@@ -22,7 +22,7 @@ h3{font-size:15px;margin:18px 0 6px;display:flex;align-items:center;gap:10px;jus
 .dn{font-weight:600;font-size:16px}.dm{font-size:12px;color:var(--m)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--off)}.dot.on{background:var(--on)}
 .sw{width:64px;height:64px;border-radius:50%;border:0;font-weight:700;color:#fff;background:var(--off);cursor:pointer;flex:none;font-size:14px}
-.sw.on{background:var(--on);box-shadow:0 0 16px #3fb95055}.sw:disabled{cursor:default}.sw.trip{background:var(--e);font-size:10px}
+.sw.sm{width:46px;height:46px;font-size:12px}.chs{display:flex;flex-direction:column;gap:8px}.sw.on{background:var(--on);box-shadow:0 0 16px #3fb95055}.sw:disabled{cursor:default}.sw.trip{background:var(--e);font-size:10px}
 .dv{display:flex;gap:14px;align-items:center}.bri{width:100%;margin:10px 0 0;accent-color:var(--a,#2f9be0)}.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;flex:1}
 .v{font-size:17px;font-weight:600}.l{font-size:11px;color:var(--m)}
 .err-l{color:var(--e);font-size:12px}
@@ -240,16 +240,16 @@ const nIn=x=>+String(x).replace(',','.')||0;
 
 // ---------- Geraete ----------
 const CVS={open:'offen',closed:'geschlossen',opening:'öffnet …',closing:'schließt …',stopped:'angehalten',calibrating:'kalibriert …'};
-function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0';const canD=x=>canSw()&&!x.locked;
+function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0';const canD=x=>canSw()&&!x.locked;const chs=d.channels?[d,...d.channels]:null,tw=chs?chs.reduce((t,c)=>t+((c.status||{}).apower||0),0):s.apower,twh=chs?chs.reduce((t,c)=>t+(c.today_wh||0),0):d.today_wh,tco=chs?chs.reduce((t,c)=>t+(c.today_cost||0),0):d.today_cost;
 const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
 <div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Batteriefühler · zuletzt '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
 <div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.winopen&&d.winopen.paused?`<span class="tag y" title="${esc(d.winopen.reason||'')}">Pausiert: ${d.winopen.until?'Temperatursturz':'Fenster offen'}</span>`:''}${d.locked?'<span class="tag" title="Schalten von Hand gesperrt, Automatik läuft">🔒 nur Anzeige</span>':''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
-<div class="dv">${cvr||sen?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canD(d)||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':d.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${lbl}</button>`}
+<div class="dv"${chs?' style="flex-direction:column;align-items:stretch;gap:10px"':''}>${chs?`<div class="chs">${chs.map(c=>chRow(c,d)).join('')}</div>`:cvr||sen?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canD(d)||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':d.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${lbl}</button>`}
 <div class="kv">${d.meter?`<div><div class="v">${d.meter.online&&d.meter.apower!=null?fmt(d.meter.apower,1,'W'):'–'}</div><div class="l">Leistung</div></div>
-<div><div class="v">${kwh(d.meter.today_wh)}</div><div class="l">heute · ${eur(d.meter.today_cost)}</div></div>`:''}${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
-<div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute · ${eur(d.today_cost)}</div></div>`:''}
+<div><div class="v">${kwh(d.meter.today_wh)}</div><div class="l">heute · ${eur(d.meter.today_cost)}</div></div>`:''}${pm?`<div><div class="v">${fmt(tw,1,'W')}</div><div class="l">Leistung${chs?' gesamt':''}</div></div>
+<div><div class="v">${kwh(twh)}</div><div class="l">heute${chs?' gesamt':''} · ${eur(tco)}</div></div>`:''}
 ${s.temperature?`<div><div class="v">${fmt(s.temperature.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`:''}
 ${s.humidity?`<div><div class="v">${fmt(s.humidity.rh,0,'%')}</div><div class="l">Feuchte</div></div>`:''}
 ${s.lux!=null?`<div><div class="v">${fmt(s.lux,0,'lx')}</div><div class="l">Helligkeit</div></div>`:''}
@@ -273,10 +273,15 @@ ${d.online&&canD(d)&&s.link!==false?`<div class="row" style="gap:6px;margin-top:
 ${!s.extras||s.extras.includes('swing_v')?`<button class="bt ${s.swing_v?'':'g'} s" onclick="clSet('${esc(d.id)}',{swing_v:${!s.swing_v}})">Swing</button>`:''}</div>`:''}</div>`:''}
 ${s.brightness!=null&&d.online&&canD(d)?`<input type="range" class="bri" min="1" max="100" value="${s.brightness}" aria-label="Helligkeit" onchange="setBri('${esc(d.id)}',+this.value)">`:''}
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur',stm_no_response:'Dimmer-Chip antwortet nicht',pm_no_response:'Messchip antwortet nicht',obstruction:'Hindernis'}[e]||e)).join(', ')}</div>`:''}
-<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
+<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm&&!chs?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
+function chLabel(c,b){if(c.id==b.id)return b.ch_label||'Kanal 1';const p=(b.name||b.id)+' · ';return (c.name||c.id).startsWith(p)?(c.name||c.id).slice(p.length):(c.name||c.id)}
+function chRow(c,b){const cs=c.status||{},on=cs.output,ok=c.online&&canSw()&&!c.locked&&!b.locked&&'output' in cs;
+return `<div class="row" style="gap:12px;flex-wrap:nowrap"><button class="sw sm ${on?'on':''}" ${ok?'':'disabled'} onclick="sw('${esc(c.id)}')" title="${c.locked||b.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${on?'AN':'AUS'}</button>
+<div style="flex:1;min-width:0"><div style="font-weight:600">${esc(chLabel(c,b))}${c.locked&&!b.locked?' <span class="l">🔒</span>':''}</div><div class="l">${'apower' in cs?fmt(cs.apower,1,'W')+' · heute '+kwh(c.today_wh):''}</div></div>
+${'apower' in cs?`<a class="lk" style="font-size:12px" onclick="showEn('${esc(c.id)}')">Energie</a>`:''}</div>`}
 async function loadDevs(){DEVS=await api('devices');if(TAB!='dv')return;
 SCN=await api('scenes');$('scbar').innerHTML=SCN.map(x=>`<button class="bt g" onclick="scnRun(${x.id},this)">${esc(x.name)}</button>`).join('');
-const groups={};DEVS.filter(d=>!d.meter_hidden).forEach(d=>(groups[d.room||'']=groups[d.room||'']||[]).push(d));
+const groups={};DEVS.filter(d=>!d.meter_hidden&&!d.combined_into).forEach(d=>(groups[d.room||'']=groups[d.room||'']||[]).push(d));
 const keys=Object.keys(groups).sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
 $('devs').innerHTML=DEVS.length?keys.map(k=>{const g=groups[k];
 return `<h3><span>${k?esc(k):(keys.length>1?'Ohne Raum':'Alle Geräte')} <span class="l">${g.length}</span></span></h3><div class="devs">${g.map(devCard).join('')}</div>`}).join('')
@@ -299,10 +304,16 @@ dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="d
 ${(d.comp||'').startsWith('climate:')?`<label>Energiemesser</label><select id="dd_m"><option value="">– keiner –</option>${DEVS.filter(x=>x.id!=d.id&&x.status&&'apower' in x.status).map(x=>`<option value="${esc(x.id)}" ${d.meter&&d.meter.id==x.id?'selected':''}>${esc(x.name||x.id)}${x.room?' · '+esc(x.room):''}</option>`).join('')}</select>
 <label class="ck"><input type="checkbox" id="dd_mh" ${!d.meter||d.meter.hide?'checked':''} style="width:auto"> Energiemesser nicht als eigenes Gerät anzeigen</label>`:''}
 ${'output' in (d.status||{})||(d.comp||'').startsWith('cover:')?`<label>Bedienung</label><label class="ck"><input type="checkbox" id="dd_lk" ${d.locked?'checked':''} style="width:auto"> Nur Anzeige – Ein/Aus von Hand sperren (Automatik, Zeitpläne und Regeln schalten weiter)</label>`:''}
+${DEVS.some(x=>x.channel_of==d.id)?`<label>Kanäle</label><label class="ck"><input type="checkbox" id="dd_cb" ${d.combined?'checked':''} style="width:auto" onchange="$('dd_chn').style.display=this.checked?'contents':'none'"> In einer Karte zusammenfassen</label>
+<div id="dd_chn" style="display:${d.combined?'contents':'none'}"><label>Name Kanal 1</label><input id="dd_c0" value="${esc(d.ch_label&&d.ch_label!='Kanal 1'?d.ch_label:'')}" placeholder="Kanal 1">
+${DEVS.filter(x=>x.channel_of==d.id).map((x,i)=>`<label>Name Kanal ${i+2}</label><input class="dd_cx" data-id="${esc(x.id)}" value="${esc(chLabel(x,d).startsWith('Kanal ')?'':chLabel(x,d))}" placeholder="Kanal ${i+2}">`).join('')}</div>`:''}
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
 <div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
-function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_lk')?{locked:$('dd_lk').checked}:{},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
+function saveDev(id){run(async()=>{if($('dd_cb')){const d=DEVS.find(x=>x.id==id),base=($('dd_n').value||id).trim();
+await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:{combine:$('dd_cb').checked,ch_label:$('dd_c0').value}});
+if($('dd_cb').checked)for(const el of document.querySelectorAll('.dd_cx')){const v=el.value.trim(),x=DEVS.find(y=>y.id==el.dataset.id),cur=chLabel(x,d);
+if(v!=(cur.startsWith('Kanal ')?'':cur)||(v&&base!=(d.name||id)))await api('devices/'+encodeURIComponent(el.dataset.id)+'/meta',{method:'POST',body:{name:v?base+' · '+v:''}})}}await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_lk')?{locked:$('dd_lk').checked}:{},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
 function delDev(id){if(!confirm('Gerät mit allen gespeicherten Werten, Läufen und Sicherungen entfernen? Verbindet es sich wieder, erscheint es neu.'))return;run(async()=>{await api('devices/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadDevs()})}
 function showEn(id){document.querySelector('#nav a[data-t=en]').click();setTimeout(()=>{$('esel').value=id;PZ=null;loadEn()},50)}
 

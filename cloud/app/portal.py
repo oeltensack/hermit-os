@@ -56,6 +56,15 @@ def _compact(d):
         h = s.get("humidity")
         out.update(lux=s.get("lux"), battery=s.get("battery"), rh=h.get("rh") if isinstance(h, dict) else None,
                    contact=s.get("contact"), motion=s.get("motion"), apower=None, wh=None)
+    if d.get("channels"):                          # zusammengefasste Kanaele (2PM/2.5)
+        base = (d["name"] or d["id"]) + " · "
+        out["chs"] = [{"id": c["id"], "n": (d.get("ch_label") or "Kanal 1") if c is d else
+                       (c["name"][len(base):] if (c["name"] or "").startswith(base) else c["name"] or c["id"]),
+                       "output": (c.get("status") or {}).get("output"), "apower": (c.get("status") or {}).get("apower"),
+                       "locked": True if c.get("locked") else None, "online": c.get("online")}
+                      for c in [d] + d["channels"]]
+        out["apower"] = sum((c.get("status") or {}).get("apower") or 0 for c in [d] + d["channels"])
+        out["wh"] = sum(c.get("today_wh") or 0 for c in [d] + d["channels"])
     if d.get("appliance"):
         out["appliance"] = {"label": d["appliance"]["label"], "state": d["appliance"]["state"]}
     if d.get("fridge") and d["fridge"].get("alarm"):
@@ -163,7 +172,7 @@ def loop(snapshot):
             continue
         try:
             body = {"v": 1, "cloud": {"ver": _version()}}
-            devs = [_compact(d) for d in snapshot() if not d.get("meter_hidden")]
+            devs = [_compact(d) for d in snapshot() if not d.get("meter_hidden") and not d.get("combined_into")]
             scn = [{"id": r["id"], "name": r["name"]} for r in q("SELECT id, name FROM scenes ORDER BY sort, name COLLATE NOCASE")]
             h = hashlib.sha1(json.dumps([devs, scn], sort_keys=True, default=str).encode()).hexdigest()
             if h != last_dev_hash or time.time() - last_full > FULL_EVERY:
