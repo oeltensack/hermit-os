@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.17.0
+- Eigener Bereich **Klima**: je Anlage Bedienung (Ein/Aus, Soll ±, Modus, Lüfter, Swing ↕/↔, Eco, Turbo, Leise), Raum-/Geräte-/Ausblastemperatur, Feuchte, Leistung, Verbrauch und Kosten heute/30 Tage, Laufzeit und Kompressorzeit heute, 24-h-Verlauf (Temperaturen, Soll, Leistung, Heiz-/Kühlbetrieb) und 14-Tage-Balken, Stand der Fenster-offen-Erkennung
+- Klima-Verlauf wird minütlich aufgezeichnet (Tabelle `climate_log`, Aufbewahrung wie die Leistungswerte)
+
 ## Pagurus Cloud 1.16.0 / Pagurus Portal 1.6
 - Fenster/Tür offen an Klimaanlagen (Gerät bearbeiten → „Fenster offen …“): Steht ein gewählter Kontakt (z. B. BLU Door/Window) länger offen, wird die Anlage ausgeschaltet und nach dem Schließen mit dem vorigen Modus wieder eingeschaltet; wahlweise auch ohne Kontakt über einen Temperatursturz am DHT22 mit fester Pause. Gilt standardmäßig nur beim Heizen, Kühlen usw. zuschaltbar. Selbst einschalten beendet die Pause. Meldung „Fenster offen“ (auch als Push)
 - Portal zeigt die Pause auf der Klima-Karte

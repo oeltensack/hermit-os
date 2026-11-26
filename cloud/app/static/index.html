@@ -63,13 +63,14 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rng a{padding:4px 9px;border-radius:5px;background:var(--bg);font-size:12px;cursor:pointer;color:var(--fg)}.rng a.a{background:var(--a)}
 .app.cool{border-color:#2f9be044}.app.alarm{border-color:var(--e);box-shadow:0 0 18px #f8514922}.app.alarm .st{color:var(--e)}.app.cool .st{color:var(--a)}
-.app.cool .ai svg .drum{animation:spin 14s linear infinite;transform-box:fill-box;transform-origin:center}.tl{position:relative}.tl svg{display:block;width:100%;height:auto}
+.app.cool .ai svg .drum{animation:spin 14s linear infinite;transform-box:fill-box;transform-origin:center}.tl{position:relative}.app.heat{border-color:#e8833a66}.app.heat .st{color:#e8833a}.app.cool2{border-color:#2f9be066}.app.cool2 .st{color:var(--a)}
+.app.paused{border-color:var(--w)}.app.paused .st{color:var(--w)}.tg{padding:4px 9px;font-size:12px}.cltgt{font-size:22px;font-weight:700;min-width:70px;text-align:center}.tl svg{display:block;width:100%;height:auto}
 .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:600px){.stats4{grid-template-columns:repeat(2,1fr)}}
 .ro .admin-only{display:none!important}.vo .user-only{display:none!important}
 @media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
 <header><h1><img src="/icon-192.png" alt="">Pagurus Cloud</h1>
-<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
+<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="kl">Klima</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
 <section class="tab a" id="dv"><div id="scbar" class="row user-only" style="margin:6px 0 2px"></div><div id="devs"></div></section>
@@ -87,6 +88,13 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 <p class="l">Ohne Temperaturfühler wertet die Cloud das Laufverhalten des Kompressors aus. Üblich sind 25–50 % Laufanteil
 und Zyklen von 10–40 min. Dauerlauf deutet auf eine offene Tür oder einen Defekt hin, fehlende Zyklen auf Stromausfall oder
 einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine undichte Tür.</p>
+</section>
+
+<section class="tab" id="kl">
+<div class="row sp"><h3 style="margin:8px 0">Klimaanlagen</h3><span class="l" id="kl_sum"></span></div>
+<div class="apps" id="climates" style="grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr))"></div>
+<p class="l">Die Cloud zeichnet jede Minute Raum-, Soll- und Ausblastemperatur, Betrieb und Kompressor auf. Strom und Kosten
+kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
 </section>
 
 <section class="tab" id="en">
@@ -277,7 +285,7 @@ function sw(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/swit
 function cvAct(id,a){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{cover:a}});await loadDevs()})}
 function cvPos(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{pos:p}});await loadDevs()})}
 const CLM={cool:'Kühlen',heat:'Heizen',dry:'Entfeuchten',fan:'Lüften',auto:'Automatik'},CLF={auto:'Auto',low:'1',low_mid:'2',mid:'3',mid_high:'4',high:'5'};
-function clSet(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/climate',{method:'POST',body:p});await loadDevs()})}
+function clSet(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/climate',{method:'POST',body:p});await loadDevs();if(TAB=='kl')await loadClimates(true)})}
 function setBri(id,b){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{brightness:b}});await loadDevs()})}
 function devDlg(id){const d=DEVS.find(x=>x.id==id),rooms=[...new Set(DEVS.map(x=>x.room).filter(Boolean))];
 dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="dd_n" value="${esc(d.name)}">
@@ -287,7 +295,7 @@ ${(d.comp||'').startsWith('climate:')?`<label>Energiemesser</label><select id="d
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
 <div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
-function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs()},'Gespeichert')}
+function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
 function delDev(id){if(!confirm('Gerät mit allen gespeicherten Werten, Läufen und Sicherungen entfernen? Verbindet es sich wieder, erscheint es neu.'))return;run(async()=>{await api('devices/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadDevs()})}
 function showEn(id){document.querySelector('#nav a[data-t=en]').click();setTimeout(()=>{$('esel').value=id;PZ=null;loadEn()},50)}
 
@@ -351,6 +359,61 @@ return `<div class="app ${cls} ${f.online?'':'off'}"><div class="ah"><div class=
 <div><div class="v">${fmt(f.apower,0,'W')}</div><div class="l">jetzt</div></div><div><div class="v">${kwh(f.today_wh)}</div><div class="l">heute</div></div>
 <div><div class="v">${kwh(f.avg_wh)}</div><div class="l">Ø pro Tag${f.days?' ('+f.days+' T)':''}</div></div><div><div class="v">${f.year_cost!=null?eur(f.year_cost):'–'}</div><div class="l">pro Jahr${f.year_kwh!=null?' · '+fmt(f.year_kwh,0,'kWh'):''}</div></div></div>
 <div class="row sp"><span class="l">${hint}</span><span class="row"><a class="lk" style="font-size:12px" onclick="showEn('${esc(f.dev)}')">Verlauf</a><a class="lk admin-only" style="font-size:12px" onclick="frDlg('${esc(f.dev)}')">Einstellen</a></span></div></div>`}
+const FAN_I='<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="9" width="30" height="13" rx="3"/><path d="M9 18h22M12 27c0 3-2 3-2 6M20 27c0 3-2 3-2 6M28 27c0 3-2 3-2 6"/></svg>';
+let CL=[],CLT=0;
+async function loadClimates(force){if(!force&&Date.now()-CLT<15000)return;if(!force&&$('climates').contains(document.activeElement))return;
+CLT=Date.now();CL=await api('climates');
+const pw=CL.reduce((t,c)=>t+(c.meter&&c.meter.online&&c.meter.apower||0),0),e=CL.reduce((t,c)=>t+(c.e_today?c.e_today.wh:0),0);
+$('kl_sum').textContent=CL.some(c=>c.meter)?`jetzt ${fmt(pw,0,'W')} · heute ${kwh(e)}`:'';
+$('climates').innerHTML=CL.length?CL.map(clCard).join(''):'<div class="card empty" style="grid-column:1/-1">Noch keine Klimaanlage verbunden.<br>TCL-/Kesser-Anlagen mit Pagurus OS (ESP32) erscheinen hier automatisch.</div>';
+document.querySelectorAll('#climates .clc').forEach(b=>clHover(b,CL.find(c=>c.dev==b.dataset.dev)))}
+function clCard(c){const s=c.status||{},id=esc(c.dev),on=!!s.output,link=s.link!==false,p=c.winopen&&c.winopen.paused,t=s.target_C??24,ok=c.online&&link&&canSw();
+const cls=!c.online||!link?'off':p?'paused':on?(s.mode=='heat'?'heat':s.mode=='cool'?'cool2':'running'):'';
+const st=!c.online?'offline':!link?'Klimagerät antwortet nicht':p?'Pausiert':on?(CLM[s.mode]||s.mode)+' · '+fmt(t,t%1?1:0,'°C'):'Aus';
+const sub=p?esc(c.winopen.reason||'Fenster offen'):on?`Lüfter ${esc(CLF[s.fan]||s.fan||'–')}${s.compressor?' · Kompressor läuft':''}`:'';
+const tg=(k,l)=>`<button class="bt ${s[k]?'':'g'} tg" onclick="clSet('${id}',{${k}:${!s[k]}})">${l}</button>`;
+const m=c.meter,tod=c.today||{};
+return `<div class="app ${cls}"><div class="ah"><div class="ai" style="color:${on&&s.mode=='heat'?'#e8833a':'var(--a)'}">${FAN_I}</div>
+<div style="flex:1;min-width:0"><div class="row sp"><span class="dn">${esc(c.name)}</span><span class="l">${esc(c.room||'')}</span></div>
+<div class="st">${st}</div><div class="l">${sub}</div></div>
+<button class="sw ${on?'on':''}" ${ok?'':'disabled'} onclick="clSet('${id}',{on:${!on}})">${on?'AN':'AUS'}</button></div>
+${ok?`<div class="row" style="gap:6px"><button class="bt g" onclick="clSet('${id}',{target_C:${Math.max(16,Math.round(t)-1)}})">−</button><span class="cltgt">${fmt(t,t%1?1:0,'°C')}</span><button class="bt g" onclick="clSet('${id}',{target_C:${Math.min(31,Math.round(t)+1)}})">+</button>
+<select onchange="clSet('${id}',{mode:this.value})" style="width:auto">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+<select onchange="clSet('${id}',{fan:this.value})" style="width:auto">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>
+<div class="row" style="gap:5px">${tg('swing_v','Swing ↕')}${tg('swing_h','Swing ↔')}${tg('eco','Eco')}${tg('turbo','Turbo')}${tg('mute','Leise')}</div>`:''}
+<div class="stats4"><div><div class="v">${fmt(s.ext_temperature_C,1,'°C')}</div><div class="l">Raum</div></div><div><div class="v">${fmt(s.ext_humidity,0,'%')}</div><div class="l">Feuchte</div></div>
+<div><div class="v">${fmt(s.current_C,1,'°C')}</div><div class="l">am Gerät</div></div><div><div class="v">${fmt(s.outlet_C,1,'°C')}</div><div class="l">Ausblasluft</div></div>
+${m?`<div><div class="v">${m.online&&m.apower!=null?fmt(m.apower,0,'W'):'–'}</div><div class="l">Leistung</div></div><div><div class="v">${kwh(c.e_today&&c.e_today.wh)}</div><div class="l">heute · ${eur(c.e_today&&c.e_today.cost)}</div></div>
+<div><div class="v">${kwh(c.e_30&&c.e_30.wh)}</div><div class="l">30 Tage · ${eur(c.e_30&&c.e_30.cost)}</div></div>`:''}
+<div><div class="v">${dur((tod.on_m||0)*3600)}</div><div class="l">an heute · Kompr. ${dur((tod.comp_m||0)*3600)}</div></div></div>
+<div><div class="l" style="margin-bottom:3px">Letzte 24 Stunden</div><div class="tl clc" data-dev="${id}">${clChart(c)}<div class="tt"></div></div>
+<div class="l" style="font-size:11px;margin-top:2px"><span style="color:#e6e9ec">━</span> Raum <span style="color:#8a96a3">┅</span> Soll <span style="color:#e8833a">━</span> Ausblasluft${m?' <span style="color:#2f9be0">▇</span> Leistung':''} · Balken unten: <span style="color:#e8833a">Heizen</span> / <span style="color:#2f9be0">Kühlen</span></div></div>
+<div><div class="l" style="margin-bottom:3px">${m?'Verbrauch':'Laufzeit'} je Tag – 14 Tage</div>${clDays(c)}</div>
+<div class="row sp"><span class="l">Fenster offen: ${c.winopen?[c.winopen.sensors?c.winopen.sensors+' Kontakt'+(c.winopen.sensors>1?'e':''):'',c.winopen.drop?'Temperatursturz':''].filter(Boolean).join(' + '):'aus'}</span>
+<span class="row"><a class="lk admin-only" style="font-size:12px" onclick="woDlg('${id}')">Fenster offen …</a>${m?`<a class="lk" style="font-size:12px" onclick="showEn('${esc(m.id)}')">Energie</a>`:''}<a class="lk admin-only" style="font-size:12px" onclick="devDlg('${id}')">Gerät …</a></span></div></div>`}
+function clChart(c){const S=c.series||[],W2=400,H=150,t1=Date.now()/1000,t0=t1-86400,X=t=>(t-t0)/86400*W2;
+if(!S.length)return `<div class="empty" style="padding:20px">Noch keine Aufzeichnung.</div>`;
+const tv=S.flatMap(p=>[p[1],p[2],p[3]]).filter(v=>v!=null);let lo=Math.floor(Math.min(...tv)-1),hi=Math.ceil(Math.max(...tv)+1);if(hi-lo<6){hi+=3;lo-=3}
+const top=6,bot=H-30,Y=v=>top+(bot-top)*(1-(v-lo)/(hi-lo)),pmax=Math.max(...S.map(p=>p[7]||0));
+let g='';for(let v=Math.ceil(lo/5)*5;v<=hi;v+=5)g+=`<line x1="0" x2="${W2}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2a333c"/><text x="2" y="${Y(v)-2}" font-size="9" fill="#8a96a3">${v}°</text>`;
+if(pmax>0){let a='';S.forEach(p=>{if(p[7]>0){const h=(p[7]/pmax)*(bot-top)*0.45;a+=`<rect x="${X(p[0])}" y="${bot-h}" width="${W2/288+0.3}" height="${h}"/>`}});g+=`<g fill="#2f9be0" fill-opacity=".25">${a}</g><text x="${W2-2}" y="${top+8}" font-size="9" fill="#2f9be0" text-anchor="end">max ${num(pmax,0)} W</text>`}
+const line=(i,col,extra)=>{let d='',prev=null;S.forEach(p=>{if(p[i]==null){prev=null;return}d+=(prev==null||p[0]-prev>900?'M':'L')+X(p[0]).toFixed(1)+','+Y(p[i]).toFixed(1);prev=p[0]});return d?`<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" ${extra||''}/>`:''};
+g+=line(3,'#e8833a','stroke-opacity=".7"')+line(2,'#8a96a3','stroke-dasharray="4 3"')+line(1,'#e6e9ec');
+S.forEach(p=>{if(p[4])g+=`<rect x="${X(p[0])}" y="${bot+3}" width="${W2/288+0.3}" height="${p[5]?7:4}" fill="${p[6]=='heat'?'#e8833a':p[6]=='cool'?'#2f9be0':'#8a96a3'}"/>`});
+for(const h of [0,6,12,18,24]){const x=h/24*W2;g+=`<text x="${x}" y="${H-3}" font-size="10" fill="#8a96a3" text-anchor="${h==0?'start':h==24?'end':'middle'}">${h==24?'jetzt':'−'+(24-h)+' h'}</text>`}
+return `<svg viewBox="0 0 ${W2} ${H}">${g}<line class="ch" y1="${top}" y2="${bot}" stroke="#8a96a3" stroke-dasharray="3 3" style="display:none"/></svg>`}
+function clHover(box,c){const svg=box.querySelector('svg');if(!svg||!c)return;const S=c.series,t0=Date.now()/1000-86400,ch=svg.querySelector('.ch');
+svg.onmousemove=e=>{const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)*400/r.width,t=t0+x/400*86400;let b=S[0];for(const p of S)if(Math.abs(p[0]-t)<Math.abs(b[0]-t))b=p;
+const bx=(b[0]-t0)/86400*400;ch.setAttribute('x1',bx);ch.setAttribute('x2',bx);ch.style.display='';
+tip(box,`<b>${hm(b[0])}</b> · ${b[4]?esc(CLM[b[6]]||b[6]||'an')+(b[5]?', Kompressor':''):'aus'}<br>Raum ${fmt(b[1],1,'°C')} · Soll ${fmt(b[2],0,'°C')} · Ausblas ${fmt(b[3],1,'°C')}${b[7]!=null?'<br>'+fmt(b[7],0,'W'):''}`,bx*r.width/400,20)};
+svg.onmouseleave=()=>{ch.style.display='none';box.querySelector('.tt').style.display='none'}}
+function clDays(c){const D=c.days||[],W2=400,H=62,bw=W2/D.length,useE=!!c.meter,val=d=>useE?(d.wh||0):(d.on_m||0),mx=Math.max(...D.map(val),useE?100:1);
+let g='';D.forEach((d,i)=>{const v=val(d),h=v/mx*(H-16),x=i*bw+2,w=bw-4,hh=d.on_m?(d.heat_m/d.on_m):0,hc=d.on_m?(d.cool_m/d.on_m):0;
+const tt=`${new Date(d.day).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}: ${useE?kwh(d.wh)+' · '+eur((d.wh||0)/1000*PRICE/100)+' · ':''}an ${dur(d.on_m*3600)}${d.heat_m?', Heizen '+dur(d.heat_m*3600):''}${d.cool_m?', Kühlen '+dur(d.cool_m*3600):''}`;
+const col=hh>=hc&&hh>0?'#e8833a':hc>0?'#2f9be0':'#56606b';
+g+=`<rect x="${x}" y="${H-12-h}" width="${w}" height="${Math.max(h,v>0?1:0)}" rx="2" fill="${col}"><title>${tt}</title></rect>`;
+if(i%2==D.length%2)g+=`<text x="${x+w/2}" y="${H-1}" font-size="9" fill="#8a96a3" text-anchor="middle">${d.day.slice(8)}.</text>`});
+return `<svg viewBox="0 0 ${W2} ${H}" style="width:100%;height:auto;display:block">${g}</svg>`}
 let FR={types:{},items:[]};
 async function loadFridges(){FR=await api('fridges');
 $('fridges').innerHTML=FR.items.length?FR.items.map(frCard).join(''):`<div class="card empty" style="grid-column:1/-1">Noch kein Kühlgerät eingerichtet.<br>Kühlschrank oder Gefriertruhe an eine Steckdose mit Messung (z. B. Plug S oder Plug mit Messfirmware) und hier mit „Gerät hinzufügen“ zuordnen.</div>`;
@@ -369,8 +432,8 @@ dlg(`<h2>Fenster/Tür offen</h2><p class="l">Steht ein Kontakt länger offen, sc
 <p class="l">Der Temperatursturz nutzt den DHT22 am Klimagerät. Beim Abtauen im Winter kann die Temperatur am Gerät auch kurz fallen – Schwelle dann höher setzen.</p>
 <div class="row sp" style="margin-top:14px"><div>${on?`<button class="bt r" onclick="woDel('${esc(id)}')">Ausschalten</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="woSave('${esc(id)}')">Speichern</button></div></div>`)}
-function woSave(id){const n=v=>+String(v).replace(',','.');run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'POST',body:{sensors:[...document.querySelectorAll('.wo_s:checked')].map(c=>c.value),delay:n($('wo_d').value),close_delay:n($('wo_c').value),modes:[...document.querySelectorAll('.wo_m:checked')].map(c=>c.value),drop:$('wo_x').checked,drop_k:n($('wo_k').value),drop_min:n($('wo_n').value),drop_pause:n($('wo_p').value)}});closeDlg();await loadDevs()},'Gespeichert')}
-function woDel(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'DELETE'});closeDlg();await loadDevs()},'Ausgeschaltet')}
+function woSave(id){const n=v=>+String(v).replace(',','.');run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'POST',body:{sensors:[...document.querySelectorAll('.wo_s:checked')].map(c=>c.value),delay:n($('wo_d').value),close_delay:n($('wo_c').value),modes:[...document.querySelectorAll('.wo_m:checked')].map(c=>c.value),drop:$('wo_x').checked,drop_k:n($('wo_k').value),drop_min:n($('wo_n').value),drop_pause:n($('wo_p').value)}});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
+function woDel(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'DELETE'});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Ausgeschaltet')}
 async function frDlg(id){if(!Object.keys(FR.types).length)FR=await api('fridges');
 const f=FR.items.find(x=>x.dev==id),T=FR.types,t=f?f.type:'fridge',c=f?f.cfg:T[t];
 if(!DEVS.some(d=>'apower' in (d.status||{}))){toast('Kein Gerät mit Leistungsmessung verbunden');return}
@@ -623,7 +686,7 @@ $('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' �
 $('bk').textContent=(i.broker||location.hostname)+':1883';{const b=i.broker||location.hostname;if(!$('g2_br').value)$('g2_br').value=b;if(!$('g2_net').value&&/^\d+\.\d+\.\d+\.\d+$/.test(b))$('g2_net').value=b.replace(/\.\d+$/,'.0/24')}$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
 let busy=false;
 async function refresh(force){if(busy&&!force)return;busy=true;try{await loadInfo();await loadDevs();await loadAl();
-if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
+if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='kl')await loadClimates(force);if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
 refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 

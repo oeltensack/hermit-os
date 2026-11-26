@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 D.Koch – Pagurus OS
+"""Klimaanlagen: minuetlicher Verlauf (Raum-/Soll-/Ausblastemperatur, Betrieb, Kompressor) und Auswertung
+fuer den eigenen Bereich in der Cloud. Strom und Kosten kommen vom gekoppelten Energiemesser."""
+import json
+import threading
+import time
+from datetime import timedelta
+
+from core import KEEP_POWER_DAYS, now_local, price_eur_kwh, q
+
+MODES = ("heat", "cool", "dry", "fan", "auto")
+
+
+def init_db():
+    q("""CREATE TABLE IF NOT EXISTS climate_log(dev TEXT, ts INTEGER, on_ INTEGER, mode TEXT, target REAL,
+         room REAL, unit REAL, outlet REAL, hum REAL, comp INTEGER, PRIMARY KEY(dev, ts))""")
+
+
+def _f(v):
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def record():
+    ts = int(time.time()) // 60 * 60
+    for r in q("SELECT id, status FROM devices WHERE comp LIKE 'climate:%' AND online=1"):
+        st = json.loads(r["status"] or "{}")
+        if st.get("link") is False or "mode" not in st:
+            continue
+        q("""INSERT OR REPLACE INTO climate_log(dev, ts, on_, mode, target, room, unit, outlet, hum, comp)
+             VALUES(?,?,?,?,?,?,?,?,?,?)""",
+          (r["id"], ts, 1 if st.get("output") else 0, st.get("mode"), _f(st.get("target_C")),
+           _f(st.get("ext_temperature_C")), _f(st.get("current_C")), _f(st.get("outlet_C")),
+           _f(st.get("ext_humidity")), 1 if st.get("compressor") else 0))
+
+
+def _day_start(days_back=0):
+    d = now_local().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_back)
+    return int(d.timestamp())
+
+
+def _hours(dev, t0, t1=None):
+    t1 = t1 or int(time.time()) + 60
+    r = q("""SELECT SUM(on_) AS on_m, SUM(comp) AS comp_m,
+                    SUM(CASE WHEN on_=1 AND mode='heat' THEN 1 ELSE 0 END) AS heat_m,
+                    SUM(CASE WHEN on_=1 AND mode='cool' THEN 1 ELSE 0 END) AS cool_m
+             FROM climate_log WHERE dev=? AND ts>=? AND ts<?""", (dev, t0, t1), one=True)
+    return {k: round((r[k] or 0) / 60, 2) for k in ("on_m", "comp_m", "heat_m", "cool_m")}
+
+
+def _energy(meter, days):
+    if not meter:
+        return None
+    since = (now_local() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    r = q("SELECT SUM(wh) AS wh FROM energy WHERE dev=? AND day>=?", (meter, since), one=True)
+    wh = r["wh"] or 0.0
+    return {"wh": round(wh, 1), "cost": round(wh / 1000 * price_eur_kwh(), 2)}
+
+
+def series(dev, meter, hours=24):
+    """Verlauf in 5-Minuten-Schritten: [ts, raum, soll, ausblas, an, kompressor, modus, watt]."""
+    t0 = int(time.time()) - hours * 3600
+    rows = q("""SELECT ts/300*300 AS b, AVG(room) AS room, AVG(target) AS target, AVG(outlet) AS outlet,
+                       MAX(on_) AS on_, MAX(comp) AS comp, MAX(mode) AS mode
+                FROM climate_log WHERE dev=? AND ts>=? GROUP BY b ORDER BY b""", (dev, t0))
+    pw = {}
+    if meter:
+        for p in q("SELECT ts/300*300 AS b, AVG(w) AS w FROM power WHERE dev=? AND ts>=? GROUP BY b", (meter, t0)):
+            pw[p["b"]] = p["w"]
+    rnd = lambda v: None if v is None else round(v, 1)
+    return [[r["b"], rnd(r["room"]), rnd(r["target"]), rnd(r["outlet"]), r["on_"], r["comp"], r["mode"],
+             rnd(pw.get(r["b"]))] for r in rows]
+
+
+def days(dev, meter, n=14):
+    """Je Tag: kWh (Energiemesser), Stunden an, davon Heizen/Kuehlen, Kompressor."""
+    out = []
+    ewh = {}
+    if meter:
+        since = (now_local() - timedelta(days=n - 1)).strftime("%Y-%m-%d")
+        ewh = {r["day"]: r["wh"] for r in q("SELECT day, wh FROM energy WHERE dev=? AND day>=?", (meter, since))}
+    for i in range(n - 1, -1, -1):
+        t0 = _day_start(i)
+        day = time.strftime("%Y-%m-%d", time.localtime(t0))
+        h = _hours(dev, t0, t0 + 86400)
+        out.append({"day": day, "wh": round(ewh.get(day, 0.0), 1) if meter else None, **h})
+    return out
+
+
+def view(d, wo=None):
+    """d = Geraetezeile wie in /api/devices (dev_row)."""
+    dev = d["id"]
+    meter = (d.get("meter") or {}).get("id")
+    return {
+        "dev": dev, "name": d["name"] or dev, "room": d["room"], "online": d["online"], "status": d["status"],
+        "meter": d.get("meter"), "winopen": wo,
+        "today": _hours(dev, _day_start()),
+        "e_today": _energy(meter, 1), "e_30": _energy(meter, 30),
+        "series": series(dev, meter), "days": days(dev, meter),
+    }
+
+
+def cleanup():
+    q("DELETE FROM climate_log WHERE ts<?", (int(time.time()) - KEEP_POWER_DAYS * 86400,))
+
+
+def loop():
+    n = 0
+    while True:
+        try:
+            record()
+            n += 1
+            if n % 360 == 0:
+                cleanup()
+        except Exception as e:
+            print("Klima-Verlauf:", e, flush=True)
+        time.sleep(60 - time.time() % 60 + 1)
+
+
+def start():
+    init_db()
+    threading.Thread(target=loop, daemon=True).start()

@@ -24,6 +24,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 import blu
+import climate
 import core
 import energy_view
 import engine
@@ -209,6 +210,7 @@ def startup():
     core.init_db()
     blu.init_db()
     winopen.init_db()
+    climate.init_db()
     blu.BUS = BUS
     ensure_admin()
     pk = setting("push_kinds")                 # neue Push-Art in bestehende Auswahl aufnehmen (einmalig)
@@ -224,6 +226,7 @@ def startup():
     engine.start(BUS)
     shade.start(BUS)
     winopen.start(BUS)
+    climate.start()
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
     portal.start(devices)
@@ -358,6 +361,22 @@ async def dev_climate(dev: str, request: Request):
     return {"result": res}
 
 
+@app.get("/api/climates")
+def climates():
+    """Eigener Bereich Klimaanlagen: Zustand, Laufzeiten, Verbrauch, 24-h-Verlauf, 14 Tage."""
+    out = []
+    for r in q("SELECT * FROM devices WHERE comp LIKE 'climate:%' AND hidden=0 "
+               "ORDER BY COALESCE(NULLIF(room,''),'~'), COALESCE(NULLIF(name,''), id)"):
+        d = dev_row(r)
+        w = winopen.get(r["id"])
+        wo = None
+        if w:
+            wo = {**winopen.view(r["id"]), "sensors": len(w["cfg"]["sensors"]), "drop": w["cfg"]["drop"],
+                  "modes": w["cfg"]["modes"]}
+        out.append(climate.view(d, wo))
+    return out
+
+
 @app.get("/api/devices/{dev}/winopen")
 def winopen_get(dev: str, request: Request):
     get_dev(dev)
@@ -421,7 +440,7 @@ def dev_delete(dev: str, request: Request):
     get_dev(dev)
     rows = [dev] + ([] if "~" in dev else [r["id"] for r in q("SELECT id FROM devices WHERE id LIKE ?", (dev + "~%",))])
     for d in rows:                               # mit zweitem Kanal (Shelly 2.5)
-        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles", "winopen"):
+        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles", "winopen", "climate_log"):
             try:
                 q(f"DELETE FROM {t} WHERE dev=?", (d,))
             except Exception:
