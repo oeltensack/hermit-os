@@ -135,7 +135,7 @@ def local_ip_for(ip):
 def detect(dev):
     info = jget(dev, "/shelly")
     if info:
-        if str(info.get("fw_id", "")).startswith("hermit-os"):
+        if str(info.get("fw_id", "")).startswith(("hermit-os", "pagurus-os")):
             return "hermit", info
         if info.get("type") in GEN1_MODELS and "gen" not in info:
             return "stock", info
@@ -158,6 +158,8 @@ def variant_from(dev, kind, info, addon, meter=False, cover=None):
             v = "hermit-25-cover"                # Original-Firmware im Rollladenbetrieb
     elif kind == "hermit":                       # Modell z. B. HERMIT-1PM-ADDON
         m = str(info.get("model", "")).lower()
+        if m.startswith("pagurus-"):             # ab 1.20 heissen die Modelle PAGURUS-…; Dateien noch hermit-*
+            m = "hermit-" + m[len("pagurus-"):]
         v = m.replace("-addon", "").replace("-meter", "") if m.startswith("hermit-") else None
         if v and "addon" in m:
             addon = True
@@ -427,7 +429,7 @@ def find_by_mac(mac, near_ip):
         try:
             with urllib.request.urlopen(f"http://{ip}/shelly", timeout=1.5) as r:
                 j = json.loads(r.read())
-            if str(j.get("fw_id", "")).startswith("hermit-os") and norm_mac(j.get("mac")) == mac:
+            if str(j.get("fw_id", "")).startswith(("hermit-os", "pagurus-os")) and norm_mac(j.get("mac")) == mac:
                 return str(ip), j
         except Exception:
             pass
@@ -448,7 +450,7 @@ def wait_hermit(dev, seconds=180, mac=""):
     while time.time() - t0 < seconds:
         check_cancel()
         info = jget(dev, "/shelly", timeout=3) or {}
-        if str(info.get("fw_id", "")).startswith("hermit-os"):
+        if str(info.get("fw_id", "")).startswith(("hermit-os", "pagurus-os")):
             log(f"FERTIG: {info.get('id')} läuft mit {info.get('fw_id')} unter {dev.base}")
             return info
         if mac and time.time() >= next_mac:
@@ -462,7 +464,7 @@ def wait_hermit(dev, seconds=180, mac=""):
             check_cancel()
             time.sleep(0.5)
     log("Pagurus OS meldet sich nicht im Netz – vermutlich keine Verbindung zum WLAN.")
-    log("Das Gerät öffnet dann den Zugangspunkt 'hermit-…': damit verbinden, http://192.168.33.1 öffnen und das WLAN eintragen.")
+    log("Das Gerät öffnet dann den Zugangspunkt 'hermit-…' bzw. 'pagurus-…': damit verbinden, http://192.168.33.1 öffnen und das WLAN eintragen.")
     return None
 
 
@@ -574,7 +576,7 @@ def flash_tasmota(dev, args, variant, fw):
             die("tasmota-minimal meldet sich nicht – Gerät prüfen und erneut starten")
         body = tasmota_upload(dev, name, data)
     if not wait_for(lambda: is_loader(dev.get("/")[1]), 180, "Pagurus Loader"):
-        die("Loader meldet sich nicht unter der alten IP – evtl. AP 'hermit-loader-…' (kein WLAN gefunden)")
+        die("Loader meldet sich nicht unter der alten IP – evtl. AP 'hermit-loader-…' bzw. 'pagurus-loader-…' (kein WLAN gefunden)")
     flash_loader(dev, args, variant, fw)
 
 

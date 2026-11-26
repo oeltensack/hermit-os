@@ -292,7 +292,8 @@ async def rpc_async(dev, method, params=None, timeout=6):
 
 def is_hermit(r):
     info = json.loads(r["info"] or "{}")
-    return str(info.get("fw_id", "")).startswith("hermit") or str(r["model"] or "").startswith("HERMIT")
+    return str(info.get("fw_id", "")).startswith(("hermit", "pagurus")) or \
+        str(r["model"] or "").upper().startswith(("HERMIT", "PAGURUS"))
 
 
 def dev_row(r, latest=None):

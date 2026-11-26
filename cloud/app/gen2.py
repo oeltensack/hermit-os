@@ -105,7 +105,7 @@ def probe(ip, timeout=1.5):
         return None
     fw = str(d.get("fw_id", ""))
     return {"ip": str(ip), "id": d.get("id"), "model": d.get("model"), "app": d.get("app"), "gen": gen,
-            "name": d.get("name"), "auth": bool(d.get("auth_en")), "hermit": fw.startswith("hermit-os"),
+            "name": d.get("name"), "auth": bool(d.get("auth_en")), "hermit": fw.startswith(("hermit-os", "pagurus-os")),
             "known": bool(q("SELECT 1 FROM devices WHERE id=?", (d.get("id"),), one=True))}
 
 

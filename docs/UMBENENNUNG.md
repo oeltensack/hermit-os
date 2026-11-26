@@ -26,13 +26,13 @@ Erst lernen alle **Empfänger** beide Namen (Cloud, Portal, App, Flash-Tool), da
 
 ## Schritte
 
-### 1 – Empfänger verstehen beide Namen (gefahrlos, sofort möglich)
+### 1 – Empfänger verstehen beide Namen – erledigt (Cloud 1.22.7)
 - Cloud: `fw_id` beginnt mit `hermit-os` **oder** `pagurus-os`; Modell beginnt mit `HERMIT` **oder** `PAGURUS`.
 - Cloud: Gerät mit neuer ID, aber bekannter MAC → vorhandenen Eintrag übernehmen (Einstellungen,
   Regeln, Verlauf, Energiemesser, Wandtafeln, Klima-Zeitpläne, Fenster-offen).
 - Flash-Tool und Scanner: beide `fw_id`, beide Variantennamen.
-- Portal und App: nur Anzeige, prüfen.
-- Intern umbenennen: Logtexte, User-Agent, Kommentare, `#define`s, JS-Namen.
+- Portal und App: prüfen nichts am Namen – keine Änderung nötig.
+- Interne Texte der Firmware (Logtexte, User-Agent, `#define`s) wandern mit Schritt 2.
 
 ### 2 – Firmware 1.20.0 sendet „pagurus“
 - `fw_id` = `pagurus-os/<ver>`, Modell `PAGURUS-…`, Zugangspunkt `pagurus-…`, Loader `pagurus-loader-…`.

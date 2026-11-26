@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.7
+- Vorbereitung Umbenennung hermit → pagurus (docs/UMBENENNUNG.md, Schritt 1): Die Cloud erkennt Pagurus OS auch an
+  `pagurus-os` und Modellen `PAGURUS-…`. Meldet sich ein Gerät als `pagurus-…`, das noch als `hermit-…` bekannt ist,
+  wird der vorhandene Eintrag mit Kanälen, Verlauf, Energie, Regeln, Szenen und Wandtafeln auf die neue ID umgeschrieben.
+- Flash-Tool erkennt ebenfalls beide Namen.
+
 ## Pagurus OS 1.19.1
 - Flash-Tool: Feld „WLAN für das Gerät“ (SSID wird vom Gerät vorbelegt, Passwort eintragen). Die Daten werden vor
   dem Aufspielen fest in die Firmware eingetragen und haben beim ersten Start Vorrang – der Umstieg von

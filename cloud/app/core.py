@@ -40,6 +40,23 @@ def qid(sql, args=()):
     return q(sql, args, one=None)
 
 
+def rename_everywhere(old, new):
+    """Geraete-ID in allen Tabellen umschreiben: exakte Treffer, Kanaele (id~…) und Vorkommen in JSON-Texten
+    (Regeln, Szenen, Wandtafeln …). IDs enthalten die MAC und sind eindeutig, ein Textersatz ist daher sicher."""
+    n = 0
+    with _lock:
+        tables = [r[0] for r in DB.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+        for t in tables:
+            for c in DB.execute(f"PRAGMA table_info({t})").fetchall():
+                if (c[2] or "").upper() not in ("TEXT", ""):
+                    continue
+                cur = DB.execute(f'UPDATE OR IGNORE "{t}" SET "{c[1]}"=REPLACE("{c[1]}", ?, ?) WHERE instr("{c[1]}", ?) > 0',
+                                 (old, new, old))
+                n += cur.rowcount
+        DB.commit()
+    return n
+
+
 def _cols(table):
     return {r[1] for r in DB.execute(f"PRAGMA table_info({table})").fetchall()}
 

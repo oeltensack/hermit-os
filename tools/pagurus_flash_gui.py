@@ -230,7 +230,7 @@ class App:
                 try:
                     with urllib.request.urlopen(f"http://{ip}/shelly", timeout=1.2) as r:
                         j = json.loads(r.read())
-                    if str(j.get("fw_id", "")).startswith("hermit-os"):
+                    if str(j.get("fw_id", "")).startswith(("hermit-os", "pagurus-os")):
                         return f"{ip}   Pagurus OS · {j.get('model')} · {j.get('name') or j.get('id')}"
                     if j.get("type") in hf.GEN1_MODELS:
                         return f"{ip}   Original · {hf.GEN1_MODELS[j['type']][0]}"

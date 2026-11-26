@@ -168,7 +168,7 @@ sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
 <div class="scroll"><table id="g2tab" style="margin-top:8px"></table></div></div>
 
 <div class="card admin-only"><h2>Push-Nachrichten</h2><div class="f">
-<label>ntfy-Adresse</label><input id="p_ntfy" placeholder="https://ntfy.sh/hermit-langes-zufaelliges-thema">
+<label>ntfy-Adresse</label><input id="p_ntfy" placeholder="https://ntfy.sh/pagurus-langes-zufaelliges-thema">
 <label>ntfy-Token</label><input id="p_ntok" type="password" placeholder="optional">
 <label>Telegram-Bot-Token</label><input id="p_ttok" type="password" placeholder="optional">
 <label>Telegram-Chat-ID</label><input id="p_tchat" placeholder="optional">
@@ -316,7 +316,7 @@ ${DEVS.some(x=>x.channel_of==d.id)?`<label>Kanäle</label><label class="ck"><inp
 <div id="dd_chn" style="display:${d.combined?'contents':'none'}"><label>Name Kanal 1</label><input id="dd_c0" value="${esc(d.ch_label&&d.ch_label!='Kanal 1'?d.ch_label:'')}" placeholder="Kanal 1">
 ${DEVS.filter(x=>x.channel_of==d.id).map((x,i)=>`<label>Name Kanal ${i+2}</label><input class="dd_cx" data-id="${esc(x.id)}" value="${esc(chLabel(x,d).startsWith('Kanal ')?'':chLabel(x,d))}" placeholder="Kanal ${i+2}">`).join('')}</div>`:''}
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
-<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}${(d.gen||2)>=2&&!(d.comp||'').startsWith('climate:')&&d.comp!='sensor:0'&&!(d.comp||'').startsWith('pm1:')&&!(d.app||'').toUpperCase().startsWith('HERMIT')&&!String(d.model||'').toUpperCase().startsWith('HERMIT')?`<button class="bt g" onclick="btnDlg('${esc(id)}')">Taster …</button>`:''}</div>
+<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}${(d.gen||2)>=2&&!(d.comp||'').startsWith('climate:')&&d.comp!='sensor:0'&&!(d.comp||'').startsWith('pm1:')&&!/^(HERMIT|PAGURUS)/.test((d.app||'').toUpperCase())&&!/^(HERMIT|PAGURUS)/.test(String(d.model||'').toUpperCase())?`<button class="bt g" onclick="btnDlg('${esc(id)}')">Taster …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
 function saveDev(id){run(async()=>{if($('dd_cb')){const d=DEVS.find(x=>x.id==id),base=($('dd_n').value||id).trim();
 await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:{combine:$('dd_cb').checked,ch_label:$('dd_c0').value}});

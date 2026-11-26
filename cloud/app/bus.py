@@ -12,6 +12,7 @@ import paho.mqtt.client as mqtt
 import blu
 import engine
 import shade
+import core
 from core import OFFLINE_ALERT_AFTER, alert, dev_name, now_local, q, today
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
@@ -376,7 +377,27 @@ def known(dev):
 
 
 def ensure(dev):
+    if dev.startswith("pagurus-"):
+        rename_legacy(dev)
     q("INSERT OR IGNORE INTO devices(id, first_seen) VALUES(?,?)", (dev, time.time()))
+
+
+_RENAMED = set()
+
+
+def rename_legacy(dev):
+    """Geraet meldet sich als pagurus-…, ist aber noch als hermit-… bekannt (neu geflasht nach der Umbenennung):
+    vorhandenen Eintrag samt Kanaelen, Verlauf, Regeln usw. auf die neue ID umschreiben statt neu anzulegen."""
+    base = dev.split("~")[0]
+    if base in _RENAMED:
+        return
+    _RENAMED.add(base)
+    old = "hermit-" + base[len("pagurus-"):]
+    if q("SELECT 1 FROM devices WHERE id=?", (base,), one=True) or \
+            not q("SELECT 1 FROM devices WHERE id=?", (old,), one=True):
+        return
+    n = core.rename_everywhere(old, base)
+    print(f"Geraet {old} heisst jetzt {base} – {n} Eintraege uebernommen", flush=True)
 
 
 def seen(dev, online=None):

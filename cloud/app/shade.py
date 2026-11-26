@@ -82,7 +82,7 @@ def fetch_weather():
            "&current=temperature_2m,cloud_cover,shortwave_radiation,wind_gusts_10m,is_day"
            "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1" % loc)
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "HermitCloud"}), timeout=15) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "PagurusCloud"}), timeout=15) as r:
             d = json.loads(r.read())
         c, dl = d.get("current") or {}, d.get("daily") or {}
         WX.update(ok=True, ts=time.time(), err="", temp=c.get("temperature_2m"), clouds=c.get("cloud_cover"),
