@@ -119,7 +119,8 @@ def record():
         q("""INSERT OR REPLACE INTO climate_log(dev, ts, on_, mode, target, room, unit, outlet, hum, comp)
              VALUES(?,?,?,?,?,?,?,?,?,?)""",
           (r["id"], ts, 1 if st.get("output") else 0, st.get("mode"), _f(st.get("target_C")),
-           _f(st.get("ext_temperature_C")), _f(st.get("current_C")), _f(st.get("outlet_C")),
+           _f(st.get("ext_temperature_C")) if _f(st.get("ext_temperature_C")) is not None else _f(st.get("current_C")),
+           _f(st.get("current_C")), _f(st.get("outlet_C")),
            _f(st.get("ext_humidity")), 1 if st.get("compressor") else 0))
 
 

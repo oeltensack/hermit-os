@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.21.4
+- Bereich Klima, Midea: Raumtemperatur im 24-h-Verlauf kommt vom Gerätefühler, wenn kein DHT22 da ist; „Kompressor“ nur bei Anlagen, die ihn melden (TCL)
+
 ## Pagurus Cloud 1.21.3
 - Reine Messgeräte (Shelly Plus PM Mini, Mini PM G3, Komponente `pm1:0`) werden erkannt: Leistung, Spannung, Strom, Verbrauch und Kosten, Energieverlauf; kein Schaltknopf mehr. Auch für Kühlgerät-/Fertig-Erkennung und als Energiemesser der Klimaanlage nutzbar; Raum-Schalten und Szenen lassen sie aus
 

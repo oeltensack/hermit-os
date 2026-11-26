@@ -404,7 +404,7 @@ ${(s.extras||[]).includes('display')?`<button class="bt g" onclick="clSet('${id}
 <div><div class="v">${fmt(s.current_C,1,'°C')}</div><div class="l">${tcl?'am Gerät':'Raum'}</div></div>${tcl?`<div><div class="v">${fmt(s.outlet_C,1,'°C')}</div><div class="l">Ausblasluft</div></div>`:''}${s.outdoor_C!=null?`<div><div class="v">${fmt(s.outdoor_C,1,'°C')}</div><div class="l">Außen</div></div>`:''}
 ${m?`<div><div class="v">${m.online&&m.apower!=null?fmt(m.apower,0,'W'):'–'}</div><div class="l">Leistung</div></div><div><div class="v">${kwh(c.e_today&&c.e_today.wh)}</div><div class="l">heute · ${eur(c.e_today&&c.e_today.cost)}</div></div>
 <div><div class="v">${kwh(c.e_30&&c.e_30.wh)}</div><div class="l">30 Tage · ${eur(c.e_30&&c.e_30.cost)}</div></div>`:''}
-<div><div class="v">${dur((tod.on_m||0)*3600)}</div><div class="l">an heute · Kompr. ${dur((tod.comp_m||0)*3600)}</div></div></div>
+<div><div class="v">${dur((tod.on_m||0)*3600)}</div><div class="l">an heute${'compressor' in s?' · Kompr. '+dur((tod.comp_m||0)*3600):''}</div></div></div>
 <div><div class="l" style="margin-bottom:3px">Letzte 24 Stunden</div><div class="tl clc" data-dev="${id}">${clChart(c)}<div class="tt"></div></div>
 <div class="l" style="font-size:11px;margin-top:2px"><span style="color:#e6e9ec">━</span> Raum <span style="color:#8a96a3">┅</span> Soll <span style="color:#e8833a">━</span> Ausblasluft${m?' <span style="color:#2f9be0">▇</span> Leistung':''} · Balken unten: <span style="color:#e8833a">Heizen</span> / <span style="color:#2f9be0">Kühlen</span></div></div>
 <div><div class="l" style="margin-bottom:3px">${m?'Verbrauch':'Laufzeit'} je Tag – 14 Tage</div>${clDays(c)}</div>
