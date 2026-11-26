@@ -146,6 +146,18 @@ for model, names in MODELS.items():
     print("  ", out.name)
 
 
+# Scanner einzeln (ohne Firmware)
+sv = re.search(r'VERSION = "([^"]+)"', (ROOT / "tools" / "pagurus_scanner.py").read_text()).group(1)
+top = f"Pagurus-Scanner-{sv}"
+with zipfile.ZipFile(dist / f"{top}.zip", "w", zipfile.ZIP_DEFLATED) as z:
+    z.write(ROOT / "Pagurus-Scanner.pyw", f"{top}/Pagurus-Scanner.pyw")
+    z.write(ROOT / "tools" / "pagurus_scanner.py", f"{top}/tools/pagurus_scanner.py")
+    z.write(ROOT / "tools" / "build_scanner.bat", f"{top}/tools/build_scanner.bat")
+    z.write(ROOT / "docs" / "SCANNER.md", f"{top}/SCANNER.md")
+    z.write(ROOT / "LICENSE", f"{top}/LICENSE")
+print("  ", f"{top}.zip")
+
+
 # ESP32-Klima: Programm (OTA) + Komplettabbild (Kabel) + Anleitung
 for model, fnames in EXTRA.items():
     top = f"Pagurus-OS-{version}-{model}"

@@ -13,6 +13,11 @@ Nur die Python-Standardbibliothek wird benoetigt.
 """
 import argparse
 import concurrent.futures
+import random
+import re
+import struct
+import subprocess
+import sys
 import csv
 import ipaddress
 import json
@@ -25,10 +30,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "1.0.0"
-PORT = int(os.environ.get("HERMIT_SCAN_PORT", "80"))       # nur fuer Tests anders
-TIMEOUT = 2.0
-WORKERS = 96
+VERSION = "1.1.0"
+PORT = int(os.environ.get("PAGURUS_SCAN_PORT", "80"))      # nur fuer Tests anders
+TIMEOUT = 4.0              # ESP8266 (Gen1) antwortet unter Last manchmal erst nach 2–3 s
+WORKERS = 48               # weniger gleichzeitige Verbindungen: WLAN-Geraete verlieren sonst Anfragen
+CONNECT_1 = 1.2            # 1. Durchgang: Verbindungsaufbau
+CONNECT_2 = 2.5            # 2. Durchgang fuer alle, die nicht geantwortet haben
 
 GEN1_NAMES = {
     "SHSW-1": "Shelly 1", "SHSW-PM": "Shelly 1PM", "SHSW-L": "Shelly 1L", "SHSW-25": "Shelly 2.5",
@@ -41,7 +48,7 @@ GEN1_NAMES = {
     "SHBTN-1": "Shelly Button1", "SHBTN-2": "Shelly Button1", "SHGS-1": "Shelly Gas", "SHSM-01": "Shelly Smoke",
     "SHSEN-1": "Shelly Sense", "SH2LED-1": "Shelly RGBW2 LED", "SHSPOT-1": "Shelly Spot", "SHSPOT-2": "Shelly Spot 2",
 }
-KINDS = ("Pagurus OS", "Shelly Gen1", "Shelly Gen2+", "Tasmota")
+KINDS = ("Pagurus OS", "Shelly Gen1", "Shelly Gen2+", "Tasmota", "Unbekannt")
 
 
 # ======================= Netzbereiche =======================
@@ -106,9 +113,22 @@ def parse_ranges(text):
 
 
 # ======================= Abfragen =======================
-def http_json(ip, path, timeout=TIMEOUT, auth=None):
+def http_json(ip, path, timeout=TIMEOUT, auth=None, tries=3):
+    """JSON holen; bei Zeitueberschreitung/Verbindungsfehler bis zu 'tries' Versuche (WLAN verliert Pakete)."""
+    for i in range(tries):
+        r = _http_json(ip, path, timeout, auth)
+        if r is not _FAIL:
+            return r
+        time.sleep(0.4 + 0.4 * i + random.random() * 0.3)
+    return None
+
+
+_FAIL = object()
+
+
+def _http_json(ip, path, timeout, auth):
     url = f"http://{ip}:{PORT}{path}" if PORT != 80 else f"http://{ip}{path}"
-    req = urllib.request.Request(url, headers={"User-Agent": f"HermitScanner/{VERSION}"})
+    req = urllib.request.Request(url, headers={"User-Agent": f"PagurusScanner/{VERSION}", "Connection": "close"})
     opener = urllib.request.build_opener()
     if auth:
         pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
@@ -118,21 +138,91 @@ def http_json(ip, path, timeout=TIMEOUT, auth=None):
     try:
         with opener.open(req, timeout=timeout) as r:
             body = r.read(200_000)
-        return json.loads(body.decode("utf-8", "replace"))
     except urllib.error.HTTPError as e:
-        if e.code == 401:
-            return {"__auth__": True}
-        return None
+        return {"__auth__": True} if e.code == 401 else None       # Antwort da, aber nichts Passendes
     except Exception:
+        return _FAIL                                               # keine Antwort: nochmal versuchen
+    try:
+        return json.loads(body.decode("utf-8", "replace"))
+    except ValueError:
         return None
 
 
-def port_open(ip, timeout=0.7):
+def port_open(ip, timeout=CONNECT_1, tries=1):
+    for _ in range(tries):
+        try:
+            with socket.create_connection((ip, PORT), timeout=timeout):
+                return True
+        except ConnectionRefusedError:
+            return False                         # Geraet da, aber kein Webserver
+        except OSError:
+            pass
+    return False
+
+
+# ======================= Zusaetzliche Quellen: mDNS und ARP-Tabelle =======================
+def _mdns_query(names):
+    """DNS-Anfrage (PTR) fuer mehrere Dienste; Bit 'Antwort direkt an mich' (QU) gesetzt."""
+    pkt = struct.pack(">HHHHHH", 0, 0, len(names), 0, 0, 0)
+    for n in names:
+        for lab in n.strip(".").split("."):
+            pkt += bytes([len(lab)]) + lab.encode()
+        pkt += b"\x00" + struct.pack(">HH", 12, 0x8001)
+    return pkt
+
+
+def mdns_discover(seconds=3.0):
+    """Geraete, die sich per mDNS melden (Shelly Gen1/Gen2+, Pagurus OS, viele Tasmota): Absender-IPs."""
+    found = set()
+    q = _mdns_query(["_shelly._tcp.local", "_http._tcp.local", "_hap._tcp.local"])
+    socks = []
+    for ip in local_ipv4() or ["0.0.0.0"]:
+        try:
+            so = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            so.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+            if ip != "0.0.0.0":
+                so.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(ip))
+            so.bind((ip, 0))
+            so.settimeout(0.2)
+            socks.append(so)
+        except OSError:
+            pass
+    end = time.time() + seconds
+    sent = 0
+    while time.time() < end:
+        if sent < 3 and time.time() > end - seconds + sent * 0.9:   # dreimal fragen
+            for so in socks:
+                try:
+                    so.sendto(q, ("224.0.0.251", 5353))
+                except OSError:
+                    pass
+            sent += 1
+        for so in socks:
+            try:
+                _, addr = so.recvfrom(9000)
+                found.add(addr[0])
+            except OSError:
+                pass
+    for so in socks:
+        so.close()
+    found.difference_update(local_ipv4())
+    return found
+
+
+def arp_ips():
+    """IPs aus der ARP-Tabelle des PCs (Geraete, die zuletzt im Netz aktiv waren)."""
     try:
-        with socket.create_connection((ip, PORT), timeout=timeout):
-            return True
-    except OSError:
-        return False
+        kw = {"creationflags": 0x08000000} if sys.platform == "win32" else {}   # ohne Konsolenfenster
+        out = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=5, **kw).stdout
+    except Exception:
+        return set()
+    ips = set()
+    for line in out.splitlines():
+        m = re.search(r"(\d+\.\d+\.\d+\.\d+)[^0-9a-fA-F]+([0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:]"
+                      r"[0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2})", line)
+        if m and not m.group(2).lower().startswith(("ff-ff", "ff:ff", "01-00-5e", "01:00:5e")):
+            ips.add(m.group(1))
+    return ips
 
 
 def fmt_mac(m):
@@ -153,15 +243,17 @@ def blank(ip):
             "power": None, "update": "", "uptime": "", "note": "", "gen": None, "url": f"http://{ip}/"}
 
 
-def probe(ip, auth=None):
-    """Erkennt Geraetetyp und liest die wichtigsten Werte. None = kein bekanntes Geraet."""
-    if not port_open(ip):
+def probe(ip, auth=None, connect=CONNECT_1, tries=1):
+    """Erkennt Geraetetyp und liest die wichtigsten Werte. None = keine Antwort auf Port 80.
+    Antwortet ein Geraet, ist aber weder Shelly noch Tasmota, kommt es als „Unbekannt“ zurueck."""
+    if not port_open(ip, connect, tries):
         return None
     d = blank(ip)
     sh = http_json(ip, "/shelly")
     if isinstance(sh, dict) and ("type" in sh or "gen" in sh or "model" in sh):
         gen = sh.get("gen") or (1 if "type" in sh else 2)
-        hermit = str(sh.get("fw_id", "")).startswith("hermit") or str(sh.get("model", "")).upper().startswith("HERMIT")
+        hermit = str(sh.get("fw_id", "")).startswith(("hermit", "pagurus")) or \
+            str(sh.get("model", "")).upper().startswith(("HERMIT", "PAGURUS"))
         d["gen"] = gen
         d["mac"] = fmt_mac(sh.get("mac"))
         if hermit or gen >= 2:
@@ -253,33 +345,58 @@ def probe(ip, auth=None):
         d["model"] = (tpl.get("NAME") if isinstance(tpl, dict) and tpl.get("NAME") else f"Modul {s.get('Module', '')}") \
             + (f" ({hw})" if hw else "")
         return d
-    return None
+    d["kind"] = "Unbekannt"
+    d["note"] = "Webserver, aber keine Shelly/Tasmota-Antwort"
+    return d
 
 
-def scan(ips, progress=None, stop=None, auth=None):
-    found = []
-    done = 0
+def scan(ips, progress=None, stop=None, auth=None, thorough=True):
+    """1. Durchgang ueber alle Adressen; parallel mDNS-Suche. 2. Durchgang (gruendlich) mit laengeren
+    Zeitlimits und Wiederholung fuer alle, die nicht geantwortet haben – zuerst die, die per mDNS oder in der
+    ARP-Tabelle als vorhanden auffallen. Adressen aus mDNS ausserhalb der Netze werden mit abgefragt."""
+    found = {}
     lock = threading.Lock()
-    with concurrent.futures.ThreadPoolExecutor(WORKERS) as ex:
-        futs = {ex.submit(probe, ip, auth): ip for ip in ips}
-        for f in concurrent.futures.as_completed(futs):
-            if stop and stop.is_set():
-                for x in futs:
-                    x.cancel()
-                break
-            r = None
-            try:
-                r = f.result()
-            except Exception:
-                pass
-            with lock:
-                done += 1
-                if r:
-                    found.append(r)
-            if progress:
-                progress(done, len(ips), r)
-    found.sort(key=lambda x: tuple(int(p) for p in x["ip"].split(".")))
-    return found
+    mdns = set()
+    md = threading.Thread(target=lambda: mdns.update(mdns_discover()), daemon=True) if thorough else None
+    if md:
+        md.start()
+    state = {"done": 0, "total": len(ips)}
+
+    def run(batch, **kw):
+        with concurrent.futures.ThreadPoolExecutor(WORKERS) as ex:
+            futs = {ex.submit(probe, ip, auth, **kw): ip for ip in batch}
+            for f in concurrent.futures.as_completed(futs):
+                if stop and stop.is_set():
+                    for x in futs:
+                        x.cancel()
+                    return
+                try:
+                    r = f.result()
+                except Exception:
+                    r = None
+                with lock:
+                    state["done"] += 1
+                    new = r and r["ip"] not in found
+                    if r:
+                        found[r["ip"]] = r
+                if progress:
+                    progress(state["done"], state["total"], r if new else None)
+
+    run(ips)
+    if thorough and not (stop and stop.is_set()):
+        if md:
+            md.join(5)
+        inside = set(ips)
+        hint = (mdns | arp_ips()) - set(found)
+        extra = sorted(ip for ip in mdns - inside - set(found))                    # mDNS ausserhalb der Netze
+        rest = [ip for ip in ips if ip not in found]
+        rest.sort(key=lambda ip: ip not in hint)                                  # Verdaechtige zuerst
+        again = extra + rest
+        state["total"] += len(again)
+        run(again, connect=CONNECT_2, tries=2)
+    rows = list(found.values())
+    rows.sort(key=lambda x: tuple(int(p) for p in x["ip"].split(".")))
+    return rows
 
 
 def reboot(d):
@@ -314,7 +431,7 @@ def cli(args):
     def prog(done, total, r):
         if r:
             print(f"  {r['ip']:15} {r['kind']:12} {r['name'][:22]:22} {r['model'][:30]:30} {r['fw']}")
-    rows = scan(ips, prog)
+    rows = scan(ips, prog, thorough=not args.schnell)
     print(f"\n{len(rows)} Geräte in {time.time() - t0:.1f} s: " +
           ", ".join(f"{k}: {sum(1 for r in rows if r['kind'] == k)}" for k in KINDS))
     if args.csv:
@@ -324,9 +441,15 @@ def cli(args):
 
 # ======================= Oberflaeche =======================
 def settings_path():
-    base = os.environ.get("APPDATA") or str(pathlib.Path.home() / ".config")
-    p = pathlib.Path(base) / "HermitScanner"
+    base = pathlib.Path(os.environ.get("APPDATA") or str(pathlib.Path.home() / ".config"))
+    p = base / "PagurusScanner"
     p.mkdir(parents=True, exist_ok=True)
+    old = base / "HermitScanner" / "settings.json"             # Einstellungen der alten Version uebernehmen
+    if old.exists() and not (p / "settings.json").exists():
+        try:
+            (p / "settings.json").write_bytes(old.read_bytes())
+        except OSError:
+            pass
     return p / "settings.json"
 
 
@@ -366,10 +489,12 @@ def gui():
     btn = ttk.Button(top, text="Suchen")
     btn.pack(side="left", padx=6)
     ttk.Button(top, text="Eigene Netze", command=lambda: rng.set(", ".join(default_ranges()))).pack(side="left")
+    thorough = tk.BooleanVar(value=cfg.get("thorough", True))
+    ttk.Checkbutton(top, text="Gründlich", variable=thorough).pack(side="left", padx=(8, 0))
 
     flt = ttk.Frame(root, padding=(8, 0))
     flt.pack(fill="x")
-    show = {k: tk.BooleanVar(value=True) for k in KINDS}
+    show = {k: tk.BooleanVar(value=k != "Unbekannt") for k in KINDS}
     for k in KINDS:
         ttk.Checkbutton(flt, text=k, variable=show[k], command=lambda: refill()).pack(side="left", padx=(0, 10))
     ttk.Label(flt, text="Filter:").pack(side="left", padx=(20, 4))
@@ -399,6 +524,7 @@ def gui():
     tv.tag_configure("Shelly Gen1", background="#f2f2f2")
     tv.tag_configure("Shelly Gen2+", background="#e3f6e8")
     tv.tag_configure("Tasmota", background="#fff4d6")
+    tv.tag_configure("Unbekannt", foreground="#777777")
 
     bot = ttk.Frame(root, padding=8)
     bot.pack(fill="x")
@@ -460,6 +586,7 @@ def gui():
         if not ips:
             return
         cfg["ranges"] = rng.get()
+        cfg["thorough"] = thorough.get()
         try:
             settings_path().write_text(json.dumps(cfg), "utf-8")
         except Exception:
@@ -470,20 +597,22 @@ def gui():
         running["v"] = True
         btn.config(text="Abbrechen")
         pb.config(maximum=len(ips), value=0)
+        deep = thorough.get()
         auth = ("admin", pw.get()) if pw.get() else None
         t0 = time.time()
 
         def prog(done, total, r):
             def ui():
-                pb.config(value=done)
-                status.set(f"Suche … {done}/{total} Adressen, {len(rows)} Geräte gefunden")
+                pb.config(maximum=total, value=done)
+                phase = "2. Durchgang" if done > len(ips) else "Suche"
+                status.set(f"{phase} … {done}/{total} Abfragen, {len(rows)} Geräte gefunden")
                 if r:
                     rows.append(r)
                     refill()
             root.after(0, ui)
 
         def work():
-            scan(ips, prog, stop, auth)
+            scan(ips, prog, stop, auth, deep)
 
             def fin():
                 running["v"] = False
@@ -524,7 +653,7 @@ def gui():
 
         def work():
             for r in s:
-                n = probe(r["ip"], ("admin", pw.get()) if pw.get() else None)
+                n = probe(r["ip"], ("admin", pw.get()) if pw.get() else None, CONNECT_2, 3)
                 if n:
                     rows[rows.index(r)] = n
             root.after(0, refill)
@@ -564,6 +693,7 @@ def main():
     ap = argparse.ArgumentParser(description="Findet Shelly (Gen1/Gen2+), Tasmota und Pagurus OS im Netz.")
     ap.add_argument("--cli", action="store_true", help="ohne Oberfläche, Ausgabe in der Konsole")
     ap.add_argument("--csv", help="Ergebnis als CSV speichern (mit --cli)")
+    ap.add_argument("--schnell", action="store_true", help="nur ein Durchgang, ohne mDNS/ARP")
     ap.add_argument("ranges", nargs="*", help="Netze, z. B. 192.168.4.0/24 192.168.5.10-80")
     a = ap.parse_args()
     if a.cli or a.csv:

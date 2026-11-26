@@ -1,5 +1,10 @@
 # Änderungen
 
+## Pagurus Scanner 1.1.0
+- Gründlicher: zwei Durchgänge (zweiter mit längeren Zeitlimits für alle, die nicht geantwortet haben), mDNS-Suche und ARP-Tabelle als zusätzliche Quellen, bis zu drei Versuche je Abfrage, weniger gleichzeitige Verbindungen – langsame oder beschäftigte Geräte (v. a. Gen1) wurden vorher teils übersprungen
+- Geräte mit Webserver, aber ohne Shelly/Tasmota-Antwort erscheinen als „Unbekannt“ (Filter, anfangs aus)
+- Letzte Hermit-Reste umbenannt (Kennung, Einstellungsordner – alte Einstellungen werden übernommen); eigenes Paket `Pagurus-Scanner-1.1.0.zip` mit `build_scanner.bat`
+
 ## Pagurus Cloud 1.21.1
 - Gen2/Gen3-Geräte ohne MQTT-Statusmeldungen (z. B. Shelly Plus 1 mit ausgeschalteten „Generic status update“ und „RPC status notifications“) blieben ohne Schaltzustand und ließen sich nicht schalten: Die Cloud holt den Status jetzt beim Verbinden per RPC und fragt solche Geräte alle 30 s ab; ein Hinweis erscheint unter Meldungen
 
