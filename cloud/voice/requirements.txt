@@ -1,0 +1,5 @@
+fastapi==0.115.*
+uvicorn==0.32.*
+faster-whisper==1.2.*
+piper-tts==1.8.*
+numpy<3

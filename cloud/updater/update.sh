@@ -28,6 +28,10 @@ do_update() {
   docker compose build cloud || return 1
   echo "-- Container neu starten"
   docker compose up -d mosquitto cloud || return 1
+  if docker ps -a --format '{{.Names}}' | grep -qx hermit-voice; then   # Sprachdienst nur, wenn eingerichtet
+    echo "-- Sprachdienst"
+    docker compose --profile voice build voice && docker compose --profile voice up -d voice
+  fi
   docker image prune -f >/dev/null 2>&1
   echo "== FERTIG $(date '+%H:%M:%S')"
 }

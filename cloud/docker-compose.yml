@@ -30,11 +30,28 @@ services:
       PUBLIC_BROKER: ${PUBLIC_BROKER:-}
       PORTAL_URL: ${PORTAL_URL:-}
       PORTAL_TOKEN: ${PORTAL_TOKEN:-}
+      VOICE_URL: ${VOICE_URL:-http://voice:10300}
       TZ: ${TZ:-Europe/Berlin}
     ports:
       - "${WEB_PORT:-8080}:8080"
     volumes:
       - ./data:/data
+
+  # Optional: Sprachdienst (Spracherkennung Whisper, Sprachausgabe Piper) fuer Sprachbefehle und die
+  # Sprach-Satelliten. Start mit:  docker compose --profile voice up -d
+  # Braucht ca. 1 GB RAM; die Modelle (ca. 550 MB) werden beim ersten Start geladen.
+  voice:
+    build: ./voice
+    image: hermit-voice:latest
+    container_name: hermit-voice
+    profiles: ["voice"]
+    restart: unless-stopped
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      PIPER_VOICE: ${PIPER_VOICE:-de_DE-thorsten-medium}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./voice-data:/data
 
   # Optional: eigener Push-Server (ntfy). Start mit:  docker compose --profile ntfy up -d
   # In der Cloud dann als ntfy-Adresse  http://<IP>:8090/<thema>  eintragen und in der ntfy-App
