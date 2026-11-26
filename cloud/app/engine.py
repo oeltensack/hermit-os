@@ -158,7 +158,7 @@ def resolve(target):
         return [val]
     if kind == "room":
         return [r["id"] for r in q("SELECT id, status FROM devices WHERE room=? AND hidden=0 "
-                                   "AND COALESCE(comp,'')!='sensor:0'", (val,))
+                                   "AND COALESCE(comp,'')!='sensor:0' AND COALESCE(comp,'') NOT LIKE 'pm1:%'", (val,))
                 if not json.loads(r["status"] or "{}").get("meter_only")]
     return []
 

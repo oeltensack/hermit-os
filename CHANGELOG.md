@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.21.3
+- Reine Messgeräte (Shelly Plus PM Mini, Mini PM G3, Komponente `pm1:0`) werden erkannt: Leistung, Spannung, Strom, Verbrauch und Kosten, Energieverlauf; kein Schaltknopf mehr. Auch für Kühlgerät-/Fertig-Erkennung und als Energiemesser der Klimaanlage nutzbar; Raum-Schalten und Szenen lassen sie aus
+
 ## Pagurus Cloud 1.21.2
 - Falsche Offline-Meldungen behoben: Geräte ohne Leistungsmessung (Plus 1, Plus 1 Mini, Plus i4, Mini G3 …) senden oft minutenlang nichts und galten nach 3 min als offline. Die Cloud fragt solche Geräte jetzt erst per `Sys.GetStatus` ab und meldet nur, wer wirklich nicht antwortet
 

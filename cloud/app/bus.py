@@ -19,7 +19,8 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_USER = os.environ.get("MQTT_USER", "")
 MQTT_PASS = os.environ.get("MQTT_PASS", "")
 SRC = "hermit-cloud"
-MAIN_COMPS = ("switch:", "cct:", "light:", "cover:", "climate:")
+MAIN_COMPS = ("switch:", "cct:", "light:", "cover:", "climate:", "pm1:")
+METER_COMPS = ("pm1:",)                   # reine Messgeraete (Plus PM Mini, Mini PM G3): kein Schalten
 
 
 # Geraete mit mehreren Schaltkanaelen (Shelly 2.5): Kanal 2 wird als eigene Zeile "<id>~1" gefuehrt –
@@ -258,7 +259,7 @@ class Bus:
             if not r or (r["gen"] or 2) < 2:
                 return
             st = json.loads(r["status"] or "{}")
-            if not (r["comp"] or "").startswith(MAIN_COMPS) or not any(k in st for k in ("output", "state", "mode")):
+            if not (r["comp"] or "").startswith(MAIN_COMPS) or not any(k in st for k in ("output", "state", "mode", "apower")):
                 self.fetch_status(dev)
             if dev in self.ntf_checked:
                 return
@@ -320,6 +321,8 @@ class Bus:
         if json.loads(r["status"] or "{}").get("meter_only"):
             raise RuntimeError(f"{dev_name(dev)}: Messfirmware – nicht schaltbar")
         comp = r["comp"] or "switch:0"
+        if comp.startswith(METER_COMPS):
+            raise RuntimeError(f"{dev_name(dev)}: Messgerät – nicht schaltbar")
         kind, cid = comp.split(":")
         if kind == "cover":                       # Rollladen: an = oeffnen, aus = schliessen
             st = json.loads(r["status"] or "{}")
