@@ -15,11 +15,33 @@ CLIMATE_KEYS = ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "t
 def init_db():
     q("""CREATE TABLE IF NOT EXISTS panels(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, token TEXT UNIQUE,
          tiles TEXT DEFAULT '[]', control INTEGER DEFAULT 1, created REAL)""")
+    cols = [r["name"] for r in q("PRAGMA table_info(panels)")]
+    if "bind" not in cols:                                     # an ein Geraet (Wall Display) oder eine IP gebunden
+        q("ALTER TABLE panels ADD COLUMN bind TEXT")
+
+
+def bind_ip(bind):
+    """Bindung -> aktuelle IP: Geraete-ID (IP aus der Cloud, folgt DHCP-Wechseln) oder feste IP."""
+    if not bind:
+        return None
+    r = q("SELECT ip FROM devices WHERE id=?", (bind,), one=True)
+    return (r["ip"] if r else None) or (bind if bind.count(".") == 3 else None)
 
 
 def all_panels():
     return [{"id": r["id"], "name": r["name"], "token": r["token"], "tiles": json.loads(r["tiles"] or "[]"),
-             "control": bool(r["control"])} for r in q("SELECT * FROM panels ORDER BY name")]
+             "control": bool(r["control"]), "bind": r["bind"] or "", "bind_ip": bind_ip(r["bind"])}
+            for r in q("SELECT * FROM panels ORDER BY name")]
+
+
+def by_ip(ip):
+    """Tafel fuer diesen Absender (kurze Adresse ohne Schluessel)."""
+    if not ip:
+        return None
+    for r in q("SELECT * FROM panels WHERE bind IS NOT NULL AND bind!=''"):
+        if bind_ip(r["bind"]) == ip:
+            return r
+    return None
 
 
 def by_token(tok):
@@ -34,11 +56,13 @@ def save(d):
             tiles.append(f"{k}:{v}")
     name = str(d.get("name") or "Wandtafel").strip()[:40]
     ctl = 1 if d.get("control", True) else 0
+    bind = str(d.get("bind") or "").strip()[:80] or None
     if d.get("id"):
-        q("UPDATE panels SET name=?, tiles=?, control=? WHERE id=?", (name, json.dumps(tiles), ctl, int(d["id"])))
+        q("UPDATE panels SET name=?, tiles=?, control=?, bind=? WHERE id=?",
+          (name, json.dumps(tiles), ctl, bind, int(d["id"])))
         return int(d["id"])
-    return qid("INSERT INTO panels(name, token, tiles, control, created) VALUES(?,?,?,?,?)",
-               (name, secrets.token_urlsafe(18), json.dumps(tiles), ctl, time.time()))
+    return qid("INSERT INTO panels(name, token, tiles, control, created, bind) VALUES(?,?,?,?,?,?)",
+               (name, secrets.token_urlsafe(18), json.dumps(tiles), ctl, time.time(), bind))
 
 
 def new_token(pid):

@@ -60,7 +60,7 @@ main::-webkit-scrollbar{display:none}
 <input type="range" id="ovr" min="1" max="100"><div class="b" style="flex:none;padding:.8rem 2rem" onclick="ovClose()">Fertig</div></div>
 <div id="toast"></div>
 <script>
-const TOK=location.pathname.split('/').filter(Boolean)[1]||'',$=i=>document.getElementById(i);
+const TOK=location.pathname.split('/').filter(Boolean)[1]||'-',$=i=>document.getElementById(i);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=(v,d)=>v==null||isNaN(v)?'–':(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const MODE={cool:'Kühlen',heat:'Heizen',dry:'Entf.',fan:'Lüften',auto:'Auto'},FAN={auto:'Auto',low:'1',low_mid:'2',mid:'3',mid_high:'4',high:'5'};

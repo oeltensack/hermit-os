@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse, PlainTextResponse
 
 import blu
 import climate
@@ -256,7 +256,9 @@ def startup():
 
 
 @app.get("/")
-def index():
+def index(request: Request):
+    if request.client and panel.by_ip(request.client.host):   # gebundenes Wall Display: gleich seine Tafel
+        return RedirectResponse("/wd", status_code=302)
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
@@ -481,28 +483,35 @@ def panels_delete(pid: int, request: Request):
     return {"ok": True}
 
 
-def _panel(tok):
-    p = panel.by_token(tok)
+def _panel(tok, request=None):
+    """Tafel ueber den Schluessel in der Adresse oder – kurze Adresse /wd – ueber die IP des Absenders."""
+    p = panel.by_ip(request.client.host if request and request.client else None) if tok == "-" else panel.by_token(tok)
     if not p:
-        raise HTTPException(404, "Unbekannte Wandtafel")
+        raise HTTPException(404, "Unbekannte Wandtafel – Adresse prüfen bzw. Gerät in der Cloud an die Tafel binden")
     return p
 
 
+@app.get("/wd")
+def wd_short(request: Request):
+    _panel("-", request)
+    return FileResponse(STATIC / "wd.html", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/wd/{tok}")
-def wd_page(tok: str):
-    _panel(tok)
+def wd_page(tok: str, request: Request):
+    _panel(tok, request)
     return FileResponse(STATIC / "wd.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/wd/{tok}/state")
-def wd_state(tok: str):
-    return panel.state(_panel(tok), devices())
+def wd_state(tok: str, request: Request):
+    return panel.state(_panel(tok, request), devices())
 
 
 @app.post("/wd/{tok}/act")
 async def wd_act(tok: str, request: Request):
     """Bedienung von der Tafel: nur Kacheln dieser Tafel, nur wenn die Tafel bedienen darf."""
-    p = _panel(tok)
+    p = _panel(tok, request)
     d = await request.json()
     tid, a, v = str(d.get("id") or ""), d.get("a"), d.get("v")
     if not p["control"] or not panel.allowed(p, tid):

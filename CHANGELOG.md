@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.1
+- Wandtafel an ein Gerät binden (Wall Display aus der Liste oder feste IP): Am Display genügt dann die kurze Adresse der Cloud (`http://<cloud>:8080`), die Cloud erkennt es an seiner IP und zeigt gleich die Tafel. Die IP folgt DHCP-Wechseln, wenn das Display in der Cloud verbunden ist
+
 ## Pagurus Cloud 1.22.0
 - **Wandtafeln** für das Shelly Wall Display oder ein Tablet (Einstellungen → Wandtafeln): eigene Seite `/wd/<schlüssel>` mit großen Kacheln, Räumen als Reiter, Szenen, Uhr und Außentemperatur. Schalten, Helligkeit (lange drücken), Rollladen ▲■▼, Klima (Soll ±, Modus, Lüfter, Ein/Aus), Fühler und Messgeräte. Zugriff nur auf die ausgewählten Kacheln, wahlweise nur Anzeige; „nur Anzeige“ einzelner Geräte gilt auch hier
 - **Taster** (Gerät → Bearbeiten → Taster …): Plus i4 und andere Gen2+-Eingänge – je Taste kurz/doppelt/lang Gerät, Raum oder Szene, ohne Shelly Cloud. i4-Karte ohne Schaltknopf, zeigt die zuletzt gedrückte Taste

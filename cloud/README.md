@@ -128,8 +128,10 @@ Eigene Bedienseite mit großen Kacheln für das Shelly Wall Display oder ein Tab
 
 1. Cloud → Einstellungen → **Wandtafeln** → „Neue Wandtafel“: Name, Kacheln (Geräte, Klimaanlagen, Rollläden,
    Fühler, Szenen) und ob geschaltet werden darf
-2. Die angezeigte Adresse (`http://<cloud>:8080/wd/<schlüssel>`) am Wall Display unter
-   **Einstellungen → Home Assistant** eintragen (oder im Browser des Tablets öffnen)
+2. Am Wall Display unter **Einstellungen → Home Assistant** die Adresse eintragen:
+   - mit **Gerät** (das Wall Display aus der Liste oder seine feste IP) genügt die kurze Adresse der Cloud,
+     z. B. `http://192.168.4.102:8080` – die Cloud erkennt das Display an seiner IP und zeigt gleich die Tafel
+   - ohne Gerät die lange Adresse mit Schlüssel (`http://<cloud>:8080/wd/<schlüssel>`), z. B. für ein Tablet
 
 Oben Uhr, Datum und Außentemperatur (aus der Beschattung), darunter Räume als Reiter und die Szenen.
 Tippen schaltet, langes Drücken auf ein dimmbares Licht öffnet den Helligkeitsregler. Klimaanlagen: Soll ±,

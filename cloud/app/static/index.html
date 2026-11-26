@@ -702,13 +702,19 @@ let PN=[],PUB='';
 async function loadPanels(){PN=await api('panels');if(!SCN.length)SCN=await api('scenes');
 $('pntab').innerHTML=PN.length?'<tr><th>Tafel</th><th>Kacheln</th><th>Adresse</th><th></th></tr>'+PN.map(p=>{const u=PUB+'/wd/'+p.token;
 return `<tr><td><b>${esc(p.name)}</b>${p.control?'':' <span class="tag">nur Anzeige</span>'}</td><td>${p.tiles.length}</td>
-<td><a class="lk" href="${esc(u)}" target="_blank" rel="noopener" style="word-break:break-all">${esc(u)}</a></td>
-<td class="n" style="white-space:nowrap"><a class="lk" onclick="navigator.clipboard&&navigator.clipboard.writeText('${esc(u)}').then(()=>toast('Adresse kopiert',1))">Kopieren</a> <a class="lk" onclick="pnDlg(${p.id})">Bearbeiten</a></td></tr>`}).join(''):'<tr><td class="empty">Noch keine Wandtafel.</td></tr>'}
+<td>${p.bind?`<b>${esc(PUB)}</b> <span class="l">– kurz, nur vom ${p.bind_ip?esc(devName(p.bind)!==p.bind?devName(p.bind)+' ('+p.bind_ip+')':p.bind_ip):'gebundenen Gerät (IP noch unbekannt)'}</span><br>`:''}
+<a class="lk" href="${esc(u)}" target="_blank" rel="noopener" style="word-break:break-all;font-size:12px">${esc(u)}</a></td>
+<td class="n" style="white-space:nowrap"><a class="lk" onclick="navigator.clipboard&&navigator.clipboard.writeText('${esc(p.bind?PUB:u)}').then(()=>toast('Adresse kopiert',1))">Kopieren</a> <a class="lk" onclick="pnDlg(${p.id})">Bearbeiten</a></td></tr>`}).join(''):'<tr><td class="empty">Noch keine Wandtafel.</td></tr>'}
 function pnDlg(id){const p=id?PN.find(x=>x.id==id):{name:'Wall Display',tiles:[],control:true},sel=new Set(p.tiles);
 const rooms=[...new Set(DEVS.map(d=>d.room||''))].sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
 const box=(v,l)=>`<label style="display:block"><input type="checkbox" class="pn_t" value="${esc(v)}" ${sel.has(v)?'checked':''} style="width:auto"> ${l}</label>`;
 dlg(`<h2>${id?'Wandtafel bearbeiten':'Neue Wandtafel'}</h2><div class="f"><label>Name</label><input id="pn_n" value="${esc(p.name)}">
 <label>Bedienung</label><label><input type="checkbox" id="pn_c" ${p.control?'checked':''} style="width:auto"> Schalten erlaubt (sonst nur Anzeige)</label>
+<label>Gerät</label><div><select id="pn_b" onchange="$('pn_ip').style.display=this.value=='ip'?'':'none'"><option value="">– keins (nur lange Adresse) –</option>
+${DEVS.filter(d=>/SAWD|WALLDISPLAY|WALL ?DISPLAY/i.test((d.model||'')+' '+(d.app||'')+' '+(d.name||''))&&!d.id.includes('~')).map(d=>`<option value="${esc(d.id)}" ${p.bind==d.id?'selected':''}>${esc(d.name||d.id)}${d.ip?' ('+esc(d.ip)+')':''}</option>`).join('')}
+<option value="ip" ${p.bind&&/^\d+\.\d+\.\d+\.\d+$/.test(p.bind)?'selected':''}>feste IP …</option></select>
+<input id="pn_ip" placeholder="192.168.3.217" value="${/^\d+\.\d+\.\d+\.\d+$/.test(p.bind||'')?esc(p.bind):''}" style="margin-top:4px;${/^\d+\.\d+\.\d+\.\d+$/.test(p.bind||'')?'':'display:none'}">
+<div class="l" style="font-size:12px;margin-top:3px">Mit Gerät genügt am Wall Display die kurze Adresse der Cloud (z. B. <b>${esc(PUB)}</b>) – die Cloud erkennt es an seiner IP.</div></div>
 ${id?`<label>Schlüssel</label><label><input type="checkbox" id="pn_k" style="width:auto"> neu erzeugen (alte Adresse wird ungültig)</label>`:''}</div>
 <div style="max-height:46vh;overflow:auto;margin-top:10px;columns:2 220px">
 ${SCN.length?`<div style="break-inside:avoid;margin-bottom:8px"><b>Szenen</b>${SCN.map(x=>box('scene:'+x.id,esc(x.name))).join('')}</div>`:''}
@@ -717,7 +723,8 @@ ${rooms.map(r=>`<div style="break-inside:avoid;margin-bottom:8px"><b>${r?esc(r):
 <div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="pnDel(${id})">Löschen</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="pnSave(${id||0})">Speichern</button></div></div>`)}
 function pnSave(id){const tiles=[...document.querySelectorAll('.pn_t:checked')].map(c=>c.value);
-run(async()=>{await api('panels',{method:'POST',body:{id:id||undefined,name:$('pn_n').value,control:$('pn_c').checked,tiles,new_token:$('pn_k')?$('pn_k').checked:false}});closeDlg();await loadPanels()},'Gespeichert')}
+const b=$('pn_b').value=='ip'?$('pn_ip').value.trim():$('pn_b').value;
+run(async()=>{await api('panels',{method:'POST',body:{id:id||undefined,name:$('pn_n').value,control:$('pn_c').checked,tiles,bind:b,new_token:$('pn_k')?$('pn_k').checked:false}});closeDlg();await loadPanels()},'Gespeichert')}
 function pnDel(id){if(!confirm('Wandtafel löschen? Die Adresse funktioniert danach nicht mehr.'))return;run(async()=>{await api('panels/'+id,{method:'DELETE'});closeDlg();await loadPanels()})}
 function savePortal(){const p={url:$('po_url').value};if($('po_tok').value)p.token=$('po_tok').value;
 run(async()=>{await api('settings',{method:'POST',body:{portal:p}});$('po_tok').value='';setTimeout(loadSet,3000);await loadSet()},'Gespeichert')}
