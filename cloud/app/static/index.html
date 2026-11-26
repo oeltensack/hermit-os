@@ -302,7 +302,7 @@ const CLM={cool:'Kühlen',heat:'Heizen',dry:'Entfeuchten',fan:'Lüften',auto:'Au
 function clModes(s){return Object.entries(CLM).filter(([k])=>!s.modes||s.modes.includes(k))}
 function clFans(s){if(!s.fans)return Object.entries(CLF);let n=0;return s.fans.map(k=>[k,k=='auto'?'Auto':String(++n)])}
 function clFanTxt(s){const f=clFans(s).find(x=>x[0]==s.fan);return f?f[1]:(s.fan||'–')}
-const CLX={swing_v:'Swing ↕',swing_h:'Swing ↔',eco:'Eco',turbo:'Turbo',mute:'Leise',sleep:'Nacht'},CLX_TCL=['swing_v','swing_h','eco','turbo','mute'];
+const CLX={swing_v:'Swing ↕',swing_h:'Swing ↔',eco:'Eco',turbo:'Turbo',mute:'Leise',sleep:'Nacht',display:'Anzeige'},CLX_TCL=['swing_v','swing_h','eco','turbo','mute','display'];
 function clStep(s,d){const st=s.step_C||1,mn=s.min_C||16,mx=s.max_C||31;return Math.max(mn,Math.min(mx,Math.round(((s.target_C||24)+d*st)/st)*st))}
 function clSet(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/climate',{method:'POST',body:p});await loadDevs();if(TAB=='kl')await loadClimates(true)})}
 function setBri(id,b){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{brightness:b}});await loadDevs()})}
@@ -406,8 +406,8 @@ return `<div class="app ${cls}"><div class="ah"><div class="ai" style="color:${o
 ${ok?`<div class="row" style="gap:6px"><button class="bt g" onclick="clSet('${id}',{target_C:${clStep(s,-1)}})">−</button><span class="cltgt">${fmt(t,t%1?1:0,'°C')}</span><button class="bt g" onclick="clSet('${id}',{target_C:${clStep(s,1)}})">+</button>
 <select onchange="clSet('${id}',{mode:this.value})" style="width:auto">${clModes(s).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
 <select onchange="clSet('${id}',{fan:this.value})" style="width:auto">${clFans(s).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select>
-${(s.extras||[]).includes('display')?`<button class="bt g" onclick="clSet('${id}',{display_toggle:true})">Anzeige</button>`:''}</div>
-<div class="row" style="gap:5px">${(s.extras||CLX_TCL).filter(k=>CLX[k]).map(k=>tg(k,CLX[k])).join('')}</div>`:''}
+${(s.extras||[]).includes('display')&&typeof s.display!='boolean'?`<button class="bt g" onclick="clSet('${id}',{display_toggle:true})">Anzeige</button>`:''}</div>
+<div class="row" style="gap:5px">${(s.extras||CLX_TCL).filter(k=>CLX[k]&&(k!='display'||typeof s.display=='boolean')).map(k=>tg(k,CLX[k])).join('')}</div>`:''}
 <div class="stats4">${tcl?`<div><div class="v">${fmt(s.ext_temperature_C,1,'°C')}</div><div class="l">Raum</div></div><div><div class="v">${fmt(s.ext_humidity,0,'%')}</div><div class="l">Feuchte</div></div>`:''}
 <div><div class="v">${fmt(s.current_C,1,'°C')}</div><div class="l">${tcl?'am Gerät':'Raum'}</div></div>${tcl?`<div><div class="v">${fmt(s.outlet_C,1,'°C')}</div><div class="l">Ausblasluft</div></div>`:''}${s.outdoor_C!=null?`<div><div class="v">${fmt(s.outdoor_C,1,'°C')}</div><div class="l">Außen</div></div>`:''}
 ${m?`<div><div class="v">${m.online&&m.apower!=null?fmt(m.apower,0,'W'):'–'}</div><div class="l">Leistung</div></div><div><div class="v">${kwh(c.e_today&&c.e_today.wh)}</div><div class="l">heute · ${eur(c.e_today&&c.e_today.cost)}</div></div>

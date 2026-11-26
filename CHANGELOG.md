@@ -1,5 +1,10 @@
 # Änderungen
 
+## Pagurus OS 1.19.2 / Pagurus Cloud 1.22.8
+- TCL-Klima: Anzeige am Innengerät schaltbar (Knopf „Anzeige“ in Cloud, Wandtafel, Portal und Modul-Webseite).
+  Bisher schaltete jeder Befehl aus der Cloud die Anzeige wieder ein – auch wenn sie per Fernbedienung aus war.
+  Jetzt bleibt der zuletzt gemeldete Zustand erhalten.
+
 ## Pagurus Cloud 1.22.7
 - Vorbereitung Umbenennung hermit → pagurus (docs/UMBENENNUNG.md, Schritt 1): Die Cloud erkennt Pagurus OS auch an
   `pagurus-os` und Modellen `PAGURUS-…`. Meldet sich ein Gerät als `pagurus-…`, das noch als `hermit-…` bekannt ist,

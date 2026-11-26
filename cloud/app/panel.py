@@ -9,7 +9,7 @@ import time
 
 from core import q, qid
 
-CLIMATE_KEYS = ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep")
+CLIMATE_KEYS = ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep", "display")
 
 
 def init_db():

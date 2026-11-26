@@ -56,7 +56,7 @@ class Ac {
   // Gewuenschten Zustand setzen (immer kompletter Satz – die Anlage uebernimmt alles)
   void set(const State& want) {
     uint8_t p[29] = {0};
-    p[2] = (want.power ? 0x04 : 0) | (beep ? 0x20 : 0) | 0x40 /* Anzeige an */ | (want.eco ? 0x80 : 0);
+    p[2] = (want.power ? 0x04 : 0) | (beep ? 0x20 : 0) | (want.display ? 0x40 : 0) | (want.eco ? 0x80 : 0);
     p[3] = SET_MODE[want.mode < 5 ? want.mode : 0] | (want.turbo ? 0x40 : 0) | (want.mute ? 0x80 : 0);
     int t = (int)lroundf(want.target);
     if (t < 16) t = 16;

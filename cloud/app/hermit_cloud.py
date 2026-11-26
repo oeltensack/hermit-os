@@ -403,7 +403,7 @@ async def dev_climate(dev: str, request: Request):
     not_locked(get_dev(dev))
     d = await request.json()
     p = {"id": 0}
-    for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep", "display_toggle"):
+    for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep", "display", "display_toggle"):
         if k in d:
             p[k] = d[k]
     try:

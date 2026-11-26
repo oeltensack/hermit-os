@@ -37,7 +37,7 @@ void acStatus(JsonObject o) {
   if (!isnan(s.outlet)) o["outlet_C"] = s.outlet;
   o["fan"] = tcl::FANS[s.fan];
   o["swing_v"] = s.swingV; o["swing_h"] = s.swingH;
-  o["eco"] = s.eco; o["turbo"] = s.turbo; o["mute"] = s.mute;
+  o["eco"] = s.eco; o["turbo"] = s.turbo; o["mute"] = s.mute; o["display"] = s.display;
   o["compressor"] = s.compressor;
 }
 
@@ -65,6 +65,7 @@ String acSet(JsonVariantConst p) {
   if (p["eco"].is<bool>()) w.eco = p["eco"];
   if (p["turbo"].is<bool>()) w.turbo = p["turbo"];
   if (p["mute"].is<bool>()) w.mute = p["mute"];
+  if (p["display"].is<bool>()) w.display = p["display"];   // Anzeige am Innengeraet
   ac.beep = cfg.beep;
   ac.set(w);
   ac.st = w;                                 // sofort anzeigen; die Antwort der Anlage bestaetigt

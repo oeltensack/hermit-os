@@ -60,7 +60,7 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 const $=i=>document.getElementById(i);
 const MODES=[['cool','Kühlen'],['heat','Heizen'],['dry','Entfeuchten'],['fan','Lüften'],['auto','Automatik']];
 const FANS=['auto','low','low_mid','mid','mid_high','high'];   // TCL; andere Anlagen melden ihre Liste selbst
-const EXTRAS=['swing_v','swing_h','eco','turbo','mute'],EXL={swing_v:'Swing ↕',swing_h:'Swing ↔',eco:'Eco',turbo:'Turbo',mute:'Leise',sleep:'Nacht'};
+const EXTRAS=['swing_v','swing_h','eco','turbo','mute','display'],EXL={swing_v:'Swing ↕',swing_h:'Swing ↔',eco:'Eco',turbo:'Turbo',mute:'Leise',sleep:'Nacht',display:'Anzeige'};
 const dez=(v,d)=>(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const f1=(v,u)=>v==null?'–':dez(v,1)+' '+u;
 let S=null,C=null,busy=false,pendT=null,tTimer=0;
@@ -82,7 +82,7 @@ function render(){const c=S['climate:0']||{},on=!!c.output;
  const md=c.modes||MODES.map(x=>x[0]),fa=c.fans||FANS,ex=c.extras||EXTRAS;let n=0;
  $('md').innerHTML=MODES.filter(([k])=>md.includes(k)).map(([k,l])=>`<button class="bt ${c.mode==k?'sel':''}" onclick="set({mode:'${k}'})">${l}</button>`).join('');
  $('fn').innerHTML=fa.map(k=>`<button class="bt ${c.fan==k?'sel':''}" onclick="set({fan:'${k}'})">${k=='auto'?'Auto':++n}</button>`).join('');
- $('ex').innerHTML=ex.filter(k=>EXL[k]).map(k=>`<button class="bt ${c[k]?'sel':''}" onclick="set({${k}:${!c[k]}})">${EXL[k]}</button>`).join('')+(ex.includes('display')?`<button class="bt" onclick="run(()=>rpc('Climate.DisplayToggle'))">Anzeige an/aus</button>`:'');
+ const dsb=typeof c.display=='boolean';$('ex').innerHTML=ex.filter(k=>EXL[k]&&(k!='display'||dsb)).map(k=>`<button class="bt ${c[k]?'sel':''}" onclick="set({${k}:${!c[k]}})">${EXL[k]}</button>`).join('')+(ex.includes('display')&&!dsb?`<button class="bt" onclick="run(()=>rpc('Climate.DisplayToggle'))">Anzeige an/aus</button>`:'');
  const w=S.wifi;$('ws').textContent=w.sta_ip?`Verbunden mit ${w.ssid} · ${w.sta_ip} · ${w.rssi} dBm`:'Nicht verbunden'+(w.ap?' – Zugangspunkt aktiv':'');
  $('qs').textContent=S.mqtt.connected?'MQTT verbunden':'MQTT nicht verbunden';
  const u=S.sys;$('fv').innerHTML=`Version ${C?C._ver:''} · Laufzeit ${Math.floor(u.uptime/3600)} h ${Math.floor(u.uptime%3600/60)} min · RAM frei ${Math.round(u.ram_free/1024)} KB`+(u.available_updates&&u.available_updates.stable?` · <b>neu: ${u.available_updates.stable.version}</b>`:'')+(u.upd_error?` · <span class="warn">${u.upd_error}</span>`:'');
