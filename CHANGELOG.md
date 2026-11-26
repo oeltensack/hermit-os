@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.4
+- Wandtafeln: Display direkt aus der Anfrageliste an eine Tafel binden („an … binden“)
+
 ## Pagurus Cloud 1.22.3
 - IP von Gen2+/Gen3-Geräten, die per MQTT verbunden sind, wird jetzt ermittelt (`WiFi.GetStatus` beim Verbinden und aus den Statusmeldungen) – vorher blieb sie leer, und eine an ein Gerät gebundene Wandtafel fand das Wall Display nicht
 - Einstellungen → Wandtafeln zeigt die letzten Anfragen von Displays an die Home-Assistant-Prüfung mit IP und Ergebnis

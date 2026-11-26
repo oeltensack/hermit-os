@@ -701,7 +701,7 @@ PUB=(s.public_url||location.origin).replace(/\/$/,'');
 await Promise.all([loadFw(),loadBk(),loadUsers(),loadUpd(),loadPanels()])}
 let PN=[],PUB='';
 async function loadPanels(){PN=await api('panels');const L=await api('panels/log').catch(()=>[]);
-$('pnlog').innerHTML=L.length?`<div class="l" style="margin-bottom:4px">Letzte Anfragen von Displays (Home-Assistant-Prüfung):</div><div class="scroll"><table>${L.slice(0,12).map(x=>`<tr><td>${hm(x.ts)}</td><td>${esc(x.ip||'?')}</td><td>${esc(x.m)} ${esc(x.p)}</td><td>${x.s<300||x.s==101?'<span class="tag g">'+x.s+'</span>':'<span class="tag r">'+x.s+'</span>'}</td><td class="l">${x.bound?'gebunden':'nicht gebunden – IP bei der Tafel eintragen'}</td></tr>`).join('')}</table></div>`:'';if(!SCN.length)SCN=await api('scenes');
+$('pnlog').innerHTML=L.length?`<div class="l" style="margin-bottom:4px">Letzte Anfragen von Displays (Home-Assistant-Prüfung):</div><div class="scroll"><table>${L.slice(0,12).map(x=>`<tr><td>${hm(x.ts)}</td><td>${esc(x.ip||'?')}</td><td>${esc(x.m)} ${esc(x.p)}</td><td>${x.s<300||x.s==101?'<span class="tag g">'+x.s+'</span>':'<span class="tag r">'+x.s+'</span>'}</td><td class="l">${x.bound?'gebunden':'nicht gebunden'}</td><td>${!x.bound&&x.ip?PN.map(p=>`<a class="lk admin-only" style="font-size:12px;white-space:nowrap" onclick="pnBind(${p.id},'${esc(x.ip)}')">an „${esc(p.name)}“ binden</a>`).join(' '):''}</td></tr>`).join('')}</table></div>`:'';if(!SCN.length)SCN=await api('scenes');
 $('pntab').innerHTML=PN.length?'<tr><th>Tafel</th><th>Kacheln</th><th>Adresse</th><th></th></tr>'+PN.map(p=>{const u=PUB+'/wd/'+p.token;
 return `<tr><td><b>${esc(p.name)}</b>${p.control?'':' <span class="tag">nur Anzeige</span>'}</td><td>${p.tiles.length}</td>
 <td>${p.bind?`<b>${esc(PUB)}</b> <span class="l">– kurz, nur vom ${p.bind_ip?esc(devName(p.bind)!==p.bind?devName(p.bind)+' ('+p.bind_ip+')':p.bind_ip):'gebundenen Gerät (IP noch unbekannt)'}</span><br>`:''}
@@ -727,6 +727,8 @@ ${rooms.map(r=>`<div style="break-inside:avoid;margin-bottom:8px"><b>${r?esc(r):
 function pnSave(id){const tiles=[...document.querySelectorAll('.pn_t:checked')].map(c=>c.value);
 const b=$('pn_b').value=='ip'?$('pn_ip').value.trim():$('pn_b').value;
 run(async()=>{await api('panels',{method:'POST',body:{id:id||undefined,name:$('pn_n').value,control:$('pn_c').checked,tiles,bind:b,new_token:$('pn_k')?$('pn_k').checked:false}});closeDlg();await loadPanels()},'Gespeichert')}
+function pnBind(id,ip){const p=PN.find(x=>x.id==id);if(!p)return;
+run(async()=>{await api('panels',{method:'POST',body:{id,name:p.name,control:p.control,tiles:p.tiles,bind:ip}});await loadPanels()},`${ip} an „${p.name}“ gebunden – am Display die Adresse noch einmal eintragen`)}
 function pnDel(id){if(!confirm('Wandtafel löschen? Die Adresse funktioniert danach nicht mehr.'))return;run(async()=>{await api('panels/'+id,{method:'DELETE'});closeDlg();await loadPanels()})}
 function savePortal(){const p={url:$('po_url').value};if($('po_tok').value)p.token=$('po_tok').value;
 run(async()=>{await api('settings',{method:'POST',body:{portal:p}});$('po_tok').value='';setTimeout(loadSet,3000);await loadSet()},'Gespeichert')}
