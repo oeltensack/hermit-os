@@ -30,11 +30,12 @@ import energy_view
 import engine
 import fridge
 import gen2
+import panel
 import portal
 import shade
 import winopen
 from bus import BUS, check_offline, seen, set_status
-from core import (DATA, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
+from core import (DATA, dev_name, KEEP_POWER_DAYS, OFFLINE_AFTER, TZ, alert, now_local, price_eur_kwh, q, qid,
                   set_setting, setting, today)
 
 VERSION = json.loads((Path(__file__).parent / "version.json").read_text())["version"]
@@ -232,6 +233,7 @@ def startup():
     blu.init_db()
     winopen.init_db()
     climate.init_db()
+    panel.init_db()
     blu.BUS = BUS
     ensure_admin()
     pk = setting("push_kinds")                 # neue Push-Art in bestehende Auswahl aufnehmen (einmalig)
@@ -397,6 +399,140 @@ async def dev_climate(dev: str, request: Request):
     except Exception as e:
         raise HTTPException(502, str(e))
     return {"result": res}
+
+
+# ======================= Taster (Plus i4 u. a.) =======================
+BTN_EVENTS = ("single_push", "double_push", "triple_push", "long_push")
+
+
+def _btn_rules(dev):
+    out = []
+    for r in q("SELECT * FROM rules"):
+        t = json.loads(r["trig"] or "{}")
+        if t.get("type") == "event" and t.get("dev") == dev and str(t.get("comp", "")).startswith("input:") \
+                and t.get("event") in BTN_EVENTS and t.get("btn"):
+            out.append((r, t))
+    return out
+
+
+@app.get("/api/buttons/{dev}")
+def buttons_get(dev: str, request: Request):
+    """Zuordnung Eingang × Druckart -> Aktion (intern als Regeln mit Kennzeichen btn gespeichert)."""
+    need(request, "admin")
+    get_dev(dev)
+    m = []
+    for r, t in _btn_rules(dev):
+        a = (json.loads(r["action"] or "[]") or [{}])[0]
+        m.append({"input": int(t["comp"].split(":")[1]), "event": t["event"], "target": a.get("target"),
+                  "mode": a.get("mode", "toggle"), "enabled": bool(r["enabled"])})
+    return {"map": m, "events": BTN_EVENTS}
+
+
+@app.post("/api/buttons/{dev}")
+async def buttons_save(dev: str, request: Request):
+    need(request, "admin")
+    get_dev(dev)
+    d = await request.json()
+    rows = []
+    for x in d.get("map") or []:
+        if not x.get("target"):
+            continue
+        if x.get("event") not in BTN_EVENTS:
+            raise HTTPException(400, "Unbekannte Druckart")
+        _target_ok(x["target"])
+        mode = x.get("mode") or "toggle"
+        if x["target"].startswith("scene:"):
+            mode = "on"
+        elif mode not in ("on", "off", "toggle"):
+            raise HTTPException(400, "Aktion: an, aus oder umschalten")
+        rows.append((int(x.get("input", 0)), x["event"], x["target"], mode))
+    for r, _ in _btn_rules(dev):
+        q("DELETE FROM rules WHERE id=?", (r["id"],))
+    names = {"single_push": "kurz", "double_push": "doppelt", "triple_push": "dreifach", "long_push": "lang"}
+    for inp, ev, target, mode in rows:
+        trig = {"type": "event", "dev": dev, "comp": f"input:{inp}", "event": ev, "btn": True}
+        act = [{"type": "switch", "target": target, "mode": mode}]
+        qid("INSERT INTO rules(name, enabled, trig, action) VALUES(?,?,?,?)",
+            (f"Taster {dev_name(dev)} {inp + 1} {names[ev]}", 1, json.dumps(trig), json.dumps(act)))
+    return {"ok": True, "count": len(rows)}
+
+
+# ======================= Wandtafeln (Wall Display) =======================
+@app.get("/api/panels")
+def panels_list(request: Request):
+    need(request, "admin")
+    return panel.all_panels()
+
+
+@app.post("/api/panels")
+async def panels_save(request: Request):
+    need(request, "admin")
+    d = await request.json()
+    pid = panel.save(d)
+    if d.get("new_token"):
+        panel.new_token(pid)
+    return {"id": pid}
+
+
+@app.delete("/api/panels/{pid}")
+def panels_delete(pid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM panels WHERE id=?", (pid,))
+    return {"ok": True}
+
+
+def _panel(tok):
+    p = panel.by_token(tok)
+    if not p:
+        raise HTTPException(404, "Unbekannte Wandtafel")
+    return p
+
+
+@app.get("/wd/{tok}")
+def wd_page(tok: str):
+    _panel(tok)
+    return FileResponse(STATIC / "wd.html", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/wd/{tok}/state")
+def wd_state(tok: str):
+    return panel.state(_panel(tok), devices())
+
+
+@app.post("/wd/{tok}/act")
+async def wd_act(tok: str, request: Request):
+    """Bedienung von der Tafel: nur Kacheln dieser Tafel, nur wenn die Tafel bedienen darf."""
+    p = _panel(tok)
+    d = await request.json()
+    tid, a, v = str(d.get("id") or ""), d.get("a"), d.get("v")
+    if not p["control"] or not panel.allowed(p, tid):
+        raise HTTPException(403, "Nicht erlaubt")
+    kind, _, ref = tid.partition(":")
+    try:
+        if kind == "scene":
+            errs = await asyncio.to_thread(engine.run_scene, int(ref))
+            return {"errors": errs}
+        not_locked(get_dev(ref))
+        if a == "toggle":
+            await asyncio.to_thread(BUS.switch, ref)
+        elif a == "bri":
+            await asyncio.to_thread(BUS.switch, ref, None, int(v))
+        elif a == "cover" and v in ("open", "stop", "close"):
+            await asyncio.to_thread(BUS.switch, ref, None, None, v)
+        elif a == "pos":
+            await asyncio.to_thread(BUS.switch, ref, None, None, None, int(v))
+        elif a == "climate" and isinstance(v, dict):
+            prm = {"id": 0, **{k: x for k, x in v.items() if k in panel.CLIMATE_KEYS}}
+            await asyncio.to_thread(BUS.rpc, ref, "Climate.Set", prm)
+            st = await asyncio.to_thread(BUS.rpc, ref, "Climate.GetStatus", {"id": 0})
+            set_status(ref, "climate:0", st, merge=True)
+        else:
+            raise HTTPException(400, "Unbekannte Aktion")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, str(e))
+    return {"ok": True}
 
 
 @app.get("/api/climates")

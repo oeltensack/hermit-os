@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.0
+- **Wandtafeln** für das Shelly Wall Display oder ein Tablet (Einstellungen → Wandtafeln): eigene Seite `/wd/<schlüssel>` mit großen Kacheln, Räumen als Reiter, Szenen, Uhr und Außentemperatur. Schalten, Helligkeit (lange drücken), Rollladen ▲■▼, Klima (Soll ±, Modus, Lüfter, Ein/Aus), Fühler und Messgeräte. Zugriff nur auf die ausgewählten Kacheln, wahlweise nur Anzeige; „nur Anzeige“ einzelner Geräte gilt auch hier
+- **Taster** (Gerät → Bearbeiten → Taster …): Plus i4 und andere Gen2+-Eingänge – je Taste kurz/doppelt/lang Gerät, Raum oder Szene, ohne Shelly Cloud. i4-Karte ohne Schaltknopf, zeigt die zuletzt gedrückte Taste
+
 ## Pagurus Cloud 1.21.4
 - Bereich Klima, Midea: Raumtemperatur im 24-h-Verlauf kommt vom Gerätefühler, wenn kein DHT22 da ist; „Kompressor“ nur bei Anlagen, die ihn melden (TCL)
 

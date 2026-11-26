@@ -145,6 +145,12 @@ kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
 <label>Adresse der Cloud</label><input id="s_pub" placeholder="http://192.168.0.50:8080 (für URL-Auslöser)">
 </div><p class="l">Standort nur für Zeitpläne mit Sonnenauf-/untergang. Kosten werden mit dem aktuellen Preis berechnet.</p><button class="bt" onclick="saveBase()">Speichern</button></div>
 
+<div class="card admin-only"><h2>Wandtafeln (Wall Display)</h2>
+<p class="l">Eigene Bedienseite für das Shelly Wall Display oder ein Tablet: große Kacheln, nach Räumen sortiert, mit Szenen.
+Am Wall Display unter <b>Einstellungen → Home Assistant</b> die Adresse eintragen. Sie enthält einen geheimen Schlüssel – wer sie kennt,
+sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
+<div class="scroll"><table id="pntab"></table></div><button class="bt g" style="margin-top:8px" onclick="pnDlg()">Neue Wandtafel</button></div>
+
 <div class="card admin-only"><h2>Fernzugang-Portal</h2>
 <p class="l">PHP-Seite auf einem Webhosting (Ordner <code>portal/</code> im Repo). Die Cloud meldet sich dort von sich aus per HTTPS, holt Schaltbefehle ab und überträgt Zustand und Meldungen – kein offener Port nötig.</p>
 <div class="f"><label>Portal-Adresse</label><input id="po_url" placeholder="https://deine-domain.de/pagurus/">
@@ -240,13 +246,13 @@ const nIn=x=>+String(x).replace(',','.')||0;
 
 // ---------- Geraete ----------
 const CVS={open:'offen',closed:'geschlossen',opening:'öffnet …',closing:'schließt …',stopped:'angehalten',calibrating:'kalibriert …'};
-function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0',pmo=(d.comp||'').startsWith('pm1:');const canD=x=>canSw()&&!x.locked;const chs=d.channels?[d,...d.channels]:null,tw=chs?chs.reduce((t,c)=>t+((c.status||{}).apower||0),0):s.apower,twh=chs?chs.reduce((t,c)=>t+(c.today_wh||0),0):d.today_wh,tco=chs?chs.reduce((t,c)=>t+(c.today_cost||0),0):d.today_cost;
+function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0',pmo=(d.comp||'').startsWith('pm1:'),inp=nInputs(d)==4&&!('output' in s);const canD=x=>canSw()&&!x.locked;const chs=d.channels?[d,...d.channels]:null,tw=chs?chs.reduce((t,c)=>t+((c.status||{}).apower||0),0):s.apower,twh=chs?chs.reduce((t,c)=>t+(c.today_wh||0),0):d.today_wh,tco=chs?chs.reduce((t,c)=>t+(c.today_cost||0),0):d.today_cost;
 const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
 <div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Batteriefühler · zuletzt '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
 <div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.winopen&&d.winopen.paused?`<span class="tag y" title="${esc(d.winopen.reason||'')}">Pausiert: ${d.winopen.until?'Temperatursturz':'Fenster offen'}</span>`:''}${d.locked?'<span class="tag" title="Schalten von Hand gesperrt, Automatik läuft">🔒 nur Anzeige</span>':''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
-<div class="dv"${chs?' style="flex-direction:column;align-items:stretch;gap:10px"':''}>${chs?`<div class="chs">${chs.map(c=>chRow(c,d)).join('')}</div>`:cvr||sen||pmo?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canD(d)||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':d.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${lbl}</button>`}
+<div class="dv"${chs?' style="flex-direction:column;align-items:stretch;gap:10px"':''}>${chs?`<div class="chs">${chs.map(c=>chRow(c,d)).join('')}</div>`:cvr||sen||pmo||inp?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canD(d)||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':d.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${lbl}</button>`}
 <div class="kv">${d.meter?`<div><div class="v">${d.meter.online&&d.meter.apower!=null?fmt(d.meter.apower,1,'W'):'–'}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.meter.today_wh)}</div><div class="l">heute · ${eur(d.meter.today_cost)}</div></div>`:''}${pm?`<div><div class="v">${fmt(tw,1,'W')}</div><div class="l">Leistung${chs?' gesamt':''}</div></div>
 <div><div class="v">${kwh(twh)}</div><div class="l">heute${chs?' gesamt':''} · ${eur(tco)}</div></div>`:''}
@@ -273,7 +279,7 @@ ${d.online&&canD(d)&&s.link!==false?`<div class="row" style="gap:6px;margin-top:
 ${!s.extras||s.extras.includes('swing_v')?`<button class="bt ${s.swing_v?'':'g'} s" onclick="clSet('${esc(d.id)}',{swing_v:${!s.swing_v}})">Swing</button>`:''}</div>`:''}</div>`:''}
 ${s.brightness!=null&&d.online&&canD(d)?`<input type="range" class="bri" min="1" max="100" value="${s.brightness}" aria-label="Helligkeit" onchange="setBri('${esc(d.id)}',+this.value)">`:''}
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur',stm_no_response:'Dimmer-Chip antwortet nicht',pm_no_response:'Messchip antwortet nicht',obstruction:'Hindernis'}[e]||e)).join(', ')}</div>`:''}
-<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm&&!chs?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
+<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm&&!chs?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}${inp?`<a class="admin-only" onclick="btnDlg('${esc(d.id)}')">Taster …</a>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
 function chLabel(c,b){if(c.id==b.id)return b.ch_label||'Kanal 1';const p=(b.name||b.id)+' · ';return (c.name||c.id).startsWith(p)?(c.name||c.id).slice(p.length):(c.name||c.id)}
 function chRow(c,b){const cs=c.status||{},on=cs.output,ok=c.online&&canSw()&&!c.locked&&!b.locked&&'output' in cs;
 return `<div class="row" style="gap:12px;flex-wrap:nowrap"><button class="sw sm ${on?'on':''}" ${ok?'':'disabled'} onclick="sw('${esc(c.id)}')" title="${c.locked||b.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${on?'AN':'AUS'}</button>
@@ -308,7 +314,7 @@ ${DEVS.some(x=>x.channel_of==d.id)?`<label>Kanäle</label><label class="ck"><inp
 <div id="dd_chn" style="display:${d.combined?'contents':'none'}"><label>Name Kanal 1</label><input id="dd_c0" value="${esc(d.ch_label&&d.ch_label!='Kanal 1'?d.ch_label:'')}" placeholder="Kanal 1">
 ${DEVS.filter(x=>x.channel_of==d.id).map((x,i)=>`<label>Name Kanal ${i+2}</label><input class="dd_cx" data-id="${esc(x.id)}" value="${esc(chLabel(x,d).startsWith('Kanal ')?'':chLabel(x,d))}" placeholder="Kanal ${i+2}">`).join('')}</div>`:''}
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
-<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}</div>
+<div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}${(d.gen||2)>=2&&!(d.comp||'').startsWith('climate:')&&d.comp!='sensor:0'&&!(d.comp||'').startsWith('pm1:')&&!(d.app||'').toUpperCase().startsWith('HERMIT')&&!String(d.model||'').toUpperCase().startsWith('HERMIT')?`<button class="bt g" onclick="btnDlg('${esc(id)}')">Taster …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
 function saveDev(id){run(async()=>{if($('dd_cb')){const d=DEVS.find(x=>x.id==id),base=($('dd_n').value||id).trim();
 await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:{combine:$('dd_cb').checked,ch_label:$('dd_c0').value}});
@@ -477,6 +483,21 @@ dlg(`<h2>Fenster/Tür offen</h2><p class="l">Steht ein Kontakt länger offen, sc
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="woSave('${esc(id)}')">Speichern</button></div></div>`)}
 function woSave(id){const n=v=>+String(v).replace(',','.');run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'POST',body:{sensors:[...document.querySelectorAll('.wo_s:checked')].map(c=>c.value),delay:n($('wo_d').value),close_delay:n($('wo_c').value),modes:[...document.querySelectorAll('.wo_m:checked')].map(c=>c.value),drop:$('wo_x').checked,drop_k:n($('wo_k').value),drop_min:n($('wo_n').value),drop_pause:n($('wo_p').value)}});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
 function woDel(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/winopen',{method:'DELETE'});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Ausgeschaltet')}
+function nInputs(d){const a=((d.app||'')+' '+(d.model||'')).toUpperCase();return /I4|SNSN-0[0D]24/.test(a)?4:/2PM|SNSW-[01]02P|S3SW-002P|PRO2/.test(a)?2:1}
+const BEV={single_push:'kurz',double_push:'doppelt',long_push:'lang',triple_push:'dreifach'};
+async function btnDlg(id){const d=DEVS.find(x=>x.id==id),r=await api('buttons/'+encodeURIComponent(id));if(!SCN.length)SCN=await api('scenes');
+const n=nInputs(d),evs=['single_push','double_push','long_push'],get=(i,e)=>r.map.find(m=>m.input==i&&m.event==e)||{};
+const cell=(i,e)=>{const m=get(i,e);return `<td><select class="bt_t" data-i="${i}" data-e="${e}" style="width:100%"><option value="">–</option>${targetOpts(m.target||'',true)}</select>
+<select class="bt_m" data-i="${i}" data-e="${e}" style="width:100%;margin-top:3px"><option value="toggle">umschalten</option><option value="on" ${m.mode=='on'?'selected':''}>an</option><option value="off" ${m.mode=='off'?'selected':''}>aus</option></select></td>`};
+dlg(`<h2>Taster – ${esc(d.name||d.id)}</h2><p class="l">Was beim Drücken passieren soll. Der Eingang muss am Gerät als <b>Taster</b> (button) eingestellt sein, nicht als Schalter.
+Szenen werden immer ausgeführt. Die Einträge erscheinen auch unter Automatik → Regeln.</p>
+<div class="scroll"><table><tr><th></th>${evs.map(e=>`<th>${BEV[e]}</th>`).join('')}</tr>
+${Array.from({length:n},(_,i)=>`<tr><td><b>Taste ${i+1}</b></td>${evs.map(e=>cell(i,e)).join('')}</tr>`).join('')}</table></div>
+${d.status&&d.status.button?`<p class="l">Zuletzt gedrückt: ${esc(d.status.button)} · vor ${ago(d.status.button_ts)}</p>`:''}
+<div class="row sp" style="margin-top:14px"><div></div><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="btnSave('${esc(id)}')">Speichern</button></div></div>`)}
+function btnSave(id){const map=[...document.querySelectorAll('.bt_t')].filter(x=>x.value).map(x=>({input:+x.dataset.i,event:x.dataset.e,target:x.value,
+mode:document.querySelector(`.bt_m[data-i="${x.dataset.i}"][data-e="${x.dataset.e}"]`).value}));
+run(async()=>{await api('buttons/'+encodeURIComponent(id),{method:'POST',body:{map}});closeDlg()},'Gespeichert')}
 async function frDlg(id){if(!Object.keys(FR.types).length)FR=await api('fridges');
 const f=FR.items.find(x=>x.dev==id),T=FR.types,t=f?f.type:'fridge',c=f?f.cfg:T[t];
 if(!DEVS.some(d=>'apower' in (d.status||{}))){toast('Kein Gerät mit Leistungsmessung verbunden');return}
@@ -675,7 +696,29 @@ const po=s.portal||{};$('po_url').value=po.url||'';$('po_tok').placeholder=po.to
 $('po_st').innerHTML=!po.url?'aus':po.ok===true?`<span style="color:var(--on)">verbunden</span> · zuletzt ${ago(po.last)}${po.active?' · Portal gerade offen':''}`:po.ok===false?`<span style="color:var(--e)">Fehler: ${esc(po.err)}</span>`:'wird verbunden …';
 $('p_ntfy').value=s.push.ntfy_url;$('p_tchat').value=s.push.tg_chat;$('p_ntok').placeholder=s.push.ntfy_token_set?'gesetzt – leer = unverändert':'optional';$('p_ttok').placeholder=s.push.tg_token_set?'gesetzt – leer = unverändert':'optional';
 $('p_kinds').innerHTML=Object.entries(s.push_all).map(([k,v])=>`<label><input type="checkbox" value="${k}" ${s.push_kinds.includes(k)?'checked':''}>${v}</label>`).join(' ');
-await Promise.all([loadFw(),loadBk(),loadUsers(),loadUpd()])}
+PUB=(s.public_url||location.origin).replace(/\/$/,'');
+await Promise.all([loadFw(),loadBk(),loadUsers(),loadUpd(),loadPanels()])}
+let PN=[],PUB='';
+async function loadPanels(){PN=await api('panels');if(!SCN.length)SCN=await api('scenes');
+$('pntab').innerHTML=PN.length?'<tr><th>Tafel</th><th>Kacheln</th><th>Adresse</th><th></th></tr>'+PN.map(p=>{const u=PUB+'/wd/'+p.token;
+return `<tr><td><b>${esc(p.name)}</b>${p.control?'':' <span class="tag">nur Anzeige</span>'}</td><td>${p.tiles.length}</td>
+<td><a class="lk" href="${esc(u)}" target="_blank" rel="noopener" style="word-break:break-all">${esc(u)}</a></td>
+<td class="n" style="white-space:nowrap"><a class="lk" onclick="navigator.clipboard&&navigator.clipboard.writeText('${esc(u)}').then(()=>toast('Adresse kopiert',1))">Kopieren</a> <a class="lk" onclick="pnDlg(${p.id})">Bearbeiten</a></td></tr>`}).join(''):'<tr><td class="empty">Noch keine Wandtafel.</td></tr>'}
+function pnDlg(id){const p=id?PN.find(x=>x.id==id):{name:'Wall Display',tiles:[],control:true},sel=new Set(p.tiles);
+const rooms=[...new Set(DEVS.map(d=>d.room||''))].sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
+const box=(v,l)=>`<label style="display:block"><input type="checkbox" class="pn_t" value="${esc(v)}" ${sel.has(v)?'checked':''} style="width:auto"> ${l}</label>`;
+dlg(`<h2>${id?'Wandtafel bearbeiten':'Neue Wandtafel'}</h2><div class="f"><label>Name</label><input id="pn_n" value="${esc(p.name)}">
+<label>Bedienung</label><label><input type="checkbox" id="pn_c" ${p.control?'checked':''} style="width:auto"> Schalten erlaubt (sonst nur Anzeige)</label>
+${id?`<label>Schlüssel</label><label><input type="checkbox" id="pn_k" style="width:auto"> neu erzeugen (alte Adresse wird ungültig)</label>`:''}</div>
+<div style="max-height:46vh;overflow:auto;margin-top:10px;columns:2 220px">
+${SCN.length?`<div style="break-inside:avoid;margin-bottom:8px"><b>Szenen</b>${SCN.map(x=>box('scene:'+x.id,esc(x.name))).join('')}</div>`:''}
+${rooms.map(r=>`<div style="break-inside:avoid;margin-bottom:8px"><b>${r?esc(r):'Ohne Raum'}</b>${DEVS.filter(d=>(d.room||'')==r&&!d.meter_hidden).map(d=>box('dev:'+d.id,esc(d.name||d.id))).join('')}</div>`).join('')}</div>
+<p class="l">Reihenfolge auf der Tafel: Räume wie hier, darin nach Name. Klimaanlagen belegen zwei Felder.</p>
+<div class="row sp" style="margin-top:14px"><div>${id?`<button class="bt r" onclick="pnDel(${id})">Löschen</button>`:''}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="pnSave(${id||0})">Speichern</button></div></div>`)}
+function pnSave(id){const tiles=[...document.querySelectorAll('.pn_t:checked')].map(c=>c.value);
+run(async()=>{await api('panels',{method:'POST',body:{id:id||undefined,name:$('pn_n').value,control:$('pn_c').checked,tiles,new_token:$('pn_k')?$('pn_k').checked:false}});closeDlg();await loadPanels()},'Gespeichert')}
+function pnDel(id){if(!confirm('Wandtafel löschen? Die Adresse funktioniert danach nicht mehr.'))return;run(async()=>{await api('panels/'+id,{method:'DELETE'});closeDlg();await loadPanels()})}
 function savePortal(){const p={url:$('po_url').value};if($('po_tok').value)p.token=$('po_tok').value;
 run(async()=>{await api('settings',{method:'POST',body:{portal:p}});$('po_tok').value='';setTimeout(loadSet,3000);await loadSet()},'Gespeichert')}
 function saveBase(){run(async()=>{const s=await api('settings',{method:'POST',body:{price_ct:$('s_price').value,location:{lat:$('s_lat').value,lon:$('s_lon').value},public_url:$('s_pub').value}});PRICE=s.price_ct},'Gespeichert')}

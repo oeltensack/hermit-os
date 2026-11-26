@@ -122,6 +122,27 @@ Zeitpläne keine Rollläden (festgefrorener Behang).
 Morgens öffnen und abends schließen geht über *Automatik → Zeitpläne* (Sonnenaufgang/-untergang ± Minuten,
 Aktion „Rollladen auf Position“, „öffnen“ oder „schließen“).
 
+## Wandtafel (Shelly Wall Display)
+
+Eigene Bedienseite mit großen Kacheln für das Shelly Wall Display oder ein Tablet.
+
+1. Cloud → Einstellungen → **Wandtafeln** → „Neue Wandtafel“: Name, Kacheln (Geräte, Klimaanlagen, Rollläden,
+   Fühler, Szenen) und ob geschaltet werden darf
+2. Die angezeigte Adresse (`http://<cloud>:8080/wd/<schlüssel>`) am Wall Display unter
+   **Einstellungen → Home Assistant** eintragen (oder im Browser des Tablets öffnen)
+
+Oben Uhr, Datum und Außentemperatur (aus der Beschattung), darunter Räume als Reiter und die Szenen.
+Tippen schaltet, langes Drücken auf ein dimmbares Licht öffnet den Helligkeitsregler. Klimaanlagen: Soll ±,
+Modus, Lüfter, Ein/Aus. Die Adresse enthält einen geheimen Schlüssel – wer sie kennt, sieht und bedient genau die
+Kacheln dieser Tafel. „Schlüssel neu erzeugen“ macht die alte Adresse ungültig. Geräte mit „nur Anzeige“ lassen sich
+auch hier nicht schalten.
+
+## Taster (Plus i4 u. a.)
+
+Gerät → Bearbeiten → **Taster …**: je Taste kurz / doppelt / lang eine Aktion (Gerät oder Raum an, aus,
+umschalten oder eine Szene). Der Eingang muss am Gerät als Taster („button“) eingestellt sein. Die Einträge sind
+normale Regeln (Automatik → Regeln) und laufen ohne Shelly Cloud. Die Karte des i4 zeigt die zuletzt gedrückte Taste.
+
 ## Update
 
 Die Cloud aktualisiert sich selbst. Unter **Info → Cloud-Update**:

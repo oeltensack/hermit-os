@@ -1,0 +1,139 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f1419"><title>Pagurus</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later · Copyright (C) 2026 D.Koch – Pagurus OS
+     Wandtafel: Bedienseite fuer das Shelly Wall Display (Einstellungen -> Home Assistant) oder ein Tablet. -->
+<style>
+:root{--bg:#0f1419;--c:#1a2129;--c2:#252e38;--fg:#e6e9ec;--m:#8a96a3;--a:#2f9be0;--on:#3fb950;--w:#d29922;--e:#f85149;--h:#e8833a}
+*{box-sizing:border-box}
+html{font-size:clamp(12px,2.3vmin,22px)}
+body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);
+ font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none;
+ -webkit-tap-highlight-color:transparent;overflow:hidden}
+header{display:flex;align-items:baseline;gap:.8rem;padding:.7rem 1rem .4rem}
+#clock{font-size:2.6rem;font-weight:700;letter-spacing:-.02em}
+#date{color:var(--m);font-size:1rem}
+#out{margin-left:auto;font-size:1.5rem;font-weight:600}
+#out small{color:var(--m);font-size:.8rem;font-weight:400;margin-right:.3rem}
+.bar{display:flex;gap:.45rem;padding:0 1rem .55rem;overflow-x:auto;scrollbar-width:none;flex:none}
+.bar::-webkit-scrollbar{display:none}
+.tab{padding:.5rem 1rem;border-radius:2rem;background:var(--c);color:var(--m);white-space:nowrap;font-size:1rem}
+.tab.a{background:var(--a);color:#fff}
+.scn{padding:.75rem 1.1rem;border-radius:.8rem;background:var(--c2);font-weight:600;white-space:nowrap}
+.scn:active,.b:active,.t:active{filter:brightness(1.3)}
+main{flex:1;overflow-y:auto;padding:0 1rem 1rem;scrollbar-width:none}
+main::-webkit-scrollbar{display:none}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:.7rem}
+.t{background:var(--c);border-radius:1rem;padding:.85rem .9rem;min-height:8.6rem;display:flex;flex-direction:column;
+ gap:.35rem;position:relative;transition:background .2s,opacity .2s;overflow:hidden}
+.t.w2{grid-column:span 2}
+.t .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:.4rem}
+.t .n{font-weight:600;font-size:1.05rem;line-height:1.2}
+.t .i{font-size:1.5rem;line-height:1}
+.t .v{font-size:1.7rem;font-weight:700;margin-top:auto}
+.t .s{color:var(--m);font-size:.9rem}
+.t.on{background:#1f3b29}.t.light.on{background:#46391a}.t.heat{background:#47301d}.t.cool{background:#1b3247}
+.t.off{opacity:.45}.t.lock .n::after{content:" 🔒";font-size:.8em}
+.t .bri{position:absolute;left:0;bottom:0;height:.35rem;background:#f2c94c}
+.btns{display:flex;gap:.4rem;margin-top:auto}
+.b{flex:1;padding:.6rem 0;border-radius:.6rem;background:var(--c2);text-align:center;font-size:1.15rem;min-width:2.6rem}
+.b.a{background:var(--a);color:#fff}.b.pw{flex:none;padding:.6rem .9rem}.b.pw.a{background:var(--on)}
+.tgt{display:flex;align-items:center;gap:.6rem}.tgt .v{margin:0;min-width:5.5rem;text-align:center;font-size:2rem}
+.chips{display:flex;gap:.35rem;flex-wrap:wrap}.chip{padding:.35rem .6rem;border-radius:1rem;background:var(--c2);font-size:.85rem}
+.chip.a{background:var(--a);color:#fff}
+.warn{color:var(--w)}.err{color:var(--e)}
+.busy::after{content:"";position:absolute;top:.7rem;right:.7rem;width:.9rem;height:.9rem;border-radius:50%;
+ border:2px solid var(--fg);border-top-color:transparent;animation:r .8s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+#ov{position:fixed;top:0;left:0;right:0;bottom:0;background:#000c;display:none;align-items:center;justify-content:center;flex-direction:column;gap:1.2rem;z-index:5}
+#ov .n{font-size:1.4rem;font-weight:600}#ov .v{font-size:3rem;font-weight:700}
+#ov input{width:70vw;height:3rem;accent-color:#f2c94c}
+#toast{position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);background:#000;border:1px solid var(--e);color:var(--fg);
+ padding:.6rem 1rem;border-radius:.6rem;display:none;z-index:6;max-width:90vw}
+.empty{color:var(--m);text-align:center;padding:3rem 1rem}
+</style></head><body>
+<header><div id="clock">--:--</div><div id="date"></div><div id="out"></div></header>
+<div class="bar" id="tabs"></div>
+<div class="bar" id="scenes"></div>
+<main><div id="grid"></div></main>
+<div id="ov" onclick="if(event.target===this)ovClose()"><div class="n" id="ovn"></div><div class="v" id="ovv"></div>
+<input type="range" id="ovr" min="1" max="100"><div class="b" style="flex:none;padding:.8rem 2rem" onclick="ovClose()">Fertig</div></div>
+<div id="toast"></div>
+<script>
+const TOK=location.pathname.split('/').filter(Boolean)[1]||'',$=i=>document.getElementById(i);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=(v,d)=>v==null||isNaN(v)?'–':(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
+const MODE={cool:'Kühlen',heat:'Heizen',dry:'Entf.',fan:'Lüften',auto:'Auto'},FAN={auto:'Auto',low:'1',low_mid:'2',mid:'3',mid_high:'4',high:'5'};
+const IC={switch:'⏻',light:'💡',cover:'▤',climate:'❄',sensor:'🌡',meter:'⚡',info:'•'};
+let S=null,TAB='',BUSY={},HOLD=0;
+try{TAB=localStorage.getItem('wd_tab_'+TOK)||''}catch(e){}
+
+function clock(){const d=new Date();$('clock').textContent=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+ $('date').textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})}
+function toast(t){$('toast').textContent=t;$('toast').style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>$('toast').style.display='none',4000)}
+
+async function load(){if(document.hidden||Date.now()<HOLD)return;
+ try{const r=await fetch('/wd/'+TOK+'/state',{cache:'no-store'});if(!r.ok)throw new Error(r.status==404?'Wandtafel unbekannt – Adresse prüfen':'HTTP '+r.status);
+  S=await r.json();render()}catch(e){if(!S)$('grid').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+
+async function act(id,a,v){if(!S.control){toast('Diese Tafel ist nur zur Anzeige');return}
+ BUSY[id]=1;render();
+ try{const r=await fetch('/wd/'+TOK+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,a,v})});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||('HTTP '+r.status));
+  if(j.errors&&j.errors.length)toast(j.errors.join('; '))}catch(e){toast(e.message)}
+ delete BUSY[id];HOLD=0;await load();setTimeout(load,1500)}
+
+function rooms(){const r=[];(S.tiles||[]).forEach(t=>{if(t.room&&!r.includes(t.room))r.push(t.room)});return r}
+function setTab(t){TAB=t;try{localStorage.setItem('wd_tab_'+TOK,t)}catch(e){}render()}
+
+function render(){if(!S)return;document.title=S.name||'Pagurus';
+ $('out').innerHTML=S.outdoor!=null?`<small>außen</small>${num(S.outdoor,1)} °C`:'';
+ const R=rooms();if(TAB&&!R.includes(TAB))TAB='';
+ $('tabs').style.display=R.length>1?'':'none';
+ $('tabs').innerHTML=[['','Alle'],...R.map(r=>[r,r])].map(([k,l])=>`<div class="tab ${TAB==k?'a':''}" onclick="setTab('${esc(k)}')">${esc(l)}</div>`).join('');
+ $('scenes').style.display=S.scenes.length?'':'none';
+ $('scenes').innerHTML=S.scenes.map(x=>`<div class="scn ${BUSY[x.id]?'busy':''}" onclick="act('${x.id}','run')">${esc(x.name)}</div>`).join('');
+ const T=S.tiles.filter(t=>!TAB||t.room==TAB);
+ $('grid').innerHTML=T.length?T.map(tile).join(''):'<div class="empty">Keine Kacheln – in der Cloud unter Einstellungen → Wandtafeln auswählen.</div>';
+ bindHold()}
+
+function fanTxt(t,f){if(!f)return '–';if(f=='auto')return 'Auto';const l=(t.fans||[]).filter(x=>x!='auto'),i=l.indexOf(f);return i<0?(FAN[f]||f):String(i+1)}
+function hd(t,ic){return `<div class="hd"><div class="n">${esc(t.name)}</div><div class="i">${ic||IC[t.k]}</div></div>`}
+function tile(t){const id=esc(t.id),cls=['t',t.k,BUSY[t.id]?'busy':'',t.online?'':'off',t.locked?'lock':''];
+ const w=t.w!=null?`${num(t.w,t.w<10?1:0)} W`:'';
+ if(t.k=='switch'||t.k=='light'){if(t.on)cls.push('on');
+  return `<div class="${cls.join(' ')}" data-id="${id}" ${t.bri!=null?'data-bri="1"':''} onclick="tap('${id}')">${hd(t)}
+  <div class="v">${t.on?'An':'Aus'}</div><div class="s">${t.bri!=null&&t.on?t.bri+' %':''}${w&&t.on?(t.bri!=null?' · ':'')+w:''}${t.online?'':'offline'}</div>
+  ${t.bri!=null&&t.on?`<div class="bri" style="width:${t.bri}%"></div>`:''}</div>`}
+ if(t.k=='cover'){const st={open:'offen',closed:'zu',opening:'öffnet …',closing:'schließt …',stopped:'gestoppt'}[t.state]||t.state||'';
+  return `<div class="${cls.join(' ')}">${hd(t)}<div class="s">${esc(st)}${t.pos!=null?' · '+t.pos+' %':''}</div>
+  <div class="btns"><div class="b" onclick="act('${id}','cover','open')">▲</div><div class="b" onclick="act('${id}','cover','stop')">■</div><div class="b" onclick="act('${id}','cover','close')">▼</div></div></div>`}
+ if(t.k=='climate'){cls.push('w2');if(t.on&&t.mode=='heat')cls.push('heat');else if(t.on&&t.mode=='cool')cls.push('cool');else if(t.on)cls.push('on');
+  const tg=t.target??22,st=t.step||1,ic=t.mode=='heat'?'☀':'❄';
+  const sub=!t.link?'<span class="err">Klimagerät antwortet nicht</span>':t.paused?`<span class="warn">Pausiert – ${esc(t.paused)}</span>`:
+   `${t.on?esc(MODE[t.mode]||t.mode)+' · Lüfter '+esc(fanTxt(t,t.fan)):'aus'}${t.room_C!=null?' · Raum '+num(t.room_C,1)+' °C':''}${t.hum!=null?' · '+num(t.hum,0)+' %':''}`;
+  return `<div class="${cls.join(' ')}">${hd(t,ic)}<div class="s">${sub}</div>
+  <div class="tgt"><div class="b" onclick="act('${id}','climate',{target_C:${Math.max(t.min,tg-st)}})">−</div><div class="v">${num(tg,st<1?1:0)} °C</div>
+  <div class="b" onclick="act('${id}','climate',{target_C:${Math.min(t.max,tg+st)}})">+</div><div class="b pw ${t.on?'a':''}" onclick="act('${id}','climate',{on:${!t.on}})">⏻</div></div>
+  <div class="chips">${t.modes.map(m=>`<div class="chip ${t.on&&t.mode==m?'a':''}" onclick="act('${id}','climate',{on:true,mode:'${m}'})">${esc(MODE[m]||m)}</div>`).join('')}
+  ${t.fans.map(f=>`<div class="chip ${t.fan==f?'a':''}" style="opacity:.85" onclick="act('${id}','climate',{fan:'${f}'})">L ${esc(fanTxt(t,f))}</div>`).join('')}</div></div>`}
+ if(t.k=='sensor'){const main=t.tC!=null?num(t.tC,1)+' °C':t.contact!=null?(t.contact?'offen':'zu'):t.lux!=null?num(t.lux,0)+' lx':'–';
+  const sub=[t.rh!=null?num(t.rh,0)+' %':'',t.tC!=null&&t.lux!=null?num(t.lux,0)+' lx':'',t.motion!=null?(t.motion?'Bewegung':'ruhig'):'',t.bat!=null&&t.bat<20?'<span class="warn">Batterie '+t.bat+' %</span>':''].filter(Boolean).join(' · ');
+  return `<div class="${cls.join(' ')}">${hd(t,t.contact!=null&&t.tC==null?'🚪':null)}<div class="v ${t.contact?'warn':''}">${main}</div><div class="s">${sub}</div></div>`}
+ if(t.k=='meter')return `<div class="${cls.join(' ')}">${hd(t)}<div class="v">${w||'–'}</div><div class="s">${t.online?'':'offline'}</div></div>`;
+ return `<div class="${cls.join(' ')}">${hd(t)}<div class="s">${t.online?'online':'offline'}</div></div>`}
+
+let holdT=null,held=false;
+function tap(id){if(held){held=false;return}act(id,'toggle')}
+function bindHold(){document.querySelectorAll('.t[data-bri]').forEach(el=>{
+ const start=()=>{held=false;clearTimeout(holdT);holdT=setTimeout(()=>{held=true;ovOpen(el.dataset.id)},550)},stop=()=>clearTimeout(holdT);
+ el.addEventListener('touchstart',start,{passive:true});el.addEventListener('mousedown',start);
+ ['touchend','touchmove','mouseup','mouseleave'].forEach(e=>el.addEventListener(e,stop,{passive:true}))})}
+function ovOpen(id){const t=S.tiles.find(x=>x.id==id);if(!t)return;HOLD=Date.now()+60000;$('ovn').textContent=t.name;
+ $('ovr').value=t.bri||50;$('ovv').textContent=(t.bri||50)+' %';$('ov').style.display='flex';
+ $('ovr').oninput=()=>$('ovv').textContent=$('ovr').value+' %';$('ovr').onchange=()=>act(id,'bri',+$('ovr').value)}
+function ovClose(){$('ov').style.display='none';HOLD=0;load()}
+
+clock();setInterval(clock,10000);load();setInterval(load,2500);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+</script></body></html>

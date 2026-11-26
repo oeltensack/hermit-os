@@ -457,8 +457,16 @@ def on_event(dev, e):
     if e.get("component", "").startswith("bthomesensor:"):
         blu.event(dev, e["component"], e.get("event", ""))
         return
-    dev = row_id(dev, e.get("component", ""))
+    comp = e.get("component", "")
     ev = e.get("event", "")
+    if comp.startswith("input:") and ev in ("single_push", "double_push", "triple_push", "long_push"):
+        r = q("SELECT status FROM devices WHERE id=?", (dev,), one=True)
+        if r:                                     # letzte Taste fuer die Karte (Komponente der Zeile bleibt)
+            st = json.loads(r["status"] or "{}")
+            names = {"single_push": "kurz", "double_push": "doppelt", "triple_push": "dreifach", "long_push": "lang"}
+            st.update(button=f"Taste {int(comp.split(':')[1]) + 1} {names[ev]}", button_ts=time.time())
+            q("UPDATE devices SET status=? WHERE id=?", (json.dumps(st), dev))
+    dev = row_id(dev, comp)
     if ev in EVENT_TEXT:
         kind, text = EVENT_TEXT[ev]
         alert(dev, kind, f"{dev_name(dev)}: {text}")
