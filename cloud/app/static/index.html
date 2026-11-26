@@ -240,13 +240,13 @@ const nIn=x=>+String(x).replace(',','.')||0;
 
 // ---------- Geraete ----------
 const CVS={open:'offen',closed:'geschlossen',opening:'öffnet …',closing:'schließt …',stopped:'angehalten',calibrating:'kalibriert …'};
-function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0';
+function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0';const canD=x=>canSw()&&!x.locked;
 const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
 <div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Batteriefühler · zuletzt '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
-<div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.winopen&&d.winopen.paused?`<span class="tag y" title="${esc(d.winopen.reason||'')}">Pausiert: ${d.winopen.until?'Temperatursturz':'Fenster offen'}</span>`:''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
-<div class="dv">${cvr||sen?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canSw()||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':''}">${lbl}</button>`}
+<div class="row" style="gap:4px">${d.fridge?`<span class="tag ${d.fridge.alarm?'r':d.fridge.state=='on'?'b':''}">${esc(d.fridge.label)}${d.fridge.alarm?' ⚠':d.fridge.state=='on'?' kühlt':''}</span>`:''}${ap?`<span class="tag ${ap.state=='running'?'b':ap.state=='finished'?'g':''}">${esc(ap.label)}${ap.state=='running'?' läuft':ap.state=='finished'?' fertig':''}</span>`:''}${d.winopen&&d.winopen.paused?`<span class="tag y" title="${esc(d.winopen.reason||'')}">Pausiert: ${d.winopen.until?'Temperatursturz':'Fenster offen'}</span>`:''}${d.locked?'<span class="tag" title="Schalten von Hand gesperrt, Automatik läuft">🔒 nur Anzeige</span>':''}${d.fw_new?`<span class="tag y" title="Firmware ${esc(d.fw_new)} verfügbar">Update</span>`:''}</div></div>
+<div class="dv">${cvr||sen?'':`<button class="sw ${on?'on':''} ${meter&&!on?'trip':''}" ${meter||!d.online||!canD(d)||!('output' in s)?'disabled':''} onclick="sw('${esc(d.id)}')" title="${meter?'Messfirmware – Reset nur am Gerät':d.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${lbl}</button>`}
 <div class="kv">${d.meter?`<div><div class="v">${d.meter.online&&d.meter.apower!=null?fmt(d.meter.apower,1,'W'):'–'}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.meter.today_wh)}</div><div class="l">heute · ${eur(d.meter.today_cost)}</div></div>`:''}${pm?`<div><div class="v">${fmt(s.apower,1,'W')}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.today_wh)}</div><div class="l">heute · ${eur(d.today_cost)}</div></div>`:''}
@@ -263,15 +263,15 @@ ${s.voltage!=null?`<div><div class="v">${fmt(s.voltage,0,'V')}</div><div class="
 ${s.brightness!=null?`<div><div class="v">${s.brightness} %</div><div class="l">Helligkeit</div></div>`:''}${s.ct!=null?`<div><div class="v">${s.ct} K</div><div class="l">Farbtemperatur</div></div>`:''}
 </div></div>
 ${cvr?`<div class="cvc"><div class="v">${CVS[s.state]||s.state||'–'}${s.current_pos!=null?' · '+s.current_pos+' %':''}</div>
-${d.online&&canSw()?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="cvAct('${esc(d.id)}','open')">▲ Auf</button><button class="bt g s" onclick="cvAct('${esc(d.id)}','stop')">■ Stopp</button><button class="bt g s" onclick="cvAct('${esc(d.id)}','close')">▼ Zu</button></div>
+${d.online&&canD(d)?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="cvAct('${esc(d.id)}','open')">▲ Auf</button><button class="bt g s" onclick="cvAct('${esc(d.id)}','stop')">■ Stopp</button><button class="bt g s" onclick="cvAct('${esc(d.id)}','close')">▼ Zu</button></div>
 ${s.pos_control?`<input type="range" class="bri" min="0" max="100" value="${s.current_pos??0}" aria-label="Position" onchange="cvPos('${esc(d.id)}',+this.value)">`:''}`:''}</div>`:''}
 ${cli?`<div class="cvc"><div class="v">${s.link===false?'<span style="color:var(--e)">Klimagerät antwortet nicht</span>':esc(CLM[s.mode]||s.mode||'–')+(s.target_C!=null?' · Soll '+fmt(s.target_C,s.target_C%1?1:0,'°C'):'')}</div>
 <div class="l">${s.current_C!=null?'Raum '+fmt(s.current_C,1,'°C')+' · ':''}${s.ext_temperature_C!=null?'Fühler '+fmt(s.ext_temperature_C,1,'°C')+(s.ext_humidity!=null?' / '+fmt(s.ext_humidity,0,'%'):'')+' · ':''}Lüfter ${esc(CLF[s.fan]||s.fan||'–')}${s.compressor?' · Kompressor läuft':''}</div>
-${d.online&&canSw()&&s.link!==false?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${Math.max(16,(s.target_C||24)-1)}})">−</button><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${Math.min(31,(s.target_C||24)+1)}})">+</button>
+${d.online&&canD(d)&&s.link!==false?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${Math.max(16,(s.target_C||24)-1)}})">−</button><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${Math.min(31,(s.target_C||24)+1)}})">+</button>
 <select onchange="clSet('${esc(d.id)}',{mode:this.value})" style="width:auto">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
 <select onchange="clSet('${esc(d.id)}',{fan:this.value})" style="width:auto">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select>
 <button class="bt ${s.swing_v?'':'g'} s" onclick="clSet('${esc(d.id)}',{swing_v:${!s.swing_v}})">Swing</button></div>`:''}</div>`:''}
-${s.brightness!=null&&d.online&&canSw()?`<input type="range" class="bri" min="1" max="100" value="${s.brightness}" aria-label="Helligkeit" onchange="setBri('${esc(d.id)}',+this.value)">`:''}
+${s.brightness!=null&&d.online&&canD(d)?`<input type="range" class="bri" min="1" max="100" value="${s.brightness}" aria-label="Helligkeit" onchange="setBri('${esc(d.id)}',+this.value)">`:''}
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur',stm_no_response:'Dimmer-Chip antwortet nicht',pm_no_response:'Messchip antwortet nicht',obstruction:'Hindernis'}[e]||e)).join(', ')}</div>`:''}
 <div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
 async function loadDevs(){DEVS=await api('devices');if(TAB!='dv')return;
@@ -292,10 +292,11 @@ dlg(`<h2>${esc(d.name||d.id)}</h2><div class="f"><label>Name</label><input id="d
 <label>Raum</label><input id="dd_r" value="${esc(d.room)}" list="dd_rl" placeholder="z. B. Bad, Keller"><datalist id="dd_rl">${rooms.map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
 ${(d.comp||'').startsWith('climate:')?`<label>Energiemesser</label><select id="dd_m"><option value="">– keiner –</option>${DEVS.filter(x=>x.id!=d.id&&x.status&&'apower' in x.status).map(x=>`<option value="${esc(x.id)}" ${d.meter&&d.meter.id==x.id?'selected':''}>${esc(x.name||x.id)}${x.room?' · '+esc(x.room):''}</option>`).join('')}</select>
 <label class="ck"><input type="checkbox" id="dd_mh" ${!d.meter||d.meter.hide?'checked':''} style="width:auto"> Energiemesser nicht als eigenes Gerät anzeigen</label>`:''}
+${'output' in (d.status||{})||(d.comp||'').startsWith('cover:')?`<label>Bedienung</label><label class="ck"><input type="checkbox" id="dd_lk" ${d.locked?'checked':''} style="width:auto"> Nur Anzeige – Ein/Aus von Hand sperren (Automatik, Zeitpläne und Regeln schalten weiter)</label>`:''}
 <label>ID / Topic</label><code>${esc(d.id)}</code><label>IP</label><span>${esc(d.ip||'–')}</span></div>
 <div class="row sp" style="margin-top:16px"><div class="row"><button class="bt r" onclick="delDev('${esc(id)}')">Entfernen</button>${'apower' in d.status?`<button class="bt g" onclick="appDlg('${esc(id)}')">Fertig-Erkennung …</button><button class="bt g" onclick="frDlg('${esc(id)}')">Kühlgerät …</button>`:''}${(d.comp||'').startsWith('climate:')?`<button class="bt g" onclick="woDlg('${esc(id)}')">Fenster offen …</button>`:''}</div>
 <div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="saveDev('${esc(id)}')">Speichern</button></div></div>`)}
-function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
+function saveDev(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/meta',{method:'POST',body:Object.assign({name:$('dd_n').value,room:$('dd_r').value},$('dd_lk')?{locked:$('dd_lk').checked}:{},$('dd_m')?{meter:$('dd_m').value,meter_hide:$('dd_mh').checked}:{})});closeDlg();await loadDevs();if(TAB=='kl')await loadClimates(true)},'Gespeichert')}
 function delDev(id){if(!confirm('Gerät mit allen gespeicherten Werten, Läufen und Sicherungen entfernen? Verbindet es sich wieder, erscheint es neu.'))return;run(async()=>{await api('devices/'+encodeURIComponent(id),{method:'DELETE'});closeDlg();await loadDevs()})}
 function showEn(id){document.querySelector('#nav a[data-t=en]').click();setTimeout(()=>{$('esel').value=id;PZ=null;loadEn()},50)}
 
@@ -367,7 +368,7 @@ const pw=CL.reduce((t,c)=>t+(c.meter&&c.meter.online&&c.meter.apower||0),0),e=CL
 $('kl_sum').textContent=CL.some(c=>c.meter)?`jetzt ${fmt(pw,0,'W')} · heute ${kwh(e)}`:'';
 $('climates').innerHTML=CL.length?CL.map(clCard).join(''):'<div class="card empty" style="grid-column:1/-1">Noch keine Klimaanlage verbunden.<br>TCL-/Kesser-Anlagen mit Pagurus OS (ESP32) erscheinen hier automatisch.</div>';
 document.querySelectorAll('#climates .clc').forEach(b=>clHover(b,CL.find(c=>c.dev==b.dataset.dev)))}
-function clCard(c){const s=c.status||{},id=esc(c.dev),on=!!s.output,link=s.link!==false,p=c.winopen&&c.winopen.paused,t=s.target_C??24,ok=c.online&&link&&canSw();
+function clCard(c){const s=c.status||{},id=esc(c.dev),on=!!s.output,link=s.link!==false,p=c.winopen&&c.winopen.paused,t=s.target_C??24,ok=c.online&&link&&canSw()&&!c.locked;
 const cls=!c.online||!link?'off':p?'paused':on?(s.mode=='heat'?'heat':s.mode=='cool'?'cool2':'running'):'';
 const st=!c.online?'offline':!link?'Klimagerät antwortet nicht':p?'Pausiert':on?(CLM[s.mode]||s.mode)+' · '+fmt(t,t%1?1:0,'°C'):'Aus';
 const sub=p?esc(c.winopen.reason||'Fenster offen'):on?`Lüfter ${esc(CLF[s.fan]||s.fan||'–')}${s.compressor?' · Kompressor läuft':''}`:'';
@@ -375,7 +376,7 @@ const tg=(k,l)=>`<button class="bt ${s[k]?'':'g'} tg" onclick="clSet('${id}',{${
 const m=c.meter,tod=c.today||{};
 return `<div class="app ${cls}"><div class="ah"><div class="ai" style="color:${on&&s.mode=='heat'?'#e8833a':'var(--a)'}">${FAN_I}</div>
 <div style="flex:1;min-width:0"><div class="row sp"><span class="dn">${esc(c.name)}</span><span class="l">${esc(c.room||'')}</span></div>
-<div class="st">${st}</div><div class="l">${sub}</div></div>
+<div class="st">${st}</div><div class="l">${sub}${c.locked?' · 🔒 nur Anzeige':''}</div></div>
 <button class="sw ${on?'on':''}" ${ok?'':'disabled'} onclick="clSet('${id}',{on:${!on}})">${on?'AN':'AUS'}</button></div>
 ${ok?`<div class="row" style="gap:6px"><button class="bt g" onclick="clSet('${id}',{target_C:${Math.max(16,Math.round(t)-1)}})">−</button><span class="cltgt">${fmt(t,t%1?1:0,'°C')}</span><button class="bt g" onclick="clSet('${id}',{target_C:${Math.min(31,Math.round(t)+1)}})">+</button>
 <select onchange="clSet('${id}',{mode:this.value})" style="width:auto">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>

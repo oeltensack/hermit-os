@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.19.0 / Pagurus Portal 1.7
+- „Nur Anzeige“ je Gerät (Bearbeiten → Bedienung): Der Schaltknopf zeigt nur noch den Zustand, Schalten von Hand ist in Cloud, Portal und App (ab 1.6.0) gesperrt – auch Helligkeit, Rollladen und Klima. Automatik, Zeitpläne, Regeln und Szenen schalten weiter
+
 ## Pagurus Cloud 1.18.0
 - Klima-Zeitpläne je Anlage (Bereich Klima → „+ Zeitpunkt“): Wochentage, Uhrzeit oder Sonnenauf-/-untergang ± Minuten, Einschalten mit Modus/Soll/Lüfter (jeweils auch „unverändert“) oder Ausschalten. Läuft eine Fenster-offen-Pause, wird das Einschalten für danach vorgemerkt, Ausschalten beendet die Pause
 - Nach einer Fenster-offen-Pause werden neben dem Modus auch Solltemperatur und Lüfter wiederhergestellt

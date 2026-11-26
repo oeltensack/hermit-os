@@ -269,6 +269,7 @@ def dev_row(r, latest=None):
         "ver": r["ver"], "mac": r["mac"], "ip": r["ip"], "gen": r["gen"], "online": bool(r["online"]),
         "last_seen": r["last_seen"], "comp": r["comp"], "status": st, "hermit": hermit,
         "today_wh": wh, "today_cost": round(wh / 1000 * price_eur_kwh(), 2), "fw_new": None,
+        "locked": bool(r["locked"]),
     }
     if "~" in r["id"]:                           # zweiter Kanal eines Geraets
         base = q("SELECT name FROM devices WHERE id=?", (r["id"].split("~")[0],), one=True)
@@ -321,6 +322,11 @@ def get_dev(dev):
     return r
 
 
+def not_locked(r):
+    if r["locked"]:
+        raise HTTPException(423, "Gesperrt – Schalten von Hand ist für dieses Gerät abgeschaltet")
+
+
 @app.post("/api/devices/{dev}/rpc")
 async def dev_rpc(dev: str, request: Request):
     need(request, "admin")
@@ -332,7 +338,7 @@ async def dev_rpc(dev: str, request: Request):
 @app.post("/api/devices/{dev}/switch")
 async def dev_switch(dev: str, request: Request):
     need(request, "user")
-    get_dev(dev)
+    not_locked(get_dev(dev))
     d = await request.json()
     try:
         res = await asyncio.to_thread(BUS.switch, dev, d.get("on") if "on" in d else None, d.get("brightness"),
@@ -346,7 +352,7 @@ async def dev_switch(dev: str, request: Request):
 async def dev_climate(dev: str, request: Request):
     """Klimaanlage (Pagurus OS ESP32): Modus, Solltemperatur, Luefter, Swing, Eco/Turbo/Leise."""
     need(request, "user")
-    get_dev(dev)
+    not_locked(get_dev(dev))
     d = await request.json()
     p = {"id": 0}
     for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute"):
@@ -429,6 +435,8 @@ async def dev_meta(dev: str, request: Request):
     d = await request.json()
     if "room" in d:
         q("UPDATE devices SET room=? WHERE id=?", (str(d["room"]).strip(), dev))
+    if "locked" in d:
+        q("UPDATE devices SET locked=? WHERE id=?", (1 if d["locked"] else 0, dev))
     if "meter" in d:
         m = str(d["meter"] or "").strip()
         if m and (m == dev or not q("SELECT id FROM devices WHERE id=?", (m,), one=True)):

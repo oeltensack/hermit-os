@@ -99,6 +99,7 @@ def init_db():
     _add_col("devices", "off_alerted", "INTEGER DEFAULT 0")
     _add_col("devices", "meter", "TEXT")                  # gekoppelter Energiemesser (z. B. Klimaanlage)
     _add_col("devices", "meter_hide", "INTEGER DEFAULT 1")
+    _add_col("devices", "locked", "INTEGER DEFAULT 0")     # nur Anzeige: kein Schalten von Hand (Automatik laeuft)
     DB.commit()
 
 

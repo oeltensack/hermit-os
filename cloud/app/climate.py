@@ -182,7 +182,7 @@ def view(d, wo=None):
     meter = (d.get("meter") or {}).get("id")
     return {
         "dev": dev, "name": d["name"] or dev, "room": d["room"], "online": d["online"], "status": d["status"],
-        "meter": d.get("meter"), "winopen": wo,
+        "meter": d.get("meter"), "winopen": wo, "locked": d.get("locked", False),
         "today": _hours(dev, _day_start()),
         "e_today": _energy(meter, 1), "e_30": _energy(meter, 30),
         "series": series(dev, meter), "days": days(dev, meter), "sched": sched_list(dev),

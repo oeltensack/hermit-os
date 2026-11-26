@@ -76,7 +76,7 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
  if(d.battery!=null)kv+=`<div><div class="v">${fmt(d.battery,0,'%')}</div><div class="l">Batterie</div></div>`;
  if(d.contact!=null)kv+=`<div><div class="v">${d.contact?'offen':'zu'}</div><div class="l">Kontakt</div></div>`;
  if(d.motion!=null)kv+=`<div><div class="v">${d.motion?'Bewegung':'ruhig'}</div><div class="l">Bewegung</div></div>`;
- const can=!ro&&d.online&&!d.meter_only&&!sen;
+ const can=!ro&&d.online&&!d.meter_only&&!sen&&!d.locked;
  let ctl=d.bri!=null&&can?`<input type="range" min="1" max="100" value="${d.bri}" aria-label="Helligkeit" onchange="cmd('${esc(d.id)}','bri',+this.value)">`:'';
  if(cov){const st={open:'offen',closed:'geschlossen',opening:'öffnet',closing:'schließt',stopped:'gestoppt'}[d.state]||d.state||'';
   ctl=`<div class="v">${esc(st)}${d.pos!=null?' · '+d.pos+' %':''}</div>`+(can?`<div class="row"><button class="bt g" onclick="cmd('${esc(d.id)}','open')">▲ Auf</button><button class="bt g" onclick="cmd('${esc(d.id)}','stop')">■ Stopp</button><button class="bt g" onclick="cmd('${esc(d.id)}','close')">▼ Zu</button></div>
@@ -88,7 +88,7 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
   <select onchange="cl('${id}',{mode:this.value})">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${c.mode==k?'selected':''}>${v}</option>`).join('')}</select>
   <select onchange="cl('${id}',{fan:this.value})">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${c.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>`:'');}
  const btn=cov||sen||d.output==null?'':`<button class="sw ${d.output?'on':''} ${w?'wait':''}" ${can?'':'disabled'} onclick="cmd('${esc(d.id)}','toggle')">${w?'…':d.meter_only?'MESS':d.output?'AN':'AUS'}</button>`;
- const tags=[d.appliance?`<span class="tag ${d.appliance.state=='finished'?'g':''}">${esc(d.appliance.label)}</span>`:'',d.fridge_alarm?'<span class="tag r">Kühlgerät-Alarm</span>':''].join('');
+ const tags=[d.appliance?`<span class="tag ${d.appliance.state=='finished'?'g':''}">${esc(d.appliance.label)}</span>`:'',d.fridge_alarm?'<span class="tag r">Kühlgerät-Alarm</span>':'',d.locked?'<span class="tag">🔒 nur Anzeige</span>':''].join('');
  return `<div class="dev ${d.online||sen?'':'off'}"><div><div class="dn">${esc(d.name||d.id)}</div>
  <div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Fühler · zuletzt vor '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)}${d.model?' · '+esc(d.model):''}</div></div>
  ${tags?`<div class="row">${tags}</div>`:''}<div class="dv">${btn}<div class="kv">${kv}</div></div>${ctl}</div>`}

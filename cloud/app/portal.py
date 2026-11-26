@@ -38,7 +38,7 @@ def _compact(d):
            "online": d["online"], "last_seen": d.get("last_seen"), "comp": d.get("comp") or "",
            "output": s.get("output"), "apower": s.get("apower"), "wh": d.get("today_wh"),
            "tC": t.get("tC") if isinstance(t, dict) else None, "meter_only": bool(s.get("meter_only")),
-           "bri": s.get("brightness")}
+           "bri": s.get("brightness"), "locked": True if d.get("locked") else None}
     if (d.get("comp") or "").startswith("cover:"):
         out.update(state=s.get("state"), pos=s.get("current_pos"), output=None)
     if (d.get("comp") or "").startswith("climate:"):
@@ -73,6 +73,8 @@ def _run(c):
     from bus import BUS
     dev, act = c.get("dev", ""), c.get("act", "")
     try:
+        if act != "scene" and (q("SELECT locked FROM devices WHERE id=?", (dev,), one=True) or {"locked": 0})["locked"]:
+            raise RuntimeError("Gesperrt – nur Anzeige")
         if act == "scene":
             errs = engine.run_scene(int(dev.partition(":")[2] or 0))
         elif act == "stop":
