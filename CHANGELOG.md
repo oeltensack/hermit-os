@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.21.2
+- Falsche Offline-Meldungen behoben: Geräte ohne Leistungsmessung (Plus 1, Plus 1 Mini, Plus i4, Mini G3 …) senden oft minutenlang nichts und galten nach 3 min als offline. Die Cloud fragt solche Geräte jetzt erst per `Sys.GetStatus` ab und meldet nur, wer wirklich nicht antwortet
+
 ## Pagurus Scanner 1.1.0
 - Gründlicher: zwei Durchgänge (zweiter mit längeren Zeitlimits für alle, die nicht geantwortet haben), mDNS-Suche und ARP-Tabelle als zusätzliche Quellen, bis zu drei Versuche je Abfrage, weniger gleichzeitige Verbindungen – langsame oder beschäftigte Geräte (v. a. Gen1) wurden vorher teils übersprungen
 - Geräte mit Webserver, aber ohne Shelly/Tasmota-Antwort erscheinen als „Unbekannt“ (Filter, anfangs aus)

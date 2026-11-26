@@ -188,14 +188,35 @@ def user_delete(name: str, request: Request):
 
 
 # ======================= Start =======================
+def ping_devices(devs):
+    """Lebenszeichen per RPC abfragen; liefert die Geraete, die geantwortet haben."""
+    import concurrent.futures
+    if not devs or not BUS.connected:
+        return set()
+
+    def one(d):
+        try:
+            BUS.rpc(d, "Sys.GetStatus", None, 5)
+            return d
+        except Exception:
+            return None
+    with concurrent.futures.ThreadPoolExecutor(min(8, len(devs))) as ex:
+        return {d for d in ex.map(one, devs) if d}
+
+
 def watchdog():
     while True:
         time.sleep(20)
         try:
             lim = time.time() - OFFLINE_AFTER
-            # Batteriefuehler (BLU, Door/Window, H&T) schlafen zwischen den Meldungen – nicht als offline melden
-            for r in q("SELECT id FROM devices WHERE online=1 AND last_seen<? AND COALESCE(comp,'')!='sensor:0'", (lim,)):
-                seen(r["id"], online=False)
+            # Batteriefuehler (BLU, Door/Window, H&T) schlafen zwischen den Meldungen – nicht als offline melden.
+            # Geraete ohne Leistungsmessung (Plus 1, Mini, i4 …) senden oft minutenlang nichts: vor „offline“
+            # erst selbst nachfragen (Sys.GetStatus). Nur wer nicht antwortet, gilt als offline.
+            stale = [r["id"] for r in q("SELECT id FROM devices WHERE online=1 AND last_seen<? "
+                                        "AND COALESCE(comp,'')!='sensor:0'", (lim,))]
+            alive = ping_devices({d.split("~")[0] for d in stale})
+            for d in stale:
+                seen(d, online=None if d.split("~")[0] in alive else False)
             check_offline()
             q("DELETE FROM power WHERE ts<?", (int(time.time()) - KEEP_POWER_DAYS * 86400,))
             q("DELETE FROM alerts WHERE ts<? AND ack=1", (time.time() - 180 * 86400,))
