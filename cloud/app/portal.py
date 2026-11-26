@@ -43,7 +43,8 @@ def _compact(d):
         out.update(state=s.get("state"), pos=s.get("current_pos"), output=None)
     if (d.get("comp") or "").startswith("climate:"):
         out.update(cl={k: s.get(k) for k in ("link", "mode", "target_C", "current_C", "fan", "swing_v", "compressor",
-                                             "ext_temperature_C", "ext_humidity") if s.get(k) is not None})
+                                             "ext_temperature_C", "ext_humidity", "outdoor_C",
+                                             "modes", "fans", "min_C", "max_C", "step_C") if s.get(k) is not None})
         if s.get("ext_temperature_C") is not None:
             out["tC"] = s["ext_temperature_C"]
         if (d.get("winopen") or {}).get("paused"):
@@ -87,7 +88,7 @@ def _run(c):
             import json as _j
             from bus import set_status
             p = {"id": 0, **{k: v for k, v in (_j.loads(c.get("arg") or "{}")).items()
-                             if k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute")}}
+                             if k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep")}}
             BUS.rpc(dev, "Climate.Set", p)
             set_status(dev, "climate:0", BUS.rpc(dev, "Climate.GetStatus", {"id": 0}), merge=True)
             errs = []

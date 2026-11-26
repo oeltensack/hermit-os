@@ -29,11 +29,7 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <main>
 <section class="tab a" id="k">
 <div class="card"><div class="big"><button class="pw" id="pw" onclick="tog()">–</button>
-<div class="kv"><div><div class="v" id="rt">–</div><div class="l">Raum (Klimagerät)</div></div>
-<div><div class="v" id="dt">–</div><div class="l">Raum (DHT22)</div></div>
-<div><div class="v" id="dh">–</div><div class="l">Feuchte</div></div>
-<div><div class="v" id="ot">–</div><div class="l">Ausblasluft</div></div>
-<div><div class="v" id="cp">–</div><div class="l">Kompressor</div></div></div></div>
+<div class="kv" id="kv"></div></div>
 <div id="lnk" class="warn" style="margin-top:10px;display:none">Keine Antwort von der Klimaanlage – UART-Verbindung prüfen</div>
 <div id="dg" class="l" style="margin-top:6px"></div></div>
 <div class="card"><h2>Solltemperatur</h2><div class="set"><button class="bt rnd" onclick="tgt(-1)">−</button><div class="t" id="tg">–</div><button class="bt rnd" onclick="tgt(1)">+</button></div></div>
@@ -52,50 +48,58 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div class="row"><button class="bt p" onclick="saveQ()">Speichern</button></div></div></section>
 <section class="tab" id="s"><div class="card"><h2>Gerät</h2><label>Name</label><input id="s_n">
 <div class="chk"><input type="checkbox" id="s_b"><span>Piepton der Klimaanlage bei Befehlen</span></div>
-<label>Korrektur DHT22 (°C)</label><input id="s_o" type="number" step="0.1">
+<div id="s_od"><label>Korrektur DHT22 (°C)</label><input id="s_o" type="number" step="0.1"></div>
 <div class="row"><button class="bt p" onclick="saveS()">Speichern</button></div></div>
 <div class="card"><h2>Firmware</h2><div id="fv" class="l"></div>
 <label>Update-Modus</label><select id="u_m"><option value="check">Nur prüfen und anzeigen</option><option value="auto">Automatisch installieren</option><option value="off">Aus</option></select>
 <label>Update-Quelle (update.json)</label><input id="u_u">
 <div class="row"><button class="bt" onclick="saveU()">Speichern</button><button class="bt" onclick="chk()">Jetzt prüfen</button><button class="bt p" id="ui" style="display:none" onclick="inst()">Installieren</button><button class="bt" onclick="if(confirm('Neu starten?'))rpc('Shelly.Reboot')">Neu starten</button></div>
-<label>Firmware-Datei hochladen (hermit-tclac-esp32.bin)</label><input type="file" id="u_f" accept=".bin"><div class="row"><button class="bt" onclick="upl()">Hochladen</button></div></div></section>
+<label id="u_fl">Firmware-Datei hochladen</label><input type="file" id="u_f" accept=".bin"><div class="row"><button class="bt" onclick="upl()">Hochladen</button></div></div></section>
 </main><div id="toast"></div>
 <script>
 const $=i=>document.getElementById(i);
 const MODES=[['cool','Kühlen'],['heat','Heizen'],['dry','Entfeuchten'],['fan','Lüften'],['auto','Automatik']];
-const FANS=[['auto','Auto'],['low','1'],['low_mid','2'],['mid','3'],['mid_high','4'],['high','5']];
+const FANS=['auto','low','low_mid','mid','mid_high','high'];   // TCL; andere Anlagen melden ihre Liste selbst
+const EXTRAS=['swing_v','swing_h','eco','turbo','mute'],EXL={swing_v:'Swing ↕',swing_h:'Swing ↔',eco:'Eco',turbo:'Turbo',mute:'Leise',sleep:'Nacht'};
 const dez=(v,d)=>(+v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const f1=(v,u)=>v==null?'–':dez(v,1)+' '+u;
 let S=null,C=null,busy=false,pendT=null,tTimer=0;
+const lim=c=>({mn:c.min_C||16,mx:c.max_C||31,st:c.step_C||1});
 function toast(m,ok){const t=$('toast');t.textContent=m;t.className=ok?'ok':'';t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3000)}
 async function rpc(m,p){const r=await fetch('/rpc',{method:'POST',body:JSON.stringify({id:1,method:m,params:p||{}})});const j=await r.json();if(j.error)throw new Error(j.error.message);return j.result}
 async function run(f,ok){try{await f();if(ok)toast(ok,1)}catch(e){toast(e.message)}}
 function render(){const c=S['climate:0']||{},on=!!c.output;
  $('pw').className='pw'+(on?' on':'');$('pw').textContent=on?'AN':'AUS';
- $('rt').textContent=f1(c.current_C,'°C');$('ot').textContent=f1(c.outlet_C,'°C');$('cp').textContent=c.compressor==null?'–':c.compressor?'läuft':'aus';
- const t=S['temperature:0']||{},h=S['humidity:0']||{};$('dt').textContent=f1(t.tC,'°C');$('dh').textContent=h.rh==null?'–':dez(h.rh,0)+' %';
- $('tg').textContent=pendT!=null?dez(pendT,0)+' °C':(c.target_C==null?'–':dez(c.target_C,c.target_C%1?1:0)+' °C');
+ const t=S['temperature:0'],h=S['humidity:0']||{},kv=[['Raum (Klimagerät)',f1(c.current_C,'°C')]];
+ if(t)kv.push(['Raum (DHT22)',f1(t.tC,'°C')],['Feuchte',h.rh==null?'–':dez(h.rh,0)+' %']);
+ if('outdoor_C' in c)kv.push(['Außen',f1(c.outdoor_C,'°C')]);
+ if(t||'outlet_C' in c)kv.push(['Ausblasluft',f1(c.outlet_C,'°C')]);
+ if('compressor' in c)kv.push(['Kompressor',c.compressor?'läuft':'aus']);
+ $('kv').innerHTML=kv.map(([l,v])=>`<div><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+ const tv=pendT!=null?pendT:c.target_C;$('tg').textContent=tv==null?'–':dez(tv,tv%1?1:0)+' °C';
  $('lnk').style.display=c.link?'none':'block';
- const g=c.diag||{};$('dg').textContent=`UART: TX GPIO${g.tx_pin}, RX GPIO${g.rx_pin} · gesendet ${g.tx_frames} Rahmen · empfangen ${g.rx_bytes} Bytes, ${g.frames} gültige Rahmen, ${g.bad} fehlerhaft, ${g.ignored} übergangen · DHT22: ${t.reads_ok||0} ok, ${t.reads_failed||0} Fehler`;
- $('md').innerHTML=MODES.map(([k,l])=>`<button class="bt ${c.mode==k?'sel':''}" onclick="set({mode:'${k}'})">${l}</button>`).join('');
- $('fn').innerHTML=FANS.map(([k,l])=>`<button class="bt ${c.fan==k?'sel':''}" onclick="set({fan:'${k}'})">${l}</button>`).join('');
- $('ex').innerHTML=[['swing_v','Swing ↕'],['swing_h','Swing ↔'],['eco','Eco'],['turbo','Turbo'],['mute','Leise']].map(([k,l])=>`<button class="bt ${c[k]?'sel':''}" onclick="set({${k}:${!c[k]}})">${l}</button>`).join('');
+ const g=c.diag||{},AC={running:'läuft',ok:'ok',failed:'keine Antwort'};$('dg').textContent=`UART: TX GPIO${g.tx_pin}, RX GPIO${g.rx_pin} · gesendet ${g.tx_frames} Rahmen · empfangen ${g.rx_bytes} Bytes, ${g.frames} gültige Rahmen, ${g.bad} fehlerhaft`+(g.ignored!=null?`, ${g.ignored} übergangen`:'')+(g.autoconf?` · Fähigkeiten: ${AC[g.autoconf]||g.autoconf}`:'')+(t?` · DHT22: ${t.reads_ok||0} ok, ${t.reads_failed||0} Fehler`:'');
+ const md=c.modes||MODES.map(x=>x[0]),fa=c.fans||FANS,ex=c.extras||EXTRAS;let n=0;
+ $('md').innerHTML=MODES.filter(([k])=>md.includes(k)).map(([k,l])=>`<button class="bt ${c.mode==k?'sel':''}" onclick="set({mode:'${k}'})">${l}</button>`).join('');
+ $('fn').innerHTML=fa.map(k=>`<button class="bt ${c.fan==k?'sel':''}" onclick="set({fan:'${k}'})">${k=='auto'?'Auto':++n}</button>`).join('');
+ $('ex').innerHTML=ex.filter(k=>EXL[k]).map(k=>`<button class="bt ${c[k]?'sel':''}" onclick="set({${k}:${!c[k]}})">${EXL[k]}</button>`).join('')+(ex.includes('display')?`<button class="bt" onclick="run(()=>rpc('Climate.DisplayToggle'))">Anzeige an/aus</button>`:'');
  const w=S.wifi;$('ws').textContent=w.sta_ip?`Verbunden mit ${w.ssid} · ${w.sta_ip} · ${w.rssi} dBm`:'Nicht verbunden'+(w.ap?' – Zugangspunkt aktiv':'');
  $('qs').textContent=S.mqtt.connected?'MQTT verbunden':'MQTT nicht verbunden';
  const u=S.sys;$('fv').innerHTML=`Version ${C?C._ver:''} · Laufzeit ${Math.floor(u.uptime/3600)} h ${Math.floor(u.uptime%3600/60)} min · RAM frei ${Math.round(u.ram_free/1024)} KB`+(u.available_updates&&u.available_updates.stable?` · <b>neu: ${u.available_updates.stable.version}</b>`:'')+(u.upd_error?` · <span class="warn">${u.upd_error}</span>`:'');
  $('ui').style.display=u.available_updates&&u.available_updates.stable?'':'none'}
 async function load(){if(busy)return;try{S=await rpc('Shelly.GetStatus');render()}catch(e){}}
 async function cfg(){C=await rpc('Shelly.GetConfig');const i=await rpc('Shelly.GetDeviceInfo');C._ver=i.ver;$('ti').textContent=i.name||'Pagurus Klima';
- $('s_n').value=C.sys.device.name||'';$('s_b').checked=C['climate:0'].beep;$('s_o').value=C['temperature:0'].offset_C||0;
+ $('u_fl').textContent=`Firmware-Datei hochladen (${i.variant}.bin)`;const tc=C['temperature:0'];$('s_od').style.display=tc?'':'none';
+ $('s_n').value=C.sys.device.name||'';$('s_b').checked=C['climate:0'].beep;$('s_o').value=tc?tc.offset_C||0:0;
  $('q_e').checked=C.mqtt.enable;$('q_s').value=C.mqtt.server||'';$('q_u').value=C.mqtt.user||'';$('q_t').value=C.mqtt.topic_prefix||'';
  $('u_m').value=C.update.mode;$('u_u').value=C.update.url;$('w_m').value=C.wifi.sta.ssid||''}
 function set(p){busy=true;run(async()=>{await rpc('Climate.Set',p);busy=false;setTimeout(load,300)}).finally(()=>busy=false)}
 function tog(){const c=S['climate:0']||{};set({on:!c.output})}
-function tgt(d){const c=S['climate:0']||{};pendT=Math.max(16,Math.min(31,Math.round((pendT!=null?pendT:c.target_C||24)+d)));render();clearTimeout(tTimer);tTimer=setTimeout(()=>{const t=pendT;pendT=null;set({target_C:t})},700)}
+function tgt(d){const c=S['climate:0']||{},L=lim(c);pendT=Math.max(L.mn,Math.min(L.mx,Math.round(((pendT!=null?pendT:c.target_C||24)+d*L.st)/L.st)*L.st));render();clearTimeout(tTimer);tTimer=setTimeout(()=>{const t=pendT;pendT=null;set({target_C:t})},700)}
 function scan(){run(async()=>{const r=await rpc('WiFi.Scan');$('w_s').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(x=>`<option>${x.ssid}</option>`).join('');$('w_m').value=''})}
 function saveW(){const s=$('w_m').value||$('w_s').value;if(!s)return toast('Netz wählen');run(()=>rpc('WiFi.SetConfig',{config:{sta:{ssid:s,pass:$('w_p').value}}}),'Gespeichert – Neustart')}
 function saveQ(){const c={enable:$('q_e').checked,server:$('q_s').value,user:$('q_u').value,topic_prefix:$('q_t').value};if($('q_p').value)c.pass=$('q_p').value;run(()=>rpc('MQTT.SetConfig',{config:c}),'Gespeichert')}
-function saveS(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('s_n').value}}});await rpc('Climate.SetConfig',{config:{beep:$('s_b').checked}});await rpc('Temperature.SetConfig',{config:{offset_C:+$('s_o').value||0}});await cfg()},'Gespeichert')}
+function saveS(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('s_n').value}}});await rpc('Climate.SetConfig',{config:{beep:$('s_b').checked}});if(C['temperature:0'])await rpc('Temperature.SetConfig',{config:{offset_C:+$('s_o').value||0}});await cfg()},'Gespeichert')}
 function saveU(){run(()=>rpc('Sys.SetConfig',{config:{update:{mode:$('u_m').value,url:$('u_u').value}}}),'Gespeichert')}
 function chk(){run(async()=>{const r=await rpc('Shelly.CheckForUpdate');await load();toast(r.stable?'Neu: '+r.stable.version:'Firmware ist aktuell',1)})}
 function upl(){const f=$('u_f').files[0];if(!f)return toast('Datei wählen');const fd=new FormData();fd.append('f',f);toast('Lade hoch …',1);

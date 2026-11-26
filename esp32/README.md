@@ -1,28 +1,48 @@
-# Pagurus OS für ESP32 – TCL-/Kesser-Klimaanlage
+# Pagurus OS für ESP32 – Klimaanlagen
 
-Ersetzt das Tuya-WLAN-Modul bzw. ESPHome auf einem ESP32 am UART der Klimaanlage. Spricht dieselbe
+Ersetzt das WLAN-Modul bzw. ESPHome auf einem ESP32 am UART der Klimaanlage. Spricht dieselbe
 Schnittstelle wie Pagurus OS auf den Shellys (JSON-RPC über HTTP und MQTT im Gen2-Format) und
 erscheint dadurch in Pagurus Cloud, Portal und App.
 
-| Komponente | Inhalt |
-| :--------- | :----- |
-| `climate:0` | `output` (an/aus), `mode` (cool, heat, dry, fan, auto), `target_C` (16–31), `current_C` (Raum am Innengerät), `outlet_C`, `fan` (auto, low, low_mid, mid, mid_high, high), `swing_v`, `swing_h`, `eco`, `turbo`, `mute`, `compressor`, `link` |
-| `temperature:0` / `humidity:0` | DHT22 (Temperatur mit einstellbarer Korrektur) |
+| Variante | Anlage | Chip | UART | Belegung |
+| :------- | :----- | :--- | :--- | :------- |
+| `hermit-tclac-esp32` | TCL / Kesser (statt Tuya-Modul) | ESP32 | 9600 8E1 | TX GPIO16, RX GPIO17, DHT22 GPIO18 |
+| `hermit-midea-esp32c3` | Midea-Protokoll: Midea, Dimstal, Comfee, Qlima, Electrolux, Artel, Inventor, Carrier … | ESP32-C3 | 9600 8N1 | TX GPIO21, RX GPIO20 |
+
+Beide Belegungen entsprechen den bisherigen ESPHome-Konfigurationen.
+
+## `climate:0`
+
+| Feld | TCL | Midea |
+| :--- | :-- | :---- |
+| `output` (an/aus), `mode`, `target_C`, `current_C`, `fan`, `swing_v`, `link` | ✓ | ✓ |
+| `mode` | cool, heat, dry, fan, auto | was die Anlage meldet (Liste in `modes`) |
+| `target_C` | 16–31 °C, ganze Grad | 16–30 °C in 0,5er-Schritten (`min_C`, `max_C`, `step_C`) |
+| `fan` | auto, low, low_mid, mid, mid_high, high | auto, low, mid, high (Liste in `fans`) |
+| `swing_h` | ✓ | wenn die Anlage es meldet |
+| `eco`, `turbo`, `mute` (Leise) | ✓ | ✓ (`extras` listet, was angeboten wird) |
+| `sleep` (Nachtmodus) | – | ✓ |
+| `outlet_C`, `compressor` | ✓ | – |
+| `outdoor_C` (Außengerät) | – | ✓, wenn ein plausibler Wert kommt |
+| DHT22: `ext_temperature_C`, `ext_humidity`, `temperature:0`, `humidity:0` | ✓ | – |
 
 RPC: `Climate.Set` (beliebige Felder oben, `on` für an/aus), `Climate.Toggle`, `Climate.GetStatus`,
-`Climate.SetConfig` (`beep`), `Temperature.SetConfig` (`offset_C`), dazu `Shelly.GetDeviceInfo/GetStatus/GetConfig`,
+`Climate.SetConfig` (`beep`, `swap_pins`), Midea zusätzlich `Climate.DisplayToggle` bzw. `Climate.Set` mit
+`display_toggle: true` (Anzeige am Innengerät),
+TCL zusätzlich `Temperature.SetConfig` (`offset_C`); dazu `Shelly.GetDeviceInfo/GetStatus/GetConfig`,
 `Sys.SetConfig`, `WiFi.SetConfig/Scan`, `MQTT.SetConfig`, `Shelly.CheckForUpdate/Update/Reboot`.
 
-## Belegung (wie in der bisherigen ESPHome-Konfiguration)
+Cloud und Portal zeigen auf der Klima-Karte nur die Modi und Lüfterstufen, die das Gerät in `modes`/`fans`
+meldet (ohne Angabe die TCL-Werte).
 
-| ESP32 | an |
-| :---- | :- |
-| GPIO16 (TX) | RX der Klimaanlage |
-| GPIO17 (RX) | TX der Klimaanlage |
-| GPIO18 | DHT22 Daten |
+## Protokolle
 
-UART 9600 8E1. Das Protokoll ist eine eigene Umsetzung nach der Beschreibung in
-[adaasch/AC-hack](https://github.com/adaasch/AC-hack) (Rahmenaufbau, Befehle 0x03/0x04/0x06).
+- **TCL:** eigene Umsetzung nach der Beschreibung in [adaasch/AC-hack](https://github.com/adaasch/AC-hack)
+  (Rahmenaufbau, Befehle 0x03/0x04/0x06).
+- **Midea:** Bibliothek [dudanov/MideaUART](https://github.com/dudanov/MideaUART) 1.1.9 (MIT-Lizenz laut
+  `library.json`), dieselbe, die ESPHome für `climate: platform: midea` verwendet. Nach dem Start fragt die
+  Firmware die Fähigkeiten der Anlage ab (Autoconf, Befehl 0xB5) und bietet nur an, was sie meldet. Antwortet
+  die Anlage darauf nicht, wird alles angeboten (Diagnosezeile: „Fähigkeiten: keine Antwort“).
 
 ## Von ESPHome umsteigen (ohne Kabel)
 
@@ -34,20 +54,26 @@ UART 9600 8E1. Das Protokoll ist eine eigene Umsetzung nach der Beschreibung in
      - platform: esphome
      - platform: web_server
    ```
-   (bei `web_server:` die Zeile `ota: false` entfernen)
-2. `http://<IP>` → „OTA Update“ → **`bin/hermit-tclac-esp32.bin`** hochladen
-3. Das WLAN aus ESPHome wird nicht übernommen: nach dem Neustart mit **`hermit-tclac-xxxxxx`** verbinden →
-   `http://192.168.33.1` → Reiter *WLAN* → Netz wählen, Passwort, speichern
+   (bei `web_server:` eine Zeile `ota: false` entfernen)
+2. `http://<IP>` → „OTA Update“ → die passende Datei hochladen:
+   **`bin/hermit-tclac-esp32.bin`** (TCL) bzw. **`bin/hermit-midea-esp32c3.bin`** (Midea)
+3. Das WLAN aus ESPHome wird nicht übernommen: nach dem Neustart mit **`hermit-tclac-xxxxxx`** bzw.
+   **`hermit-midea-xxxxxx`** verbinden → `http://192.168.33.1` → Reiter *WLAN* → Netz wählen, Passwort, speichern
 4. Unter der neuen IP Reiter *MQTT*: Server der Pagurus Cloud (`192.168.4.102:1883`), Benutzer/Passwort aus
    der `.env` der Cloud
 
-Die Partitionstabelle von ESPHome bleibt dabei bestehen (je 1,25 MB für zwei Programme) – das passt.
+Die Partitionstabelle von ESPHome bleibt dabei bestehen; beide Programme passen hinein.
 
 ## Per Kabel
 
 ```
-esptool.py --chip esp32 --port COM5 write_flash 0x0 hermit-tclac-esp32-factory.bin
+esptool.py --chip esp32   --port COM5 write_flash 0x0 hermit-tclac-esp32-factory.bin
+esptool.py --chip esp32c3 --port COM5 write_flash 0x0 hermit-midea-esp32c3-factory.bin
 ```
+
+Beim ESP32-C3 liegt die Klimaanlage auf den UART0-Pins (GPIO20/21); Pagurus OS benutzt dafür UART1, `Serial`
+ist der USB-Anschluss. Nach dem Einschalten schreibt der Bootloader des C3 ein paar Zeilen auf GPIO21 –
+das war mit ESPHome genauso und stört die Anlage nicht.
 
 ## Updates
 
@@ -57,4 +83,9 @@ Jede Datei wird vor dem Umschalten per SHA-256 geprüft.
 ## Hinweise
 
 - Im Lüftermodus ignoriert die Anlage die Solltemperatur.
-- Kommt keine Antwort von der Anlage, zeigt die Oberfläche „Keine Antwort“ – dann TX/RX tauschen.
+- Midea: Im Automatikmodus und mit Eco/Turbo/Nacht regelt die Anlage den Lüfter selbst (Lüfter-Befehle
+  werden dann übergangen). Eco nur beim Kühlen, Turbo beim Kühlen oder Heizen, Nacht nicht beim Entfeuchten
+  oder Lüften. Turbo nutzt das Turbo-Preset, wenn die Anlage es meldet, sonst die Turbo-Lüfterstufe.
+- Midea: Einen Modus bei ausgeschalteter Anlage wählen merkt ihn nur vor; er gilt beim Einschalten.
+- Kommt keine Antwort von der Anlage, zeigt die Oberfläche „Keine Antwort“ – dann TX/RX prüfen
+  (`Climate.SetConfig` mit `{"swap_pins": true}` tauscht sie ohne Umlöten).

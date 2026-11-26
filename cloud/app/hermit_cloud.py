@@ -350,12 +350,12 @@ async def dev_switch(dev: str, request: Request):
 
 @app.post("/api/devices/{dev}/climate")
 async def dev_climate(dev: str, request: Request):
-    """Klimaanlage (Pagurus OS ESP32): Modus, Solltemperatur, Luefter, Swing, Eco/Turbo/Leise."""
+    """Klimaanlage (Pagurus OS ESP32): Modus, Solltemperatur, Luefter, Swing, Eco/Turbo/Leise/Nacht."""
     need(request, "user")
     not_locked(get_dev(dev))
     d = await request.json()
     p = {"id": 0}
-    for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute"):
+    for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep", "display_toggle"):
         if k in d:
             p[k] = d[k]
     try:

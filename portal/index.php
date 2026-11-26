@@ -83,10 +83,10 @@ function card(d){const ro=S.read_only,w=PEND[d.id],cov=(d.comp||'').startsWith('
   ${d.pos!=null?`<input type="range" min="0" max="100" value="${d.pos}" onchange="cmd('${esc(d.id)}','pos',+this.value)">`:''}`:'');}
  if(d.cl){const c=d.cl,id=esc(d.id),t=c.target_C||24;
   ctl=c.link===false?'<div class="l" style="color:var(--e,#e55)">Klimagerät antwortet nicht</div>':
-  (c.paused?`<div class="l" style="color:#e8b13a">Pausiert – ${esc(c.paused)}</div>`:'')+`<div class="l">${d.output?esc(CLM[c.mode]||c.mode||'')+' · Soll '+fmt(t,t%1?1:0,'°C'):'aus'}${c.current_C!=null?' · Raum '+fmt(c.current_C,1,'°C'):''}${c.ext_humidity!=null?' · '+fmt(c.ext_humidity,0,'%'):''} · Lüfter ${esc(CLF[c.fan]||c.fan||'–')}${c.compressor?' · Kompressor läuft':''}</div>`+
-  (can?`<div class="row"><button class="bt g" onclick="cl('${id}',{target_C:${Math.max(16,Math.round(t)-1)}})">−</button><b style="min-width:3.5em;text-align:center">${fmt(t,t%1?1:0,'°C')}</b><button class="bt g" onclick="cl('${id}',{target_C:${Math.min(31,Math.round(t)+1)}})">+</button>
-  <select onchange="cl('${id}',{mode:this.value})">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${c.mode==k?'selected':''}>${v}</option>`).join('')}</select>
-  <select onchange="cl('${id}',{fan:this.value})">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${c.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>`:'');}
+  (c.paused?`<div class="l" style="color:#e8b13a">Pausiert – ${esc(c.paused)}</div>`:'')+`<div class="l">${d.output?esc(CLM[c.mode]||c.mode||'')+' · Soll '+fmt(t,t%1?1:0,'°C'):'aus'}${c.current_C!=null?' · Raum '+fmt(c.current_C,1,'°C'):''}${c.ext_humidity!=null?' · '+fmt(c.ext_humidity,0,'%'):''} ${c.outdoor_C!=null?' · Außen '+fmt(c.outdoor_C,1,'°C'):''} · Lüfter ${esc(clFanTxt(c))}${c.compressor?' · Kompressor läuft':''}</div>`+
+  (can?`<div class="row"><button class="bt g" onclick="cl('${id}',{target_C:${clStep(c,-1)}})">−</button><b style="min-width:3.5em;text-align:center">${fmt(t,t%1?1:0,'°C')}</b><button class="bt g" onclick="cl('${id}',{target_C:${clStep(c,1)}})">+</button>
+  <select onchange="cl('${id}',{mode:this.value})">${clModes(c).map(([k,v])=>`<option value="${k}" ${c.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+  <select onchange="cl('${id}',{fan:this.value})">${clFans(c).map(([k,v])=>`<option value="${k}" ${c.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>`:'');}
  const btn=cov||sen||d.output==null?'':`<button class="sw ${d.output?'on':''} ${w?'wait':''}" ${can?'':'disabled'} onclick="cmd('${esc(d.id)}','toggle')">${w?'…':d.meter_only?'MESS':d.output?'AN':'AUS'}</button>`;
  const tags=[d.appliance?`<span class="tag ${d.appliance.state=='finished'?'g':''}">${esc(d.appliance.label)}</span>`:'',d.fridge_alarm?'<span class="tag r">Kühlgerät-Alarm</span>':'',d.locked?'<span class="tag">🔒 nur Anzeige</span>':''].join('');
  return `<div class="dev ${d.online||sen?'':'off'}"><div><div class="dn">${esc(d.name||d.id)}</div>
@@ -107,6 +107,10 @@ let busy=false;
 async function load(){if(busy||document.hidden)return;busy=true;try{S=await api('state');$('login').style.display='none';render()}catch(e){if(e.message!='login')$('stat').textContent='Portal nicht erreichbar'}finally{busy=false}}
 const CLM={cool:'Kühlen',heat:'Heizen',dry:'Entfeuchten',fan:'Lüften',auto:'Automatik'},CLF={auto:'Auto',low:'1',low_mid:'2',mid:'3',mid_high:'4',high:'5'};
 function cl(dev,arg){cmd(dev,'climate',null,arg)}
+function clModes(s){return Object.entries(CLM).filter(([k])=>!s.modes||s.modes.includes(k))}
+function clFans(s){if(!s.fans)return Object.entries(CLF);let n=0;return s.fans.map(k=>[k,k=='auto'?'Auto':String(++n)])}
+function clFanTxt(s){const f=clFans(s).find(x=>x[0]==s.fan);return f?f[1]:(s.fan||'–')}
+function clStep(s,d){const st=s.step_C||1,mn=s.min_C||16,mx=s.max_C||31;return Math.max(mn,Math.min(mx,Math.round(((s.target_C||24)+d*st)/st)*st))}
 async function cmd(dev,act,pos,arg){try{const r=await api('cmd',{dev,act,pos,arg});PEND[dev]=r.id;render();setTimeout(load,800)}catch(e){if(e.message!='login')toast(e.message)}}
 $('lf').onsubmit=async e=>{e.preventDefault();try{await api('login',{password:$('pw').value});$('pw').value='';$('login').style.display='none';load()}catch(x){toast(x.message)}};
 $('lo').onclick=async()=>{await api('logout',{}).catch(()=>{});location.reload()};

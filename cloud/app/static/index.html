@@ -266,11 +266,11 @@ ${cvr?`<div class="cvc"><div class="v">${CVS[s.state]||s.state||'–'}${s.curren
 ${d.online&&canD(d)?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="cvAct('${esc(d.id)}','open')">▲ Auf</button><button class="bt g s" onclick="cvAct('${esc(d.id)}','stop')">■ Stopp</button><button class="bt g s" onclick="cvAct('${esc(d.id)}','close')">▼ Zu</button></div>
 ${s.pos_control?`<input type="range" class="bri" min="0" max="100" value="${s.current_pos??0}" aria-label="Position" onchange="cvPos('${esc(d.id)}',+this.value)">`:''}`:''}</div>`:''}
 ${cli?`<div class="cvc"><div class="v">${s.link===false?'<span style="color:var(--e)">Klimagerät antwortet nicht</span>':esc(CLM[s.mode]||s.mode||'–')+(s.target_C!=null?' · Soll '+fmt(s.target_C,s.target_C%1?1:0,'°C'):'')}</div>
-<div class="l">${s.current_C!=null?'Raum '+fmt(s.current_C,1,'°C')+' · ':''}${s.ext_temperature_C!=null?'Fühler '+fmt(s.ext_temperature_C,1,'°C')+(s.ext_humidity!=null?' / '+fmt(s.ext_humidity,0,'%'):'')+' · ':''}Lüfter ${esc(CLF[s.fan]||s.fan||'–')}${s.compressor?' · Kompressor läuft':''}</div>
-${d.online&&canD(d)&&s.link!==false?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${Math.max(16,(s.target_C||24)-1)}})">−</button><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${Math.min(31,(s.target_C||24)+1)}})">+</button>
-<select onchange="clSet('${esc(d.id)}',{mode:this.value})" style="width:auto">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
-<select onchange="clSet('${esc(d.id)}',{fan:this.value})" style="width:auto">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select>
-<button class="bt ${s.swing_v?'':'g'} s" onclick="clSet('${esc(d.id)}',{swing_v:${!s.swing_v}})">Swing</button></div>`:''}</div>`:''}
+<div class="l">${s.current_C!=null?'Raum '+fmt(s.current_C,1,'°C')+' · ':''}${s.ext_temperature_C!=null?'Fühler '+fmt(s.ext_temperature_C,1,'°C')+(s.ext_humidity!=null?' / '+fmt(s.ext_humidity,0,'%'):'')+' · ':''}${s.outdoor_C!=null?'Außen '+fmt(s.outdoor_C,1,'°C')+' · ':''}Lüfter ${esc(clFanTxt(s))}${s.compressor?' · Kompressor läuft':''}</div>
+${d.online&&canD(d)&&s.link!==false?`<div class="row" style="gap:6px;margin-top:8px"><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${clStep(s,-1)}})">−</button><button class="bt g s" onclick="clSet('${esc(d.id)}',{target_C:${clStep(s,1)}})">+</button>
+<select onchange="clSet('${esc(d.id)}',{mode:this.value})" style="width:auto">${clModes(s).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+<select onchange="clSet('${esc(d.id)}',{fan:this.value})" style="width:auto">${clFans(s).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select>
+${!s.extras||s.extras.includes('swing_v')?`<button class="bt ${s.swing_v?'':'g'} s" onclick="clSet('${esc(d.id)}',{swing_v:${!s.swing_v}})">Swing</button>`:''}</div>`:''}</div>`:''}
 ${s.brightness!=null&&d.online&&canD(d)?`<input type="range" class="bri" min="1" max="100" value="${s.brightness}" aria-label="Helligkeit" onchange="setBri('${esc(d.id)}',+this.value)">`:''}
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur',stm_no_response:'Dimmer-Chip antwortet nicht',pm_no_response:'Messchip antwortet nicht',obstruction:'Hindernis'}[e]||e)).join(', ')}</div>`:''}
 <div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
@@ -285,6 +285,12 @@ function sw(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/swit
 function cvAct(id,a){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{cover:a}});await loadDevs()})}
 function cvPos(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{pos:p}});await loadDevs()})}
 const CLM={cool:'Kühlen',heat:'Heizen',dry:'Entfeuchten',fan:'Lüften',auto:'Automatik'},CLF={auto:'Auto',low:'1',low_mid:'2',mid:'3',mid_high:'4',high:'5'};
+// Anlagen melden ihre Modi, Lüfterstufen und Temperaturschritte selbst (Midea); ohne Angabe gilt TCL
+function clModes(s){return Object.entries(CLM).filter(([k])=>!s.modes||s.modes.includes(k))}
+function clFans(s){if(!s.fans)return Object.entries(CLF);let n=0;return s.fans.map(k=>[k,k=='auto'?'Auto':String(++n)])}
+function clFanTxt(s){const f=clFans(s).find(x=>x[0]==s.fan);return f?f[1]:(s.fan||'–')}
+const CLX={swing_v:'Swing ↕',swing_h:'Swing ↔',eco:'Eco',turbo:'Turbo',mute:'Leise',sleep:'Nacht'},CLX_TCL=['swing_v','swing_h','eco','turbo','mute'];
+function clStep(s,d){const st=s.step_C||1,mn=s.min_C||16,mx=s.max_C||31;return Math.max(mn,Math.min(mx,Math.round(((s.target_C||24)+d*st)/st)*st))}
 function clSet(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/climate',{method:'POST',body:p});await loadDevs();if(TAB=='kl')await loadClimates(true)})}
 function setBri(id,b){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{brightness:b}});await loadDevs()})}
 function devDlg(id){const d=DEVS.find(x=>x.id==id),rooms=[...new Set(DEVS.map(x=>x.room).filter(Boolean))];
@@ -371,19 +377,20 @@ document.querySelectorAll('#climates .clc').forEach(b=>clHover(b,CL.find(c=>c.de
 function clCard(c){const s=c.status||{},id=esc(c.dev),on=!!s.output,link=s.link!==false,p=c.winopen&&c.winopen.paused,t=s.target_C??24,ok=c.online&&link&&canSw()&&!c.locked;
 const cls=!c.online||!link?'off':p?'paused':on?(s.mode=='heat'?'heat':s.mode=='cool'?'cool2':'running'):'';
 const st=!c.online?'offline':!link?'Klimagerät antwortet nicht':p?'Pausiert':on?(CLM[s.mode]||s.mode)+' · '+fmt(t,t%1?1:0,'°C'):'Aus';
-const sub=p?esc(c.winopen.reason||'Fenster offen'):on?`Lüfter ${esc(CLF[s.fan]||s.fan||'–')}${s.compressor?' · Kompressor läuft':''}`:'';
-const tg=(k,l)=>`<button class="bt ${s[k]?'':'g'} tg" onclick="clSet('${id}',{${k}:${!s[k]}})">${l}</button>`;
+const sub=p?esc(c.winopen.reason||'Fenster offen'):on?`Lüfter ${esc(clFanTxt(s))}${s.compressor?' · Kompressor läuft':''}`:'';
+const tg=(k,l)=>`<button class="bt ${s[k]?'':'g'} tg" onclick="clSet('${id}',{${k}:${!s[k]}})">${l}</button>`,tcl=!s.fans;
 const m=c.meter,tod=c.today||{};
 return `<div class="app ${cls}"><div class="ah"><div class="ai" style="color:${on&&s.mode=='heat'?'#e8833a':'var(--a)'}">${FAN_I}</div>
 <div style="flex:1;min-width:0"><div class="row sp"><span class="dn">${esc(c.name)}</span><span class="l">${esc(c.room||'')}</span></div>
 <div class="st">${st}</div><div class="l">${sub}${c.locked?' · 🔒 nur Anzeige':''}</div></div>
 <button class="sw ${on?'on':''}" ${ok?'':'disabled'} onclick="clSet('${id}',{on:${!on}})">${on?'AN':'AUS'}</button></div>
-${ok?`<div class="row" style="gap:6px"><button class="bt g" onclick="clSet('${id}',{target_C:${Math.max(16,Math.round(t)-1)}})">−</button><span class="cltgt">${fmt(t,t%1?1:0,'°C')}</span><button class="bt g" onclick="clSet('${id}',{target_C:${Math.min(31,Math.round(t)+1)}})">+</button>
-<select onchange="clSet('${id}',{mode:this.value})" style="width:auto">${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
-<select onchange="clSet('${id}',{fan:this.value})" style="width:auto">${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select></div>
-<div class="row" style="gap:5px">${tg('swing_v','Swing ↕')}${tg('swing_h','Swing ↔')}${tg('eco','Eco')}${tg('turbo','Turbo')}${tg('mute','Leise')}</div>`:''}
-<div class="stats4"><div><div class="v">${fmt(s.ext_temperature_C,1,'°C')}</div><div class="l">Raum</div></div><div><div class="v">${fmt(s.ext_humidity,0,'%')}</div><div class="l">Feuchte</div></div>
-<div><div class="v">${fmt(s.current_C,1,'°C')}</div><div class="l">am Gerät</div></div><div><div class="v">${fmt(s.outlet_C,1,'°C')}</div><div class="l">Ausblasluft</div></div>
+${ok?`<div class="row" style="gap:6px"><button class="bt g" onclick="clSet('${id}',{target_C:${clStep(s,-1)}})">−</button><span class="cltgt">${fmt(t,t%1?1:0,'°C')}</span><button class="bt g" onclick="clSet('${id}',{target_C:${clStep(s,1)}})">+</button>
+<select onchange="clSet('${id}',{mode:this.value})" style="width:auto">${clModes(s).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+<select onchange="clSet('${id}',{fan:this.value})" style="width:auto">${clFans(s).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select>
+${(s.extras||[]).includes('display')?`<button class="bt g" onclick="clSet('${id}',{display_toggle:true})">Anzeige</button>`:''}</div>
+<div class="row" style="gap:5px">${(s.extras||CLX_TCL).filter(k=>CLX[k]).map(k=>tg(k,CLX[k])).join('')}</div>`:''}
+<div class="stats4">${tcl?`<div><div class="v">${fmt(s.ext_temperature_C,1,'°C')}</div><div class="l">Raum</div></div><div><div class="v">${fmt(s.ext_humidity,0,'%')}</div><div class="l">Feuchte</div></div>`:''}
+<div><div class="v">${fmt(s.current_C,1,'°C')}</div><div class="l">${tcl?'am Gerät':'Raum'}</div></div>${tcl?`<div><div class="v">${fmt(s.outlet_C,1,'°C')}</div><div class="l">Ausblasluft</div></div>`:''}${s.outdoor_C!=null?`<div><div class="v">${fmt(s.outdoor_C,1,'°C')}</div><div class="l">Außen</div></div>`:''}
 ${m?`<div><div class="v">${m.online&&m.apower!=null?fmt(m.apower,0,'W'):'–'}</div><div class="l">Leistung</div></div><div><div class="v">${kwh(c.e_today&&c.e_today.wh)}</div><div class="l">heute · ${eur(c.e_today&&c.e_today.cost)}</div></div>
 <div><div class="v">${kwh(c.e_30&&c.e_30.wh)}</div><div class="l">30 Tage · ${eur(c.e_30&&c.e_30.cost)}</div></div>`:''}
 <div><div class="v">${dur((tod.on_m||0)*3600)}</div><div class="l">an heute · Kompr. ${dur((tod.comp_m||0)*3600)}</div></div></div>
@@ -392,10 +399,10 @@ ${m?`<div><div class="v">${m.online&&m.apower!=null?fmt(m.apower,0,'W'):'–'}</
 <div><div class="l" style="margin-bottom:3px">${m?'Verbrauch':'Laufzeit'} je Tag – 14 Tage</div>${clDays(c)}</div>
 <div><div class="row sp" style="margin-bottom:3px"><span class="l">Zeitplan</span><a class="lk admin-only" style="font-size:12px" onclick="csDlg('${id}')">+ Zeitpunkt</a></div>
 ${(c.sched||[]).length?`<div class="csl">${c.sched.map(x=>`<div class="row sp ${x.enabled?'':'ack'}" style="padding:3px 0;border-top:1px solid var(--b)"><span><b>${esc(x.today||timeTxt(x.time))}</b> <span class="l">${daysTxt(x.days)}${x.time.startsWith('sun')&&x.today?' · '+esc(timeTxt(x.time)):''}</span></span>
-<span>${csTxt(x.action)}${x.enabled?'':' <span class="tag">aus</span>'} <a class="lk admin-only" style="font-size:12px" onclick="csDlg('${id}',${x.id})">Ändern</a></span></div>`).join('')}</div>`:'<div class="l" style="font-size:12px">Kein Zeitplan.</div>'}</div>
+<span>${csTxt(x.action,s)}${x.enabled?'':' <span class="tag">aus</span>'} <a class="lk admin-only" style="font-size:12px" onclick="csDlg('${id}',${x.id})">Ändern</a></span></div>`).join('')}</div>`:'<div class="l" style="font-size:12px">Kein Zeitplan.</div>'}</div>
 <div class="row sp"><span class="l">Fenster offen: ${c.winopen?[c.winopen.sensors?c.winopen.sensors+' Kontakt'+(c.winopen.sensors>1?'e':''):'',c.winopen.drop?'Temperatursturz':''].filter(Boolean).join(' + '):'aus'}</span>
 <span class="row"><a class="lk admin-only" style="font-size:12px" onclick="woDlg('${id}')">Fenster offen …</a>${m?`<a class="lk" style="font-size:12px" onclick="showEn('${esc(m.id)}')">Energie</a>`:''}<a class="lk admin-only" style="font-size:12px" onclick="devDlg('${id}')">Gerät …</a></span></div></div>`}
-function csTxt(a){return a.on?`<span style="color:${a.mode=='heat'?'#e8833a':a.mode=='cool'?'var(--a)':'inherit'}">${a.mode?esc(CLM[a.mode]):'Ein'}</span>${a.target_C!=null?' '+a.target_C+' °C':''}${a.fan?' · Lüfter '+esc(CLF[a.fan]):''}`:'<span class="l">Aus</span>'}
+function csTxt(a,s){return a.on?`<span style="color:${a.mode=='heat'?'#e8833a':a.mode=='cool'?'var(--a)':'inherit'}">${a.mode?esc(CLM[a.mode]):'Ein'}</span>${a.target_C!=null?' '+a.target_C+' °C':''}${a.fan?' · Lüfter '+esc(clFans(s||{}).find(f=>f[0]==a.fan)?.[1]||a.fan):''}`:'<span class="l">Aus</span>'}
 function csDlg(dev,sid){const c=CL.find(x=>x.dev==dev),x=sid?c.sched.find(y=>y.id==sid):{enabled:true,days:31,time:'06:30',action:{on:true,mode:(c.status||{}).mode||'heat',target_C:Math.round((c.status||{}).target_C||22)}};
 const a=x.action,sun=x.time.startsWith('sun'),kind=sun?(x.time.startsWith('sunrise')?'sunrise':'sunset'):'time',off=sun?(x.time.slice(kind.length)||'0'):'0';
 dlg(`<h2>Zeitpunkt – ${esc(c.name)}</h2><div class="f">
@@ -403,9 +410,9 @@ dlg(`<h2>Zeitpunkt – ${esc(c.name)}</h2><div class="f">
 <label>Zeit</label><div class="row"><select id="cs_k" onchange="$('cs_t').style.display=this.value=='time'?'':'none';$('cs_ow').style.display=this.value=='time'?'none':''"><option value="time">Uhrzeit</option><option value="sunrise" ${kind=='sunrise'?'selected':''}>Sonnenaufgang</option><option value="sunset" ${kind=='sunset'?'selected':''}>Sonnenuntergang</option></select>
 <input id="cs_t" type="time" value="${sun?'06:30':esc(x.time)}" style="${sun?'display:none':''}"><span id="cs_ow" style="${sun?'':'display:none'}">± <input id="cs_o" style="width:60px" value="${off}"> min</span></div>
 <label>Aktion</label><select id="cs_on" onchange="$('cs_more').style.display=this.value=='1'?'contents':'none'"><option value="1">Einschalten</option><option value="0" ${a.on?'':'selected'}>Ausschalten</option></select>
-<div id="cs_more" style="display:${a.on?'contents':'none'}"><label>Modus</label><select id="cs_m"><option value="">unverändert</option>${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${a.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+<div id="cs_more" style="display:${a.on?'contents':'none'}"><label>Modus</label><select id="cs_m"><option value="">unverändert</option>${clModes(c.status||{}).map(([k,v])=>`<option value="${k}" ${a.mode==k?'selected':''}>${v}</option>`).join('')}</select>
 <label>Solltemperatur</label><div class="row"><input id="cs_tg" style="width:70px" value="${a.target_C??''}" placeholder="–"> °C <span class="l">leer = unverändert</span></div>
-<label>Lüfter</label><select id="cs_f"><option value="">unverändert</option>${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${a.fan==k?'selected':''}>${v}</option>`).join('')}</select></div>
+<label>Lüfter</label><select id="cs_f"><option value="">unverändert</option>${clFans(c.status||{}).map(([k,v])=>`<option value="${k}" ${a.fan==k?'selected':''}>${v}</option>`).join('')}</select></div>
 <label>Aktiv</label><label><input type="checkbox" id="cs_e" ${x.enabled?'checked':''} style="width:auto"> Zeitpunkt ausführen</label></div>
 <p class="l">Steht die Anlage gerade wegen offenem Fenster in Pause, merkt sich die Cloud das Einschalten und führt es nach dem Schließen aus. Ausschalten beendet die Pause.</p>
 <div class="row sp" style="margin-top:14px"><div>${sid?`<button class="bt r" onclick="csDel('${esc(dev)}',${sid})">Löschen</button>`:''}</div>

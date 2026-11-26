@@ -20,6 +20,7 @@ Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Pagurus Clo
 | **Sonoff RF Bridge 433** (R2 mit EFM8, 1 MB) | `hermit-rfbridge` | eigene Komponente `rf`, Funksteckdosen als `switch:<n>` | Codes empfangen, speichern (Taste, Kontakt, Schalter), senden; Aktionen je Code; Standard- und Portisch-Firmware |
 | **1-MB-Steckdose mit ESP8285** (Touch-Taste, ohne Messung) | `hermit-plug1m` | `switch:0` wie Plus Plug S ohne Messung | Relais, Touch-Taste, LED je Relais/WLAN; Wechsel von ESPHome/Tasmota über eigenen 1-MB-Loader |
 | **TCL-/Kesser-Klimaanlage** mit ESP32 am UART (statt Tuya-Modul/ESPHome) | `hermit-tclac-esp32` | `climate:0`, DHT22 als `temperature:0`/`humidity:0` | Modus, Soll-/Raumtemperatur, Lüfter, Swing, Eco/Turbo/Leise; Anleitung in [esp32/README.md](esp32/README.md) |
+| **Midea-Klimaanlage** (auch Dimstal, Comfee, Qlima, Electrolux, Artel …) mit ESP32-C3 am UART (statt WLAN-Stick/ESPHome) | `hermit-midea-esp32c3` | `climate:0` | Modus, Soll (0,5 °C)/Raum-/Außentemperatur, Lüfter, Swing, Eco/Turbo/Leise/Nacht, Anzeige; Fähigkeiten fragt die Firmware bei der Anlage ab; Anleitung in [esp32/README.md](esp32/README.md) |
 
 > Shelly ist eine Marke der Shelly Group. Pagurus OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.

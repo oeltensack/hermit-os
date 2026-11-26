@@ -1,5 +1,17 @@
 # Änderungen
 
+## 1.19.0 / Pagurus Cloud 1.20.0 / Pagurus Portal 1.8
+- **Neue Variante `hermit-midea-esp32c3`:** Midea-Klimaanlagen (auch Dimstal, Comfee, Qlima, Electrolux, Artel …)
+  an einem ESP32-C3 statt WLAN-Stick bzw. ESPHome, UART TX GPIO21 / RX GPIO20 (9600 8N1). Protokoll über die
+  Bibliothek dudanov/MideaUART (MIT), dieselbe wie in ESPHome. Fähigkeiten werden bei der Anlage abgefragt
+  (Modi, Swing, Eco, Turbo); Soll in 0,5 °C, Raum- und Außentemperatur, Lüfter Auto/1/2/3, Leise, Turbo,
+  Nachtmodus, Anzeige an/aus, Piepton abschaltbar (Standard aus). Umstieg von ESPHome per Browser-Upload,
+  Komplettabbild fürs Kabel (`esp32c3`, ab 0x0)
+- ESP32-Projekt aufgeteilt: gemeinsamer Kern, Anbindung je Anlage (`ac_tcl.h`, `ac_midea.h`); TCL unverändert
+- Klima-Seite am Gerät zeigt Modi, Lüfter, Extras und Messwerte nach dem, was die Anlage meldet
+- Cloud (Gerätekarte und Bereich Klima) und Portal: zeigen nur die Modi/Lüfterstufen des Geräts (`modes`, `fans`), Soll ± in der
+  Schrittweite des Geräts (halbe Grad), Außentemperatur; Nachtmodus (`sleep`) wird durchgereicht
+
 ## Pagurus Cloud 1.19.0 / Pagurus Portal 1.7
 - „Nur Anzeige“ je Gerät (Bearbeiten → Bedienung): Der Schaltknopf zeigt nur noch den Zustand, Schalten von Hand ist in Cloud, Portal und App (ab 1.6.0) gesperrt – auch Helligkeit, Rollladen und Klima. Automatik, Zeitpläne, Regeln und Szenen schalten weiter
 

@@ -40,7 +40,7 @@ def sched_clean(d):
         if a.get("mode") in MODES:
             act["mode"] = a["mode"]
         if a.get("target_C") not in (None, ""):
-            act["target_C"] = max(16, min(31, int(round(float(a["target_C"])))))
+            act["target_C"] = max(16, min(31, round(float(a["target_C"]) * 2) / 2))   # halbe Grad (Midea)
         if a.get("fan") in FANS:
             act["fan"] = a["fan"]
     return {"days": days, "time": t, "action": act, "enabled": 1 if d.get("enabled", True) else 0}

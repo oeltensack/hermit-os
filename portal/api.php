@@ -172,10 +172,10 @@ if ($a === 'cmd' && $post) {
         $c = is_array($in['arg'] ?? null) ? $in['arg'] : [];
         $p = [];
         if (isset($c['on'])) $p['on'] = (bool)$c['on'];
-        if (isset($c['target_C'])) $p['target_C'] = max(16, min(31, (int)$c['target_C']));
+        if (isset($c['target_C'])) $p['target_C'] = max(16, min(31, round((float)$c['target_C'] * 2) / 2));   // halbe Grad (Midea)
         if (in_array($c['mode'] ?? null, ['cool', 'heat', 'dry', 'fan', 'auto'], true)) $p['mode'] = $c['mode'];
         if (in_array($c['fan'] ?? null, ['auto', 'low', 'low_mid', 'mid', 'mid_high', 'high'], true)) $p['fan'] = $c['fan'];
-        foreach (['swing_v', 'swing_h', 'eco', 'turbo', 'mute'] as $k) if (isset($c[$k])) $p[$k] = (bool)$c[$k];
+        foreach (['swing_v', 'swing_h', 'eco', 'turbo', 'mute', 'sleep'] as $k) if (isset($c[$k])) $p[$k] = (bool)$c[$k];
         if (!$p) out(['error' => 'Keine Klima-Werte'], 400);
         $arg = json_encode($p);
     }

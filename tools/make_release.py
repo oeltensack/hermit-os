@@ -34,7 +34,7 @@ version = re.search(r'FW_VERSION=\\"([0-9.]+)\\"', ini).group(1)
 
 subprocess.run(["pio", "run"], cwd=ROOT, check=True)
 
-# ESP32 (Klimaanlage TCL): eigenes PlatformIO-Projekt in esp32/, gleiche Versionsnummer
+# ESP32 (Klimaanlagen TCL und Midea): eigenes PlatformIO-Projekt in esp32/, gleiche Versionsnummer
 e32 = ROOT / "esp32"
 e32ini = (e32 / "platformio.ini").read_text()
 (e32 / "platformio.ini").write_text(re.sub(r'FW_VERSION=\\"[0-9.]+\\"', f'FW_VERSION=\\\\"{version}\\\\"', e32ini))
@@ -55,17 +55,21 @@ for env, name in VARIANTS.items():
         g.write(data)
     files[name] = {"url": f"bin/{name}.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
 
-# ESP32: Programm fuer OTA (update.json) und Komplettabbild fuer das erste Flashen per Kabel (ab 0x0)
-b32 = e32 / ".pio" / "build" / "tclac"
-shutil.copy(b32 / "firmware.bin", bindir / "hermit-tclac-esp32.bin")
-data = (bindir / "hermit-tclac-esp32.bin").read_bytes()
-files["hermit-tclac-esp32"] = {"url": "bin/hermit-tclac-esp32.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+# ESP32: Programm fuer OTA (update.json) und Komplettabbild fuer das erste Flashen per Kabel (ab 0x0).
+# Env -> (Name, Chip, Adresse des Bootloaders: ESP32 0x1000, ESP32-C3 0x0)
+ESP32 = {"tclac": ("hermit-tclac-esp32", "esp32", "0x1000"),
+         "midea_c3": ("hermit-midea-esp32c3", "esp32c3", "0x0")}
 boot_app0 = next(pathlib.Path.home().glob(".platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"))
-subprocess.run([sys.executable, str(next(pathlib.Path.home().glob(".platformio/packages/tool-esptoolpy/esptool.py"))),
-                "--chip", "esp32", "merge_bin", "-o", str(bindir / "hermit-tclac-esp32-factory.bin"),
-                "--flash_mode", "dio", "--flash_size", "4MB",
-                "0x1000", str(b32 / "bootloader.bin"), "0x8000", str(b32 / "partitions.bin"),
-                "0xe000", str(boot_app0), "0x10000", str(b32 / "firmware.bin")], check=True, stdout=subprocess.DEVNULL)
+esptool = str(next(pathlib.Path.home().glob(".platformio/packages/tool-esptoolpy/esptool.py")))
+for env, (name, chip, boot) in ESP32.items():
+    b32 = e32 / ".pio" / "build" / env
+    shutil.copy(b32 / "firmware.bin", bindir / f"{name}.bin")
+    data = (bindir / f"{name}.bin").read_bytes()
+    files[name] = {"url": f"bin/{name}.bin", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+    subprocess.run([sys.executable, esptool, "--chip", chip, "merge_bin", "-o", str(bindir / f"{name}-factory.bin"),
+                    "--flash_mode", "dio", "--flash_size", "4MB",
+                    boot, str(b32 / "bootloader.bin"), "0x8000", str(b32 / "partitions.bin"),
+                    "0xe000", str(boot_app0), "0x10000", str(b32 / "firmware.bin")], check=True, stdout=subprocess.DEVNULL)
 
 # Pagurus Loader – fuer den Wechsel von Tasmota; der 1-MB-Loader zusaetzlich als Zwischenstufe beim Update
 for env, name in (("loader", "hermit-loader"), ("loader_1m", "hermit-loader-1m"), ("loader_1m_plug1m", "hermit-loader-1m-plug1m")):
@@ -113,7 +117,8 @@ MODELS = {
     "Sonoff-RF-Bridge": ["hermit-rfbridge"],
     "Steckdose-1MB-ESP8285": ["hermit-plug1m"],
 }
-EXTRA = {"Klima-TCL-ESP32": ["hermit-tclac-esp32.bin", "hermit-tclac-esp32-factory.bin"]}
+EXTRA = {"Klima-TCL-ESP32": ["hermit-tclac-esp32.bin", "hermit-tclac-esp32-factory.bin"],
+         "Klima-Midea-ESP32-C3": ["hermit-midea-esp32c3.bin", "hermit-midea-esp32c3-factory.bin"]}
 dist = ROOT / "dist"
 dist.mkdir(exist_ok=True)
 for f in dist.glob("*.zip"):

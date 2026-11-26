@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 D.Koch – Pagurus OS
-// Pagurus OS fuer ESP32 – TCL-/Kesser-Klimaanlage (statt des Tuya-WLAN-Moduls) mit DHT22.
+// Pagurus OS fuer ESP32 – Klimaanlagen am UART des WLAN-Moduls. Gemeinsamer Kern, die Anlage selbst
+// steckt in ac_tcl.h (TCL/Kesser, ESP32 mit DHT22) bzw. ac_midea.h (Midea/Dimstal, ESP32-C3).
 // Spricht dieselbe Schnittstelle wie Pagurus OS auf den Shellys: JSON-RPC ueber HTTP und MQTT
 // (Gen2-Format), Updates aus update.json mit SHA-256-Pruefung.
 //   climate:0      Klimaanlage (output = an/aus, mode, target_C, current_C, fan, swing …)
-//   temperature:0  DHT22
-//   humidity:0     DHT22
+//   temperature:0  DHT22 (nur TCL-Variante)
+//   humidity:0     DHT22 (nur TCL-Variante)
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
@@ -18,31 +19,48 @@
 #include <WiFiClientSecure.h>
 #include <Update.h>
 #include <mbedtls/sha256.h>
-#include <DHT.h>
 #include <time.h>
-#include "tcl.h"
 #include "webui_gz.h"
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.0.0"
 #endif
+#define DEF_UPD_URL "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/update.json"
+
+#if defined(AC_MIDEA)
+// Midea/Dimstal am ESP32-C3 – Belegung wie in der bisherigen ESPHome-Konfiguration
+#define DEV_PREFIX  "hermit-midea"
+#define DEV_MODEL   "HERMIT-MIDEA-ESP32C3"
+#define DEV_VARIANT "hermit-midea-esp32c3"
+#define DEV_APP     "MideaAc"
+#define PIN_AC_TX   21
+#define PIN_AC_RX   20
+#define DEF_BEEP    false
+#else
+// TCL/Kesser am ESP32 – Belegung wie in der bisherigen ESPHome-Konfiguration
 #define DEV_PREFIX  "hermit-tclac"
 #define DEV_MODEL   "HERMIT-TCLAC-ESP32"
 #define DEV_VARIANT "hermit-tclac-esp32"
-#define DEF_UPD_URL "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/update.json"
+#define DEV_APP     "TclAc"
+#define PIN_AC_TX   16
+#define PIN_AC_RX   17
+#define PIN_DHT     18
+#define HAS_DHT     1
+#define DEF_BEEP    true
+#endif
 
-// Belegung wie in der bisherigen ESPHome-Konfiguration
-#define PIN_AC_TX  16
-#define PIN_AC_RX  17
-#define PIN_DHT    18
+#ifdef HAS_DHT
+#include <DHT.h>
+#endif
 
 WebServer server(80);
 DNSServer dns;
 Preferences prefs;
 WiFiClient mqNet;
 PubSubClient mq(mqNet);
+#ifdef HAS_DHT
 DHT dht(PIN_DHT, DHT22);
-tcl::Ac ac;
+#endif
 
 String devId, mac;
 bool apActive = false;
@@ -52,13 +70,14 @@ struct Cfg {
   String name, ssid, pass;
   bool mqEnable = false; String mqServer, mqUser, mqPass, mqPrefix;
   String updUrl = DEF_UPD_URL; String updMode = "check";   // check | auto | off
-  bool beep = true;
+  bool beep = DEF_BEEP;
   float tOffset = 0;                    // Korrektur DHT22
   bool swap = false;                    // TX/RX zur Klimaanlage tauschen
 } cfg;
 
 float dhtT = NAN, dhtH = NAN;
 uint32_t dhtAt = 0, dhtOk = 0, dhtFail = 0;
+bool mqDirty = false;
 String updAvailVer, updAvailUrl, updAvailSha, updErr, updState = "idle";
 uint32_t updNextCheck = 120000;
 bool updPending = false;
@@ -76,7 +95,7 @@ void loadCfg() {
   cfg.mqPrefix = prefs.getString("mqPre", "");
   cfg.updUrl = prefs.getString("updUrl", DEF_UPD_URL);
   cfg.updMode = prefs.getString("updMode", "check");
-  cfg.beep = prefs.getBool("beep", true);
+  cfg.beep = prefs.getBool("beep", DEF_BEEP);
   cfg.tOffset = prefs.getFloat("tOff", 0);
   cfg.swap = prefs.getBool("swap", false);
   prefs.end();
@@ -103,35 +122,31 @@ void saveCfg() {
 String jstr(JsonVariantConst v, const char* def) { return v.is<const char*>() ? String(v.as<const char*>()) : String(def); }
 int idxOf(const char* const* arr, int n, const String& s) { for (int i = 0; i < n; i++) if (s == arr[i]) return i; return -1; }
 
+#if defined(AC_MIDEA)
+#include "ac_midea.h"
+#else
+#include "ac_tcl.h"
+#endif
+
 // ======================= Status =======================
 void climateStatus(JsonObject o) {
-  const tcl::State& s = ac.st;
   o["id"] = 0;
-  o["output"] = s.power;
-  o["link"] = ac.linkOk();
-  JsonObject dg = o["diag"].to<JsonObject>();           // Fehlersuche UART
-  dg["rx_bytes"] = ac.rxBytes; dg["tx_frames"] = ac.txFrames; dg["frames"] = ac.frames; dg["bad"] = ac.badFrames;
-  dg["ignored"] = ac.ignored;
-  dg["tx_pin"] = cfg.swap ? PIN_AC_RX : PIN_AC_TX; dg["rx_pin"] = cfg.swap ? PIN_AC_TX : PIN_AC_RX;
-  if (!s.valid) return;
-  o["mode"] = tcl::MODES[s.mode];
-  o["target_C"] = s.target;
-  if (!isnan(s.room)) o["current_C"] = s.room;
-  if (!isnan(s.outlet)) o["outlet_C"] = s.outlet;
-  o["fan"] = tcl::FANS[s.fan];
-  o["swing_v"] = s.swingV; o["swing_h"] = s.swingH;
-  o["eco"] = s.eco; o["turbo"] = s.turbo; o["mute"] = s.mute;
-  o["compressor"] = s.compressor;
+  acStatus(o);
+#ifdef HAS_DHT
+  if (!acValid()) return;
   if (!isnan(dhtT)) o["ext_temperature_C"] = roundf((dhtT + cfg.tOffset) * 10) / 10;   // DHT22 fuer die Karte
   if (!isnan(dhtH)) o["ext_humidity"] = roundf(dhtH);
+#endif
 }
+#ifdef HAS_DHT
 void tempStatus(JsonObject o) { o["id"] = 0; o["reads_ok"] = dhtOk; o["reads_failed"] = dhtFail; if (!isnan(dhtT)) o["tC"] = roundf((dhtT + cfg.tOffset) * 10) / 10; else o["errors"].add("read"); }
 void humStatus(JsonObject o) { o["id"] = 0; if (!isnan(dhtH)) o["rh"] = roundf(dhtH * 10) / 10; else o["errors"].add("read"); }
+#endif
 
 void deviceInfo(JsonObject o) {
   o["name"] = cfg.name.length() ? cfg.name : (const char*)nullptr;
   o["id"] = devId; o["mac"] = mac; o["model"] = DEV_MODEL; o["gen"] = 2;
-  o["fw_id"] = String(FW_VERSION) + "-pagurus"; o["ver"] = FW_VERSION; o["app"] = "TclAc";
+  o["fw_id"] = String(FW_VERSION) + "-pagurus"; o["ver"] = FW_VERSION; o["app"] = DEV_APP;
   o["variant"] = DEV_VARIANT; o["auth_en"] = false;
 }
 
@@ -160,8 +175,10 @@ void fullStatus(JsonObject o) {
   wifiStatus(o["wifi"].to<JsonObject>());
   o["mqtt"]["connected"] = mq.connected();
   climateStatus(o["climate:0"].to<JsonObject>());
+#ifdef HAS_DHT
   tempStatus(o["temperature:0"].to<JsonObject>());
   humStatus(o["humidity:0"].to<JsonObject>());
+#endif
 }
 
 void fullConfig(JsonObject o) {
@@ -171,14 +188,14 @@ void fullConfig(JsonObject o) {
   m["enable"] = cfg.mqEnable; m["server"] = cfg.mqServer; m["user"] = cfg.mqUser;
   m["topic_prefix"] = cfg.mqPrefix.length() ? cfg.mqPrefix : devId;
   o["wifi"]["sta"]["ssid"] = cfg.ssid;
-  o["climate:0"]["beep"] = cfg.beep;
-  o["climate:0"]["swap_pins"] = cfg.swap;
+  acConfig(o["climate:0"].to<JsonObject>());
+#ifdef HAS_DHT
   o["temperature:0"]["offset_C"] = cfg.tOffset;
+#endif
   o["update"]["url"] = cfg.updUrl; o["update"]["mode"] = cfg.updMode;
 }
 
 // ======================= MQTT (Gen2-Format) =======================
-bool mqDirty = false;
 uint32_t mqNext = 0, mqLast = 0, mqBackoff = 5000;
 String mqPre() { return cfg.mqPrefix.length() ? cfg.mqPrefix : devId; }
 
@@ -190,8 +207,10 @@ void mqPub(const String& topic, JsonDocument& d, bool retain = false) {
 
 void mqStatusAll() {
   JsonDocument a; climateStatus(a.to<JsonObject>()); mqPub(mqPre() + "/status/climate:0", a, true);
+#ifdef HAS_DHT
   JsonDocument b; tempStatus(b.to<JsonObject>());    mqPub(mqPre() + "/status/temperature:0", b, true);
   JsonDocument c; humStatus(c.to<JsonObject>());     mqPub(mqPre() + "/status/humidity:0", c, true);
+#endif
   JsonDocument d; sysStatus(d.to<JsonObject>());     mqPub(mqPre() + "/status/sys", d, true);
   JsonDocument n;
   n["src"] = devId; n["dst"] = mqPre() + "/events"; n["method"] = "NotifyStatus";
@@ -342,38 +361,6 @@ void handleUpdates() {
   if (updCheck() && updAvailVer.length() && cfg.updMode == "auto") updPending = true;
 }
 
-// ======================= Klima steuern =======================
-String climateSet(JsonVariantConst p) {
-  if (!ac.st.valid) return "Keine Verbindung zur Klimaanlage (UART)";
-  tcl::State w = ac.st;
-  if (p["on"].is<bool>()) w.power = p["on"];
-  if (p["mode"].is<const char*>()) {
-    int i = idxOf(tcl::MODES, 5, p["mode"].as<const char*>());
-    if (i < 0) return "Modus: cool, fan, dry, heat, auto";
-    w.mode = i;
-  }
-  if (p["target_C"].is<float>()) {
-    float t = p["target_C"];
-    if (t < 16 || t > 31) return "Solltemperatur 16–31 °C";
-    w.target = t;
-  }
-  if (p["fan"].is<const char*>()) {
-    int i = idxOf(tcl::FANS, 6, p["fan"].as<const char*>());
-    if (i < 0) return "Lüfter: auto, low, low_mid, mid, mid_high, high";
-    w.fan = i;
-  }
-  if (p["swing_v"].is<bool>()) w.swingV = p["swing_v"];
-  if (p["swing_h"].is<bool>()) w.swingH = p["swing_h"];
-  if (p["eco"].is<bool>()) w.eco = p["eco"];
-  if (p["turbo"].is<bool>()) w.turbo = p["turbo"];
-  if (p["mute"].is<bool>()) w.mute = p["mute"];
-  ac.beep = cfg.beep;
-  ac.set(w);
-  ac.st = w;                                 // sofort anzeigen; die Antwort der Anlage bestaetigt
-  mqDirty = true;
-  return "";
-}
-
 // ======================= RPC =======================
 #define ERR(c, m) do { err = m; return c; } while (0)
 
@@ -388,8 +375,11 @@ int rpcCall(const String& method, JsonVariantConst p, JsonDocument& out, String&
     for (const char* x : {"Shelly.GetDeviceInfo", "Shelly.GetStatus", "Shelly.GetConfig", "Shelly.Reboot",
                           "Shelly.CheckForUpdate", "Shelly.Update", "Sys.GetStatus", "Sys.SetConfig",
                           "WiFi.GetStatus", "WiFi.SetConfig", "WiFi.Scan", "MQTT.GetConfig", "MQTT.SetConfig",
-                          "Climate.GetStatus", "Climate.Set", "Climate.Toggle", "Climate.SetConfig",
-                          "Temperature.GetStatus", "Temperature.SetConfig", "Humidity.GetStatus"}) a.add(x);
+                          "Climate.GetStatus", "Climate.Set", "Climate.Toggle", "Climate.SetConfig", AC_METHODS
+#ifdef HAS_DHT
+                          "Temperature.GetStatus", "Temperature.SetConfig", "Humidity.GetStatus"
+#endif
+                          }) a.add(x);
     return 0;
   }
   if (m == "shelly.reboot") { rebootAt = millis() + 1000; return 0; }
@@ -435,26 +425,21 @@ int rpcCall(const String& method, JsonVariantConst p, JsonDocument& out, String&
   }
   if (m == "shelly.update") { updPending = true; return 0; }
   if (m == "climate.getstatus") { climateStatus(o); return 0; }
-  if (m == "climate.set") { String e = climateSet(p); if (e.length()) ERR(-103, e); o["was_on"] = ac.st.power; return 0; }
+  if (m == "climate.set") { String e = acSet(p); if (e.length()) ERR(-103, e); o["was_on"] = acPower(); return 0; }
   if (m == "climate.toggle") {
-    JsonDocument q; q["on"] = !ac.st.power;
-    String e = climateSet(q.as<JsonVariantConst>()); if (e.length()) ERR(-103, e); return 0;
+    JsonDocument q; q["on"] = !acPower();
+    String e = acSet(q.as<JsonVariantConst>()); if (e.length()) ERR(-103, e); return 0;
   }
-  if (m == "climate.setconfig") {
-    if (p["config"]["beep"].is<bool>()) { cfg.beep = p["config"]["beep"]; saveCfg(); }
-    if (p["config"]["swap_pins"].is<bool>() && (bool)p["config"]["swap_pins"] != cfg.swap) {
-      cfg.swap = p["config"]["swap_pins"]; saveCfg();
-      Serial2.end();
-      ac.begin(Serial2, cfg.swap ? PIN_AC_TX : PIN_AC_RX, cfg.swap ? PIN_AC_RX : PIN_AC_TX);
-    }
-    o["restart_required"] = false; return 0;
-  }
+  if (m == "climate.setconfig") { acSetConfig(p["config"]); o["restart_required"] = false; return 0; }
+  { String e; if (acRpc(m, p, o, e)) { if (e.length()) ERR(-103, e); mqDirty = true; return 0; } }
+#ifdef HAS_DHT
   if (m == "temperature.getstatus") { tempStatus(o); return 0; }
   if (m == "temperature.setconfig") {
     if (p["config"]["offset_C"].is<float>()) { cfg.tOffset = p["config"]["offset_C"]; saveCfg(); }
     o["restart_required"] = false; return 0;
   }
   if (m == "humidity.getstatus") { humStatus(o); return 0; }
+#endif
   ERR(-114, "Methode unbekannt: " + method);
 }
 
@@ -515,15 +500,18 @@ void handleWifi() {
 
 // ======================= Start =======================
 void setup() {
-  Serial.begin(115200);
+#ifndef AC_MIDEA
+  Serial.begin(115200);                     // nicht beim ESP32-C3: dort liegt die Klimaanlage auf den UART0-Pins
+#endif
   uint8_t m[6]; WiFi.macAddress(m);
   char b[13]; sprintf(b, "%02x%02x%02x%02x%02x%02x", m[0], m[1], m[2], m[3], m[4], m[5]);
   mac = String(b); mac.toUpperCase();
   devId = String(DEV_PREFIX) + "-" + String(b);
   loadCfg();
-  ac.beep = cfg.beep;
-  ac.begin(Serial2, cfg.swap ? PIN_AC_TX : PIN_AC_RX, cfg.swap ? PIN_AC_RX : PIN_AC_TX);
+  acBegin();
+#ifdef HAS_DHT
   dht.begin();
+#endif
 
   WiFi.persistent(false);
   WiFi.setHostname(devId.c_str());
@@ -568,17 +556,15 @@ void loop() {
   server.handleClient();
   if (apActive) dns.processNextRequest();
   handleWifi();
-  ac.loop();
-  static bool lastLink = false, lastPower = false; static uint8_t lastMode = 255; static float lastTarget = 0;
-  if (ac.linkOk() != lastLink || ac.st.power != lastPower || ac.st.mode != lastMode || ac.st.target != lastTarget) {
-    lastLink = ac.linkOk(); lastPower = ac.st.power; lastMode = ac.st.mode; lastTarget = ac.st.target; mqDirty = true;
-  }
+  acLoop();
+#ifdef HAS_DHT
   if (millis() - dhtAt > (dhtOk ? 30000UL : 5000UL) && millis() > 3000) {   // DHT22 braucht ~2 s nach dem Start
     dhtAt = millis();
     float t = dht.readTemperature(), h = dht.readHumidity();
     if (!isnan(t) && !isnan(h)) { dhtT = t; dhtH = h; dhtOk++; } else dhtFail++;
     mqDirty = true;
   }
+#endif
   handleMqtt();
   handleUpdates();
   if (updPending) {
