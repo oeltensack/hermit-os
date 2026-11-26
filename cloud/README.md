@@ -133,6 +133,10 @@ Eigene Bedienseite mit großen Kacheln für das Shelly Wall Display oder ein Tab
      z. B. `http://192.168.4.102:8080` – die Cloud erkennt das Display an seiner IP und zeigt gleich die Tafel
    - ohne Gerät die lange Adresse mit Schlüssel (`http://<cloud>:8080/wd/<schlüssel>`), z. B. für ein Tablet
 
+   Das Wall Display nimmt nur Adressen an, die wie ein Home Assistant antworten. Für gebundene Displays beantwortet
+   die Cloud diese Prüfung (Anmelde-Schnittstelle nach der dokumentierten HA-API). Fragt das Display nach Benutzer
+   und Passwort, irgendetwas eintragen – es wird nicht gebraucht und nicht gespeichert.
+
 Oben Uhr, Datum und Außentemperatur (aus der Beschattung), darunter Räume als Reiter und die Szenen.
 Tippen schaltet, langes Drücken auf ein dimmbares Licht öffnet den Helligkeitsregler. Klimaanlagen: Soll ±,
 Modus, Lüfter, Ein/Aus. Die Adresse enthält einen geheimen Schlüssel – wer sie kennt, sieht und bedient genau die

@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.2
+- Shelly Wall Display: Die Cloud beantwortet für gebundene Displays die Home-Assistant-Prüfung (`/auth/login_flow`, `/auth/providers`, `/auth/token`, `/api/`, `/api/config`, `/api/websocket`, `/manifest.json`) – vorher meldete das Display „keine gültige HA-Instanz“. Andere Geräte bekommen dort weiterhin 404; die ausgegebenen Tokens gelten für nichts
+
 ## Pagurus Cloud 1.22.1
 - Wandtafel an ein Gerät binden (Wall Display aus der Liste oder feste IP): Am Display genügt dann die kurze Adresse der Cloud (`http://<cloud>:8080`), die Cloud erkennt es an seiner IP und zeigt gleich die Tafel. Die IP folgt DHCP-Wechseln, wenn das Display in der Cloud verbunden ist
 

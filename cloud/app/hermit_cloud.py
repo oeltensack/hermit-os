@@ -30,6 +30,7 @@ import energy_view
 import engine
 import fridge
 import gen2
+import hacompat
 import panel
 import portal
 import shade
@@ -115,7 +116,8 @@ OPEN_PATHS = ("/api/login", "/api/info/public")
 @app.middleware("http")
 async def auth(request: Request, call_next):
     p = request.url.path
-    if p.startswith("/api/") and p not in OPEN_PATHS:
+    ha = p in hacompat.PATHS and request.client and panel.by_ip(request.client.host)   # Wall-Display-Pruefung
+    if p.startswith("/api/") and p not in OPEN_PATHS and not ha:
         u = current_user(request)
         if not u:
             return JSONResponse({"detail": "Anmeldung erforderlich"}, status_code=401)
@@ -253,6 +255,9 @@ def startup():
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
     portal.start(devices)
+
+
+app.include_router(hacompat.router)
 
 
 @app.get("/")
