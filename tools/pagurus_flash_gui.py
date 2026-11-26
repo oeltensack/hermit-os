@@ -24,6 +24,7 @@ class App:
         self.root = root
         self.q = queue.Queue()
         self.busy = False
+        self.installing = False
         root.title("Pagurus OS Flasher")
         root.minsize(720, 560)
         try:
@@ -73,6 +74,16 @@ class App:
         self.port = tk.StringVar(value="8266")
         ttk.Entry(opt, textvariable=self.port, width=7).grid(row=1, column=3, sticky="w", padx=6, pady=(8, 0))
 
+        ttk.Label(opt, text="WLAN für das Gerät").grid(row=3, column=0, sticky="w", pady=(8, 0))
+        self.ssid = tk.StringVar()
+        ttk.Entry(opt, textvariable=self.ssid, width=24).grid(row=3, column=1, sticky="w", padx=6, pady=(8, 0))
+        ttk.Label(opt, text="WLAN-Passwort").grid(row=3, column=2, sticky="e", pady=(8, 0))
+        self.wpass = tk.StringVar()
+        ttk.Entry(opt, textvariable=self.wpass, show="•", width=20).grid(row=3, column=3, sticky="w", padx=6, pady=(8, 0))
+        ttk.Label(opt, text="Wird beim Umstieg fest in Pagurus OS eingetragen – so findet das Gerät sein WLAN sicher wieder. "
+                            "Leer lassen = aus der alten Firmware übernehmen.", foreground="#666", wraplength=640
+                  ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(2, 0))
+
         ttk.Label(opt, text="Eigene .bin (optional)").grid(row=2, column=0, sticky="w", pady=(8, 0))
         self.binpath = tk.StringVar()
         ttk.Entry(opt, textvariable=self.binpath).grid(row=2, column=1, columnspan=2, sticky="we", padx=6, pady=(8, 0))
@@ -84,6 +95,8 @@ class App:
         bar.pack(fill="x")
         self.startbtn = ttk.Button(bar, text="Pagurus OS installieren", style="Big.TButton", command=self.start)
         self.startbtn.pack(side="left")
+        self.stopbtn = ttk.Button(bar, text="Abbrechen", command=self.cancel, state="disabled")
+        self.stopbtn.pack(side="left", padx=(8, 0))
         self.prog = ttk.Progressbar(bar, mode="indeterminate", length=220)
         self.prog.pack(side="left", padx=12)
         self.status = tk.StringVar(value="Bereit")
@@ -125,6 +138,10 @@ class App:
                     self.ipbox["values"] = val
                     if val and not self.ip.get():
                         self.ip.set(val[0].split()[0])
+                elif kind == "ssid":
+                    if not self.ssid.get().strip():
+                        self.ssid.set(val)
+                        self.write(f"WLAN-Name vom Gerät übernommen: {val} – Passwort bitte eintragen")
                 elif kind == "done":
                     self.set_busy(False, val)
                 elif kind == "ask":
@@ -139,6 +156,7 @@ class App:
         self.busy = busy
         self.status.set(text)
         self.startbtn.configure(state="disabled" if busy else "normal")
+        self.stopbtn.configure(state="normal" if busy else "disabled")
         if busy:
             self.prog.start(12)
         else:
@@ -149,6 +167,18 @@ class App:
         self.q.put(("ask", (msg, ev, box)))
         ev.wait()
         return box[0]
+
+    def cancel(self):
+        if not self.busy or hf.CANCEL.is_set():
+            return
+        if self.installing and not messagebox.askyesno(
+                "Pagurus OS Flasher", "Vorgang abbrechen?\n\nLäuft gerade eine Übertragung zum Gerät, wird sie noch zu Ende "
+                "geführt. Das Gerät danach nicht sofort vom Strom trennen – es startet von selbst neu."):
+            return
+        hf.CANCEL.set()
+        self.status.set("Breche ab …")
+        self.stopbtn.configure(state="disabled")
+        hf.log("Abbruch angefordert …")
 
     def pick_bin(self):
         f = filedialog.askopenfilename(title="Firmware wählen", filetypes=[("ESP8266-Firmware", "*.bin")],
@@ -165,9 +195,11 @@ class App:
                                   bin=self.binpath.get() or None, user="admin", password=self.pw.get(),
                                   port=int(self.port.get() or 8266), serve_ip=None, mg2x_zip=None, yes=True)
 
-    def thread(self, fn, busytext):
+    def thread(self, fn, busytext, installing=False):
         if self.busy:
             return
+        hf.CANCEL.clear()
+        self.installing = installing
         self.set_busy(True, busytext)
 
         def run():
@@ -175,7 +207,7 @@ class App:
             try:
                 fn()
             except SystemExit:
-                result = "Abgebrochen – siehe Protokoll"
+                result = "Abgebrochen" if hf.CANCEL.is_set() else "Abgebrochen – siehe Protokoll"
             except Exception as e:
                 self.q.put(("log", "FEHLER: " + str(e)))
                 result = "Fehler"
@@ -193,6 +225,8 @@ class App:
             hf.log(f"Durchsuche {net} nach Shellys …")
 
             def probe(ip):
+                if hf.CANCEL.is_set():
+                    return None
                 try:
                     with urllib.request.urlopen(f"http://{ip}/shelly", timeout=1.2) as r:
                         j = json.loads(r.read())
@@ -223,6 +257,7 @@ class App:
             hosts = [str(h) for h in net.hosts() if str(h) != me]
             with concurrent.futures.ThreadPoolExecutor(64) as ex:
                 found = [r for r in ex.map(probe, hosts) if r]
+            hf.check_cancel()
             found.sort(key=lambda s: tuple(int(x) for x in s.split()[0].split(".")))
             for f in found:
                 hf.log("  " + f)
@@ -245,6 +280,10 @@ class App:
                 extra = f" · {info.get('fw_id')}"
             elif kind == "stock":
                 extra = f" · {info.get('fw', '')}"
+            if kind != "hermit" and not self.ssid.get().strip():
+                ss = hf.device_ssid(dev, kind, info)
+                if ss:
+                    self.q.put(("ssid", ss))
             text = f"{KIND_NAMES[kind]}{extra}  →  installiert wird: {v}"
             self.q.put(("info", text))
             hf.log(f"{a.ip}: {text}")
@@ -260,20 +299,33 @@ class App:
             variant = a.variant or hf.variant_from(dev, kind, info, a.addon, a.meter)
             if not variant:
                 hf.die("Modell nicht erkannt – bitte Firmware im Auswahlfeld wählen")
+            ssid, wpass = self.ssid.get().strip(), self.wpass.get()
+            if kind != "hermit" and not ssid:
+                ss = hf.device_ssid(dev, kind, info)
+                if ss:
+                    self.q.put(("ssid", ss))
+                    ssid = ss
             warn = ""
+            if kind != "hermit":
+                warn += (f"\nWLAN: {ssid}" + ("" if wpass else "  (ohne Passwort!)")) if ssid else \
+                        "\nWLAN: wird aus der alten Firmware übernommen (klappt nicht immer – besser oben eintragen)"
             if kind == "stock":
                 warn = ("\n\nDabei wird per WLAN der Bootloader ersetzt. Strom während des Vorgangs nicht trennen. "
                         "Die Windows-Firewall muss Port " + str(a.port) + " zulassen.")
             if not self.ask(f"Gefunden: {KIND_NAMES[kind]}\nInstalliert wird: {variant}\nGerät: {a.ip}{warn}\n\nFortfahren?"):
                 hf.log("Abgebrochen")
                 return
-            fw = hf.load_bin(a, variant)
+            if kind != "hermit" and ssid and not wpass and not self.ask(
+                    f"Für das WLAN „{ssid}“ ist kein Passwort eingetragen.\n\nNur fortfahren, wenn das WLAN offen ist."):
+                hf.log("Abgebrochen – WLAN-Passwort fehlt")
+                return
+            fw = hf.apply_wifi(hf.load_bin(a, variant), kind, ssid, wpass)
             a.mac = hf.device_mac(dev, kind, info)
             {"stock": lambda: hf.flash_stock(dev, a, info, variant, fw),
              "tasmota": lambda: hf.flash_tasmota(dev, a, variant, fw),
              "loader": lambda: hf.flash_loader(dev, a, variant, fw),
              "hermit": lambda: hf.flash_hermit(dev, a, variant, fw)}[kind]()
-        self.thread(job, "Installiere …")
+        self.thread(job, "Installiere …", installing=True)
 
 
 def main():

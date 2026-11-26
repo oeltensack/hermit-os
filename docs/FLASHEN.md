@@ -63,7 +63,12 @@ So läuft es im Hintergrund:
 3. Der Shelly bekommt `http://<ip>/ota?url=http://<pc>:8266/mg2hermit.zip`, installiert mg2hermit,
    startet 1–2× neu und lädt dann Pagurus OS vom PC.
 4. Pagurus OS übernimmt beim ersten Start **WLAN und feste IP** aus der Konfiguration der Original-Firmware.
-5. Der Flasher wartet auf Pagurus OS unter der alten IP und sucht das Gerät notfalls **per MAC-Adresse** im Netz.
+   Sicherer: im Flasher unter **„WLAN für das Gerät“** Name und Passwort eintragen (der Name wird beim Prüfen
+   vom Gerät übernommen). Beides wird dann vor dem Aufspielen fest in die Firmware geschrieben und hat beim
+   ersten Start Vorrang – gilt genauso für den Weg über Tasmota und den Loader. Kommandozeile: `--ssid … --wifi-pass …`.
+5. Der Flasher wartet auf Pagurus OS unter der alten IP und sucht das Gerät zwischendurch **per MAC-Adresse** im Netz.
+   Mit **„Abbrechen“** lässt sich Suche und Warten jederzeit beenden; eine laufende Übertragung zum Gerät wird
+   noch zu Ende geführt.
 
 **Voraussetzungen**
 - Die **Windows-Firewall** muss eingehende Verbindungen auf Port 8266 für Python bzw. die EXE erlauben,

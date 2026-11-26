@@ -17,11 +17,12 @@ Aufruf:
   python3 tools/pagurus_flash.py 192.168.5.153
   python3 tools/pagurus_flash.py 192.168.5.153 --addon
   python3 tools/pagurus_flash.py 192.168.5.153 --user admin --password geheim
+  python3 tools/pagurus_flash.py 192.168.5.153 --ssid MeinWLAN --wifi-pass geheim   (WLAN sicher übernehmen)
 
 Nur Python 3.8+ Standardbibliothek. Der PC muss im selben Netz wie der Shelly sein;
 die Windows-Firewall muss eingehende Verbindungen auf dem Port (Standard 8266) erlauben.
 """
-import argparse, base64, concurrent.futures, hashlib, http.server, io, ipaddress, json, os, pathlib, socket, sys, threading, time
+import argparse, base64, concurrent.futures, gzip, hashlib, http.server, io, ipaddress, json, os, pathlib, socket, sys, threading, time
 import urllib.error, urllib.parse, urllib.request, uuid, zipfile
 
 if getattr(sys, "frozen", False):            # als EXE (PyInstaller): bin/ liegt neben der EXE
@@ -50,6 +51,15 @@ def is_loader(body):
 
 def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
+
+
+CANCEL = threading.Event()               # von der Oberflaeche gesetzt: laufenden Vorgang abbrechen
+
+
+def check_cancel():
+    if CANCEL.is_set():
+        log("Abgebrochen")
+        sys.exit(1)
 
 
 def die(msg):
@@ -88,8 +98,8 @@ class Dev:
                         timeout=timeout)
 
 
-def jget(dev, path):
-    st, body = dev.get(path)
+def jget(dev, path, timeout=8):
+    st, body = dev.get(path, timeout)
     if st != 200:
         return None
     try:
@@ -102,10 +112,13 @@ def wait_for(cond, seconds, what):
     log(f"Warte auf {what} (max. {seconds} s) …")
     t = time.time()
     while time.time() - t < seconds:
+        check_cancel()
         r = cond()
         if r:
             return r
-        time.sleep(3)
+        for _ in range(6):
+            check_cancel()
+            time.sleep(0.5)
     return None
 
 
@@ -194,6 +207,76 @@ def load_bin(args, variant):
         die(f"{p.name} ist keine ESP8266-Firmware (.bin, nicht .gz verwenden)")
     log(f"Firmware: {p.name} ({len(data) // 1024} KB)")
     return data
+
+
+# ---------------------------------------------------------------- WLAN-Daten in die Firmware eintragen
+PROV_MARK = b"PAGURUS-WLAN-SLOT1\0"
+PROV_SIZE = 128
+_CRC_T = []
+
+
+def _crc8266(data):
+    """CRC wie eboot (CRC-32, MSB zuerst, Start 0xFFFFFFFF, ohne Abschluss-XOR)."""
+    if not _CRC_T:
+        for i in range(256):
+            c = i << 24
+            for _ in range(8):
+                c = ((c << 1) ^ 0x04C11DB7) if c & 0x80000000 else (c << 1)
+            _CRC_T.append(c & 0xFFFFFFFF)
+    crc = 0xFFFFFFFF
+    for b in data:
+        crc = ((crc << 8) & 0xFFFFFFFF) ^ _CRC_T[(crc >> 24) ^ b]
+    return crc
+
+
+def _app_checksum_pos(raw):
+    """Position des XOR-Pruefbytes im Programm-Abbild (ab 0x1000, nach dem Bootloader)."""
+    off = 0x1000
+    if raw[off] != 0xE9:
+        return None
+    n = raw[off + 1]
+    p = off + 8
+    for _ in range(n):
+        ln = int.from_bytes(raw[p + 4:p + 8], "little")
+        p += 8 + ln
+    size = p - off + 1
+    while size & 15:
+        size += 1
+    return off + size - 1
+
+
+def put_wifi(fw, ssid, password):
+    """SSID/Passwort in den Platzhalter der Firmware schreiben; Pruefsummen anpassen. -> neue Datei oder None"""
+    gz = fw[:2] == b"\x1f\x8b"
+    raw = bytearray(gzip.decompress(fw) if gz else fw)
+    s, pw = ssid.encode(), password.encode()
+    if not (0 < len(s) <= 32) or len(pw) > 64:
+        die("WLAN-Name max. 32, Passwort max. 64 Zeichen")
+    pos, i = -1, raw.find(PROV_MARK)
+    while i >= 0:                                    # der Platzhalter ist der Fundort, auf den nur Nullen folgen
+        if not any(raw[i + len(PROV_MARK):i + PROV_SIZE]):
+            if pos >= 0:
+                return None
+            pos = i
+        i = raw.find(PROV_MARK, i + 1)
+    cpos = _app_checksum_pos(raw)
+    if pos < 0 or cpos is None or not (0x1000 < pos < cpos):
+        return None
+    data = s + b"\0" + pw + b"\0"
+    a = pos + len(PROV_MARK)
+    x = 0
+    for k, b in enumerate(data):
+        x ^= raw[a + k] ^ b
+        raw[a + k] = b
+    raw[cpos] ^= x                                   # XOR-Pruefsumme des Abbilds
+    sz = int.from_bytes(raw[0x1010:0x1014], "little")
+    if sz == len(raw):                               # CRC des Arduino-Cores (Groesse + CRC ab 0x1010)
+        raw[0x1010:0x1018] = bytes(8)
+        crc = _crc8266(raw)
+        raw[0x1010:0x1014] = sz.to_bytes(4, "little")
+        raw[0x1014:0x1018] = crc.to_bytes(4, "little")
+    out = bytes(raw)
+    return gzip.compress(out, 9) if gz else out
 
 
 # ---------------------------------------------------------------- Webserver auf dem PC
@@ -339,6 +422,8 @@ def find_by_mac(mac, near_ip):
     log(f"Suche das Gerät per MAC {mac} in {net} …")
 
     def probe(ip):
+        if CANCEL.is_set():
+            return None
         try:
             with urllib.request.urlopen(f"http://{ip}/shelly", timeout=1.5) as r:
                 j = json.loads(r.read())
@@ -354,22 +439,57 @@ def find_by_mac(mac, near_ip):
     return None
 
 
-def wait_hermit(dev, seconds=240, mac=""):
-    info = wait_for(lambda: (jget(dev, "/shelly") or {}).get("fw_id", "").startswith("hermit-os") and jget(dev, "/shelly"),
-                    seconds, "Pagurus OS")
-    if info:
-        log(f"FERTIG: {info.get('id')} läuft mit {info.get('fw_id')} unter {dev.base}")
-        return info
-    if mac:
-        for _ in range(3):
-            r = find_by_mac(mac, dev.base.split("//")[1])
+def wait_hermit(dev, seconds=180, mac=""):
+    """Wartet auf Pagurus OS unter der alten IP; sucht zwischendurch per MAC, falls es eine neue IP bekommen hat."""
+    log(f"Warte auf Pagurus OS (max. {seconds} s) …")
+    near = dev.base.split("//")[1]
+    t0 = time.time()
+    next_mac = t0 + 40
+    while time.time() - t0 < seconds:
+        check_cancel()
+        info = jget(dev, "/shelly", timeout=3) or {}
+        if str(info.get("fw_id", "")).startswith("hermit-os"):
+            log(f"FERTIG: {info.get('id')} läuft mit {info.get('fw_id')} unter {dev.base}")
+            return info
+        if mac and time.time() >= next_mac:
+            r = find_by_mac(mac, near)
+            check_cancel()
             if r:
                 log(f"FERTIG: {r[1].get('id')} läuft mit {r[1].get('fw_id')} unter der NEUEN Adresse http://{r[0]}")
                 return r[1]
-            time.sleep(20)
-    log("Pagurus OS meldet sich nicht im Netz. Vermutlich wurde kein WLAN übernommen –")
-    log("dann im WLAN nach 'hermit-…' suchen und http://192.168.33.1 öffnen.")
+            next_mac = time.time() + 30
+        for _ in range(6):
+            check_cancel()
+            time.sleep(0.5)
+    log("Pagurus OS meldet sich nicht im Netz – vermutlich keine Verbindung zum WLAN.")
+    log("Das Gerät öffnet dann den Zugangspunkt 'hermit-…': damit verbinden, http://192.168.33.1 öffnen und das WLAN eintragen.")
     return None
+
+
+def device_ssid(dev, kind, info):
+    """WLAN-Name, mit dem das Geraet gerade verbunden ist (zum Vorbelegen)."""
+    try:
+        if kind == "stock":
+            return ((jget(dev, "/settings", 4) or {}).get("wifi_sta") or {}).get("ssid") or ""
+        if kind == "tasmota":
+            return ((jget(dev, "/cm?cmnd=Status%2011", 4) or {}).get("StatusSTS", {}).get("Wifi") or {}).get("SSId") or ""
+        if kind == "hermit":
+            return (jget(dev, "/rpc/WiFi.GetStatus", 4) or {}).get("ssid") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def apply_wifi(fw, kind, ssid, password):
+    """WLAN-Daten in die Firmware schreiben (nur beim Umstieg auf Pagurus OS noetig)."""
+    if not ssid or kind == "hermit":
+        return fw
+    out = put_wifi(fw, ssid, password or "")
+    if out is None:
+        log("Hinweis: Diese Firmware-Datei hat keinen WLAN-Platzhalter (vor 1.19.1) – WLAN wird aus der alten Firmware übernommen")
+        return fw
+    log(f"WLAN „{ssid}“ in die Firmware eingetragen")
+    return out
 
 
 def flash_stock(dev, args, info, variant, fw):
@@ -510,6 +630,8 @@ def main():
     ap.add_argument("--port", type=int, default=8266, help="Port des Webservers auf dem PC (Original-Firmware)")
     ap.add_argument("--serve-ip", help="IP des PCs, falls die automatische Erkennung falsch liegt")
     ap.add_argument("--mg2x-zip", help="lokale mg2tasmota-Shelly1(PM).zip statt Download")
+    ap.add_argument("--ssid", help="WLAN, mit dem sich Pagurus OS verbinden soll (empfohlen beim Umstieg)")
+    ap.add_argument("--wifi-pass", default="", help="Passwort dieses WLANs")
     ap.add_argument("-y", "--yes", action="store_true", help="ohne Rückfrage")
     args = ap.parse_args()
 
@@ -530,7 +652,7 @@ def main():
                                     else " Relais bleibt während des Vorgangs aus."))
     if not args.yes and input("Fortfahren? [j/N] ").strip().lower() not in ("j", "ja", "y", "yes"):
         sys.exit(0)
-    fw = load_bin(args, variant)
+    fw = apply_wifi(load_bin(args, variant), kind, args.ssid, args.wifi_pass)
     args.mac = device_mac(dev, kind, info)
     {"stock": lambda: flash_stock(dev, args, info, variant, fw),
      "tasmota": lambda: flash_tasmota(dev, args, variant, fw),

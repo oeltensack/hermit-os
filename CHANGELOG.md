@@ -1,5 +1,12 @@
 # Änderungen
 
+## Pagurus OS 1.19.1
+- Flash-Tool: Feld „WLAN für das Gerät“ (SSID wird vom Gerät vorbelegt, Passwort eintragen). Die Daten werden vor
+  dem Aufspielen fest in die Firmware eingetragen und haben beim ersten Start Vorrang – der Umstieg von
+  Original-Firmware oder Tasmota verliert das WLAN nicht mehr. Kommandozeile: `--ssid … --wifi-pass …`.
+- Flash-Tool: Knopf „Abbrechen“; Suche und Warten lassen sich jederzeit beenden.
+- Flash-Tool: Nach dem Aufspielen wird früher per MAC nach dem Gerät gesucht (neue IP) statt erst nach 3 Minuten.
+
 ## Pagurus Cloud 1.22.6
 - Gerätekarten: Die Temperatur der Elektronik in Schaltern, Steckdosen und Messgeräten steht nur noch klein als „intern … °C“ unten in der Karte; als „Temperatur“ erscheinen nur noch echte Fühler. Das Portal zeigt sie gar nicht mehr.
 

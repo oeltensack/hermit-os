@@ -3227,6 +3227,24 @@ void setupServer() {
   server.begin();
 }
 
+// WLAN-Daten vom Flash-Tool: tools/pagurus_flash.py traegt SSID und Passwort vor dem Aufspielen hinter dem
+// Marker ein ("MARKER\0ssid\0pass\0") und korrigiert die Pruefsummen der Datei. Hat beim ersten Start Vorrang
+// vor allen uebernommenen Daten.
+#define PROV_MARK "PAGURUS-WLAN-SLOT1"
+static const char provSlot[128] PROGMEM __attribute__((used, aligned(4))) = PROV_MARK;
+static bool provWifi(String& ss, String& pw) {
+  char b[129] = {0};
+  const char* p = provSlot;
+  asm volatile("" : "+r"(p));                    // Inhalt erst zur Laufzeit lesen (wird nachtraeglich gepatcht)
+  memcpy_P(b, p, 128);
+  const size_t m = sizeof(PROV_MARK);            // inkl. \0
+  if (memcmp(b, PROV_MARK, m) || !b[m]) return false;
+  ss = String(b + m);
+  size_t o = m + ss.length() + 1;
+  pw = o < 128 ? String(b + o) : String();
+  return ss.length() > 0 && ss.length() <= 32;
+}
+
 // Kandidat i als WLAN uebernehmen (feste IP nur, wenn IP, Maske und Gateway zusammenpassen)
 void applyCand(size_t i) {
   const WifiCand& c = wifiCands[i];
@@ -3353,6 +3371,7 @@ void setup() {
   loadCfg();
   if (firstBoot && !cfg.ssid.length() && !safeMode) {   // nur beim allerersten Start: WLAN (und feste IP) uebernehmen
     // Kandidaten: SDK-Speicher (zuletzt vom Chip benutzt) -> Original-Firmware (beide Bereiche) -> Tasmota
+    { WifiCand c; if (provWifi(c.ssid, c.pass)) { c.src = "flash-tool"; addCand(wifiCands, c); } }
     struct station_config sc;
     if (wifi_station_get_config_default(&sc) && sc.ssid[0]) {
       char ss[33] = {0}, pw[65] = {0};
