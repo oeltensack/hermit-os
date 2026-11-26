@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.18.0
+- Klima-Zeitpläne je Anlage (Bereich Klima → „+ Zeitpunkt“): Wochentage, Uhrzeit oder Sonnenauf-/-untergang ± Minuten, Einschalten mit Modus/Soll/Lüfter (jeweils auch „unverändert“) oder Ausschalten. Läuft eine Fenster-offen-Pause, wird das Einschalten für danach vorgemerkt, Ausschalten beendet die Pause
+- Nach einer Fenster-offen-Pause werden neben dem Modus auch Solltemperatur und Lüfter wiederhergestellt
+
 ## Pagurus Cloud 1.17.0
 - Eigener Bereich **Klima**: je Anlage Bedienung (Ein/Aus, Soll ±, Modus, Lüfter, Swing ↕/↔, Eco, Turbo, Leise), Raum-/Geräte-/Ausblastemperatur, Feuchte, Leistung, Verbrauch und Kosten heute/30 Tage, Laufzeit und Kompressorzeit heute, 24-h-Verlauf (Temperaturen, Soll, Leistung, Heiz-/Kühlbetrieb) und 14-Tage-Balken, Stand der Fenster-offen-Erkennung
 - Klima-Verlauf wird minütlich aufgezeichnet (Tabelle `climate_log`, Aufbewahrung wie die Leistungswerte)

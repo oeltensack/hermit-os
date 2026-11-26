@@ -7,7 +7,10 @@ import threading
 import time
 from datetime import timedelta
 
-from core import KEEP_POWER_DAYS, now_local, price_eur_kwh, q
+from core import KEEP_POWER_DAYS, alert, dev_name, now_local, price_eur_kwh, q, qid
+
+BUS = None
+FANS = ("auto", "low", "low_mid", "mid", "mid_high", "high")
 
 MODES = ("heat", "cool", "dry", "fan", "auto")
 
@@ -15,6 +18,92 @@ MODES = ("heat", "cool", "dry", "fan", "auto")
 def init_db():
     q("""CREATE TABLE IF NOT EXISTS climate_log(dev TEXT, ts INTEGER, on_ INTEGER, mode TEXT, target REAL,
          room REAL, unit REAL, outlet REAL, hum REAL, comp INTEGER, PRIMARY KEY(dev, ts))""")
+    q("""CREATE TABLE IF NOT EXISTS climate_sched(id INTEGER PRIMARY KEY AUTOINCREMENT, dev TEXT, enabled INTEGER DEFAULT 1,
+         days INTEGER DEFAULT 127, time TEXT, action TEXT, last_run TEXT)""")
+
+
+# ======================= Zeitplaene =======================
+def sched_clean(d):
+    """Eingabe pruefen: Tage, Zeit (HH:MM oder sunrise/sunset±min), Aktion {on, mode, target_C, fan}."""
+    import engine
+    t = str(d.get("time") or "").strip()
+    try:
+        engine.sched_time(t, now_local().date())
+    except Exception:
+        raise ValueError("Zeit als HH:MM oder Sonnenauf-/-untergang ± Minuten")
+    days = int(d.get("days", 127)) & 127
+    if not days:
+        raise ValueError("Mindestens einen Tag wählen")
+    a = d.get("action") or {}
+    act = {"on": bool(a.get("on"))}
+    if act["on"]:
+        if a.get("mode") in MODES:
+            act["mode"] = a["mode"]
+        if a.get("target_C") not in (None, ""):
+            act["target_C"] = max(16, min(31, int(round(float(a["target_C"])))))
+        if a.get("fan") in FANS:
+            act["fan"] = a["fan"]
+    return {"days": days, "time": t, "action": act, "enabled": 1 if d.get("enabled", True) else 0}
+
+
+def sched_save(dev, d):
+    c = sched_clean(d)
+    vals = (c["enabled"], c["days"], c["time"], json.dumps(c["action"]))
+    if d.get("id"):
+        q("UPDATE climate_sched SET enabled=?, days=?, time=?, action=?, last_run=NULL WHERE id=? AND dev=?",
+          vals + (int(d["id"]), dev))
+        return int(d["id"])
+    return qid("INSERT INTO climate_sched(enabled, days, time, action, dev) VALUES(?,?,?,?,?)", vals + (dev,))
+
+
+def sched_list(dev):
+    import engine
+    out = []
+    for r in q("SELECT * FROM climate_sched WHERE dev=?", (dev,)):
+        try:
+            t = engine.sched_time(r["time"], now_local().date())
+            today = t.strftime("%H:%M") if t else None
+        except Exception:
+            today = None
+        out.append({"id": r["id"], "enabled": bool(r["enabled"]), "days": r["days"], "time": r["time"],
+                    "today": today, "action": json.loads(r["action"] or "{}")})
+    out.sort(key=lambda x: (x["today"] or x["time"]))
+    return out
+
+
+def _apply(dev, act):
+    """Zeitplan ausfuehren. Steht die Anlage wegen offenem Fenster in Pause, wird nur der Wunsch fuer danach
+    gemerkt (Einschalten) bzw. die Pause beendet (Ausschalten)."""
+    w = q("SELECT paused, saved FROM winopen WHERE dev=?", (dev,), one=True)
+    if w and w["paused"]:
+        if act["on"]:
+            saved = json.loads(w["saved"] or "{}")
+            saved.update({k: v for k, v in act.items() if k != "on"})
+            q("UPDATE winopen SET saved=? WHERE dev=?", (json.dumps(saved), dev))
+        else:
+            q("UPDATE winopen SET paused=NULL, until=NULL, saved=NULL, reason=NULL WHERE dev=?", (dev,))
+        return
+    BUS.rpc(dev, "Climate.Set", {"id": 0, **act})
+
+
+def run_schedules():
+    import engine
+    now = now_local()
+    key = now.strftime("%Y-%m-%d")
+    for s in q("SELECT * FROM climate_sched WHERE enabled=1"):
+        if not (s["days"] >> now.weekday()) & 1 or s["last_run"] == key:
+            continue
+        try:
+            t = engine.sched_time(s["time"], now.date())
+        except Exception:
+            continue
+        if t is None or not (t <= now < t + timedelta(minutes=10)):
+            continue
+        q("UPDATE climate_sched SET last_run=? WHERE id=?", (key, s["id"]))
+        try:
+            _apply(s["dev"], json.loads(s["action"] or "{}"))
+        except Exception as e:
+            alert(s["dev"], "rule", f"Klima-Zeitplan {dev_name(s['dev'])} {s['time']}: {e}")
 
 
 def _f(v):
@@ -96,7 +185,7 @@ def view(d, wo=None):
         "meter": d.get("meter"), "winopen": wo,
         "today": _hours(dev, _day_start()),
         "e_today": _energy(meter, 1), "e_30": _energy(meter, 30),
-        "series": series(dev, meter), "days": days(dev, meter),
+        "series": series(dev, meter), "days": days(dev, meter), "sched": sched_list(dev),
     }
 
 
@@ -109,6 +198,7 @@ def loop():
     while True:
         try:
             record()
+            run_schedules()
             n += 1
             if n % 360 == 0:
                 cleanup()
@@ -117,6 +207,8 @@ def loop():
         time.sleep(60 - time.time() % 60 + 1)
 
 
-def start():
+def start(bus):
+    global BUS
+    BUS = bus
     init_db()
     threading.Thread(target=loop, daemon=True).start()

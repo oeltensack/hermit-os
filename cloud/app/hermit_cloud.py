@@ -226,7 +226,7 @@ def startup():
     engine.start(BUS)
     shade.start(BUS)
     winopen.start(BUS)
-    climate.start()
+    climate.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
     portal.start(devices)
@@ -377,6 +377,25 @@ def climates():
     return out
 
 
+@app.post("/api/climates/{dev}/sched")
+async def climate_sched_save(dev: str, request: Request):
+    need(request, "admin")
+    r = get_dev(dev)
+    if not (r["comp"] or "").startswith("climate:"):
+        raise HTTPException(400, "Keine Klimaanlage")
+    try:
+        return {"id": climate.sched_save(dev, await request.json())}
+    except (ValueError, TypeError, KeyError) as e:
+        raise HTTPException(400, str(e) or "Zeit als HH:MM oder sunrise±Minuten / sunset±Minuten")
+
+
+@app.delete("/api/climates/{dev}/sched/{sid}")
+def climate_sched_delete(dev: str, sid: int, request: Request):
+    need(request, "admin")
+    q("DELETE FROM climate_sched WHERE id=? AND dev=?", (sid, dev))
+    return {"ok": True}
+
+
 @app.get("/api/devices/{dev}/winopen")
 def winopen_get(dev: str, request: Request):
     get_dev(dev)
@@ -440,7 +459,7 @@ def dev_delete(dev: str, request: Request):
     get_dev(dev)
     rows = [dev] + ([] if "~" in dev else [r["id"] for r in q("SELECT id FROM devices WHERE id LIKE ?", (dev + "~%",))])
     for d in rows:                               # mit zweitem Kanal (Shelly 2.5)
-        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles", "winopen", "climate_log"):
+        for t in ("power", "energy", "energy_h", "appliances", "runs", "backups", "fridges", "fridge_cycles", "winopen", "climate_log", "climate_sched"):
             try:
                 q(f"DELETE FROM {t} WHERE dev=?", (d,))
             except Exception:

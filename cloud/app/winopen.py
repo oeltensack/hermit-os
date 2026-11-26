@@ -95,8 +95,9 @@ def _resume(dev, r, why):
     row = q("SELECT saved FROM winopen WHERE dev=?", (dev,), one=True)
     saved = json.loads(row["saved"] or "{}") if row else {}
     p = {"id": 0, "on": True}
-    if saved.get("mode"):
-        p["mode"] = saved["mode"]
+    for k in ("mode", "target_C", "fan"):           # vorheriger Zustand bzw. Wunsch eines Zeitplans aus der Pause
+        if saved.get(k) is not None:
+            p[k] = saved[k]
     BUS.rpc(dev, "Climate.Set", p)                  # schlaegt es fehl, bleibt die Pause und es wird erneut versucht
     q("UPDATE winopen SET paused=NULL, until=NULL, saved=NULL, reason=NULL WHERE dev=?", (dev,))
     _hist.pop(dev, None)

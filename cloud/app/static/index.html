@@ -389,8 +389,32 @@ ${m?`<div><div class="v">${m.online&&m.apower!=null?fmt(m.apower,0,'W'):'–'}</
 <div><div class="l" style="margin-bottom:3px">Letzte 24 Stunden</div><div class="tl clc" data-dev="${id}">${clChart(c)}<div class="tt"></div></div>
 <div class="l" style="font-size:11px;margin-top:2px"><span style="color:#e6e9ec">━</span> Raum <span style="color:#8a96a3">┅</span> Soll <span style="color:#e8833a">━</span> Ausblasluft${m?' <span style="color:#2f9be0">▇</span> Leistung':''} · Balken unten: <span style="color:#e8833a">Heizen</span> / <span style="color:#2f9be0">Kühlen</span></div></div>
 <div><div class="l" style="margin-bottom:3px">${m?'Verbrauch':'Laufzeit'} je Tag – 14 Tage</div>${clDays(c)}</div>
+<div><div class="row sp" style="margin-bottom:3px"><span class="l">Zeitplan</span><a class="lk admin-only" style="font-size:12px" onclick="csDlg('${id}')">+ Zeitpunkt</a></div>
+${(c.sched||[]).length?`<div class="csl">${c.sched.map(x=>`<div class="row sp ${x.enabled?'':'ack'}" style="padding:3px 0;border-top:1px solid var(--b)"><span><b>${esc(x.today||timeTxt(x.time))}</b> <span class="l">${daysTxt(x.days)}${x.time.startsWith('sun')&&x.today?' · '+esc(timeTxt(x.time)):''}</span></span>
+<span>${csTxt(x.action)}${x.enabled?'':' <span class="tag">aus</span>'} <a class="lk admin-only" style="font-size:12px" onclick="csDlg('${id}',${x.id})">Ändern</a></span></div>`).join('')}</div>`:'<div class="l" style="font-size:12px">Kein Zeitplan.</div>'}</div>
 <div class="row sp"><span class="l">Fenster offen: ${c.winopen?[c.winopen.sensors?c.winopen.sensors+' Kontakt'+(c.winopen.sensors>1?'e':''):'',c.winopen.drop?'Temperatursturz':''].filter(Boolean).join(' + '):'aus'}</span>
 <span class="row"><a class="lk admin-only" style="font-size:12px" onclick="woDlg('${id}')">Fenster offen …</a>${m?`<a class="lk" style="font-size:12px" onclick="showEn('${esc(m.id)}')">Energie</a>`:''}<a class="lk admin-only" style="font-size:12px" onclick="devDlg('${id}')">Gerät …</a></span></div></div>`}
+function csTxt(a){return a.on?`<span style="color:${a.mode=='heat'?'#e8833a':a.mode=='cool'?'var(--a)':'inherit'}">${a.mode?esc(CLM[a.mode]):'Ein'}</span>${a.target_C!=null?' '+a.target_C+' °C':''}${a.fan?' · Lüfter '+esc(CLF[a.fan]):''}`:'<span class="l">Aus</span>'}
+function csDlg(dev,sid){const c=CL.find(x=>x.dev==dev),x=sid?c.sched.find(y=>y.id==sid):{enabled:true,days:31,time:'06:30',action:{on:true,mode:(c.status||{}).mode||'heat',target_C:Math.round((c.status||{}).target_C||22)}};
+const a=x.action,sun=x.time.startsWith('sun'),kind=sun?(x.time.startsWith('sunrise')?'sunrise':'sunset'):'time',off=sun?(x.time.slice(kind.length)||'0'):'0';
+dlg(`<h2>Zeitpunkt – ${esc(c.name)}</h2><div class="f">
+<label>Tage</label><div class="row">${DAYN.map((n,i)=>`<label><input type="checkbox" class="cs_d" value="${i}" ${(x.days>>i)&1?'checked':''} style="width:auto"> ${n}</label>`).join(' ')}</div>
+<label>Zeit</label><div class="row"><select id="cs_k" onchange="$('cs_t').style.display=this.value=='time'?'':'none';$('cs_ow').style.display=this.value=='time'?'none':''"><option value="time">Uhrzeit</option><option value="sunrise" ${kind=='sunrise'?'selected':''}>Sonnenaufgang</option><option value="sunset" ${kind=='sunset'?'selected':''}>Sonnenuntergang</option></select>
+<input id="cs_t" type="time" value="${sun?'06:30':esc(x.time)}" style="${sun?'display:none':''}"><span id="cs_ow" style="${sun?'':'display:none'}">± <input id="cs_o" style="width:60px" value="${off}"> min</span></div>
+<label>Aktion</label><select id="cs_on" onchange="$('cs_more').style.display=this.value=='1'?'contents':'none'"><option value="1">Einschalten</option><option value="0" ${a.on?'':'selected'}>Ausschalten</option></select>
+<div id="cs_more" style="display:${a.on?'contents':'none'}"><label>Modus</label><select id="cs_m"><option value="">unverändert</option>${Object.entries(CLM).map(([k,v])=>`<option value="${k}" ${a.mode==k?'selected':''}>${v}</option>`).join('')}</select>
+<label>Solltemperatur</label><div class="row"><input id="cs_tg" style="width:70px" value="${a.target_C??''}" placeholder="–"> °C <span class="l">leer = unverändert</span></div>
+<label>Lüfter</label><select id="cs_f"><option value="">unverändert</option>${Object.entries(CLF).map(([k,v])=>`<option value="${k}" ${a.fan==k?'selected':''}>${v}</option>`).join('')}</select></div>
+<label>Aktiv</label><label><input type="checkbox" id="cs_e" ${x.enabled?'checked':''} style="width:auto"> Zeitpunkt ausführen</label></div>
+<p class="l">Steht die Anlage gerade wegen offenem Fenster in Pause, merkt sich die Cloud das Einschalten und führt es nach dem Schließen aus. Ausschalten beendet die Pause.</p>
+<div class="row sp" style="margin-top:14px"><div>${sid?`<button class="bt r" onclick="csDel('${esc(dev)}',${sid})">Löschen</button>`:''}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="csSave('${esc(dev)}',${sid||0})">Speichern</button></div></div>`)}
+function csSave(dev,sid){const k=$('cs_k').value,o=parseInt($('cs_o').value)||0,time=k=='time'?$('cs_t').value:k+(o?(o>0?'+':'')+o:'');
+const on=$('cs_on').value=='1',tg=$('cs_tg').value.trim().replace(',','.');
+const body={id:sid||undefined,enabled:$('cs_e').checked,days:[...document.querySelectorAll('.cs_d:checked')].reduce((m,c)=>m|(1<<+c.value),0),time,
+action:on?{on:true,mode:$('cs_m').value||undefined,target_C:tg?+tg:undefined,fan:$('cs_f').value||undefined}:{on:false}};
+run(async()=>{await api('climates/'+encodeURIComponent(dev)+'/sched',{method:'POST',body});closeDlg();await loadClimates(true)},'Gespeichert')}
+function csDel(dev,sid){if(!confirm('Zeitpunkt löschen?'))return;run(async()=>{await api('climates/'+encodeURIComponent(dev)+'/sched/'+sid,{method:'DELETE'});closeDlg();await loadClimates(true)})}
 function clChart(c){const S=c.series||[],W2=400,H=150,t1=Date.now()/1000,t0=t1-86400,X=t=>(t-t0)/86400*W2;
 if(!S.length)return `<div class="empty" style="padding:20px">Noch keine Aufzeichnung.</div>`;
 const tv=S.flatMap(p=>[p[1],p[2],p[3]]).filter(v=>v!=null);let lo=Math.floor(Math.min(...tv)-1),hi=Math.ceil(Math.max(...tv)+1);if(hi-lo<6){hi+=3;lo-=3}
