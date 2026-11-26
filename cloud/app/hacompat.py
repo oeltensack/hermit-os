@@ -15,14 +15,14 @@ import time
 from collections import deque
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 import panel
 
 HA_VERSION = "2026.11.0"
 router = APIRouter()
 # Pfade unter /api/, die ohne Cloud-Anmeldung erreichbar sein muessen (nur fuer gebundene Displays)
-PATHS = {"/api/", "/api/config", "/api/discovery_info"}
+PATHS = {"/api", "/api/", "/api/config", "/api/discovery_info"}
 LOG = deque(maxlen=40)          # letzte Pruefungen durch Displays (Einstellungen -> Wandtafeln)
 
 
@@ -43,8 +43,10 @@ def bound(request):
 
 
 def _json(data):
-    body = json.dumps(data)
-    return JSONResponse(content=data, headers={"Content-Length": str(len(body.encode())), "Cache-Control": "no-store"})
+    """Kompaktes JSON wie Home Assistant; die Laenge setzt Starlette passend zum Inhalt (Content-Length muss stimmen,
+    der Client des Displays wartet sonst auf fehlende Bytes und meldet „keine gueltige HA-Instanz“)."""
+    body = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode()
+    return Response(content=body, media_type="application/json", headers={"Cache-Control": "no-store"})
 
 
 def _config(request):
@@ -66,12 +68,18 @@ def _config(request):
 @router.get("/manifest.json")
 def manifest(request: Request):
     bound(request)
-    return _json({"background_color": "#0f1419", "description": "Pagurus Wandtafel", "dir": "ltr",
-                  "display": "standalone", "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"}],
-                  "lang": "de-DE", "name": "Home Assistant", "short_name": "Pagurus", "start_url": "/?homescreen=1",
-                  "theme_color": "#0f1419"})
+    # Felder wie beim Manifest eines Home Assistant – die App des Displays erkennt den Server daran
+    # (u. a. related_applications). Nur die Symbole sind die der Pagurus Cloud.
+    return _json({"background_color": "#FFFFFF", "description": "Home automation platform that puts local control and "
+                  "privacy first.", "dir": "ltr", "display": "standalone",
+                  "icons": [{"purpose": "any", "sizes": "192x192", "src": "/icon-192.png", "type": "image/png"},
+                            {"purpose": "maskable", "sizes": "192x192", "src": "/icon-192.png", "type": "image/png"}],
+                  "id": "/?homescreen=1", "lang": "en-US", "name": "Home Assistant", "prefer_related_applications": True,
+                  "related_applications": [{"id": "io.homeassistant.companion.android", "platform": "play"}],
+                  "short_name": "Home Assistant", "start_url": "/?homescreen=1", "theme_color": "#03A9F4"})
 
 
+@router.get("/api")
 @router.get("/api/")
 def api_root(request: Request):
     bound(request)

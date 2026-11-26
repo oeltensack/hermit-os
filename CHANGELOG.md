@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.5
+- Wall Display: Antworten der Home-Assistant-Prüfung hatten eine zu große Längenangabe (Content-Length) – der Client des Displays wartete auf fehlende Bytes und meldete „keine gültige HA-Instanz“. Jetzt passend; Manifest wie bei Home Assistant, `/api` auch ohne Schrägstrich
+
 ## Pagurus Cloud 1.22.4
 - Wandtafeln: Display direkt aus der Anfrageliste an eine Tafel binden („an … binden“)
 
