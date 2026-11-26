@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.3
+- IP von Gen2+/Gen3-Geräten, die per MQTT verbunden sind, wird jetzt ermittelt (`WiFi.GetStatus` beim Verbinden und aus den Statusmeldungen) – vorher blieb sie leer, und eine an ein Gerät gebundene Wandtafel fand das Wall Display nicht
+- Einstellungen → Wandtafeln zeigt die letzten Anfragen von Displays an die Home-Assistant-Prüfung mit IP und Ergebnis
+
 ## Pagurus Cloud 1.22.2
 - Shelly Wall Display: Die Cloud beantwortet für gebundene Displays die Home-Assistant-Prüfung (`/auth/login_flow`, `/auth/providers`, `/auth/token`, `/api/`, `/api/config`, `/api/websocket`, `/manifest.json`) – vorher meldete das Display „keine gültige HA-Instanz“. Andere Geräte bekommen dort weiterhin 404; die ausgegebenen Tokens gelten für nichts
 

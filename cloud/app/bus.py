@@ -192,6 +192,8 @@ class Bus:
                 set_info(v, {k: d.get(k) for k in ("model", "app", "ver", "mac", "gen", "ip")}, live=live)
         elif rest.startswith("status/"):
             comp = rest[7:]
+            if comp == "wifi" and isinstance(d, dict) and d.get("sta_ip"):
+                set_ip(dev, d["sta_ip"])
             if comp.startswith(MAIN_COMPS):
                 set_status(self.chan_row(dev, comp), comp, d, live=live)
             elif comp.startswith(SENSOR_COMPS):
@@ -212,6 +214,8 @@ class Bus:
                     on_event(dev, e)
             elif m in ("NotifyStatus", "NotifyFullStatus"):
                 for k, v in p.items():
+                    if k == "wifi" and isinstance(v, dict) and v.get("sta_ip"):
+                        set_ip(dev, v["sta_ip"])
                     if isinstance(v, dict) and k.startswith(MAIN_COMPS):
                         set_status(row_id(dev, k), k, v, merge=True)
                     elif isinstance(v, dict) and k.startswith(SENSOR_COMPS):
@@ -258,6 +262,12 @@ class Bus:
             r = q("SELECT comp, status, gen FROM devices WHERE id=?", (dev,), one=True)
             if not r or (r["gen"] or 2) < 2:
                 return
+            try:                                   # IP fuer Anzeige und Wandtafel-Bindung (GetDeviceInfo hat keine)
+                w = self.rpc(dev, "WiFi.GetStatus")
+                if w.get("sta_ip"):
+                    set_ip(dev, w["sta_ip"])
+            except Exception:
+                pass
             st = json.loads(r["status"] or "{}")
             if not (r["comp"] or "").startswith(MAIN_COMPS) or not any(k in st for k in ("output", "state", "mode", "apower")):
                 self.fetch_status(dev)
@@ -409,6 +419,11 @@ def set_info(dev, d, live=True):
        d.get("ip"), d.get("name"), dev))
     if live:
         seen(dev)
+
+
+def set_ip(dev, ip):
+    """IP merken (auch fuer weitere Kanaele desselben Geraets)."""
+    q("UPDATE devices SET ip=? WHERE (id=? OR id LIKE ?) AND COALESCE(ip,'')!=?", (ip, dev, dev + "~%", ip))
 
 
 def set_status(dev, comp, st, merge=False, live=True):

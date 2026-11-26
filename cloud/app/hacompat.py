@@ -11,6 +11,8 @@ Danach laedt das Display die eingetragene Adresse, und die Cloud leitet es auf s
 """
 import json
 import secrets
+import time
+from collections import deque
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -21,6 +23,17 @@ HA_VERSION = "2026.11.0"
 router = APIRouter()
 # Pfade unter /api/, die ohne Cloud-Anmeldung erreichbar sein muessen (nur fuer gebundene Displays)
 PATHS = {"/api/", "/api/config", "/api/discovery_info"}
+LOG = deque(maxlen=40)          # letzte Pruefungen durch Displays (Einstellungen -> Wandtafeln)
+
+
+def watched(path):
+    return path in PATHS or path.startswith("/auth/") or path in ("/manifest.json", "/api/websocket") \
+        or path.startswith("/lovelace")
+
+
+def note(ip, method, path, status):
+    LOG.appendleft({"ts": time.time(), "ip": ip, "m": method, "p": path, "s": status,
+                    "bound": bool(panel.by_ip(ip))})
 
 
 def bound(request):
@@ -138,6 +151,7 @@ def lovelace(rest: str, request: Request):
 @router.websocket("/api/websocket")
 async def websocket(ws: WebSocket):
     ip = ws.client.host if ws.client else None
+    note(ip, "WS", "/api/websocket", 101 if panel.by_ip(ip) else 403)
     if not panel.by_ip(ip):
         await ws.close(code=1008)
         return

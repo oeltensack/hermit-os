@@ -149,7 +149,8 @@ kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
 <p class="l">Eigene Bedienseite für das Shelly Wall Display oder ein Tablet: große Kacheln, nach Räumen sortiert, mit Szenen.
 Am Wall Display unter <b>Einstellungen → Home Assistant</b> die Adresse eintragen. Sie enthält einen geheimen Schlüssel – wer sie kennt,
 sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
-<div class="scroll"><table id="pntab"></table></div><button class="bt g" style="margin-top:8px" onclick="pnDlg()">Neue Wandtafel</button></div>
+<div class="scroll"><table id="pntab"></table></div><button class="bt g" style="margin-top:8px" onclick="pnDlg()">Neue Wandtafel</button>
+<div id="pnlog" style="margin-top:10px"></div></div>
 
 <div class="card admin-only"><h2>Fernzugang-Portal</h2>
 <p class="l">PHP-Seite auf einem Webhosting (Ordner <code>portal/</code> im Repo). Die Cloud meldet sich dort von sich aus per HTTPS, holt Schaltbefehle ab und überträgt Zustand und Meldungen – kein offener Port nötig.</p>
@@ -699,7 +700,8 @@ $('p_kinds').innerHTML=Object.entries(s.push_all).map(([k,v])=>`<label><input ty
 PUB=(s.public_url||location.origin).replace(/\/$/,'');
 await Promise.all([loadFw(),loadBk(),loadUsers(),loadUpd(),loadPanels()])}
 let PN=[],PUB='';
-async function loadPanels(){PN=await api('panels');if(!SCN.length)SCN=await api('scenes');
+async function loadPanels(){PN=await api('panels');const L=await api('panels/log').catch(()=>[]);
+$('pnlog').innerHTML=L.length?`<div class="l" style="margin-bottom:4px">Letzte Anfragen von Displays (Home-Assistant-Prüfung):</div><div class="scroll"><table>${L.slice(0,12).map(x=>`<tr><td>${hm(x.ts)}</td><td>${esc(x.ip||'?')}</td><td>${esc(x.m)} ${esc(x.p)}</td><td>${x.s<300||x.s==101?'<span class="tag g">'+x.s+'</span>':'<span class="tag r">'+x.s+'</span>'}</td><td class="l">${x.bound?'gebunden':'nicht gebunden – IP bei der Tafel eintragen'}</td></tr>`).join('')}</table></div>`:'';if(!SCN.length)SCN=await api('scenes');
 $('pntab').innerHTML=PN.length?'<tr><th>Tafel</th><th>Kacheln</th><th>Adresse</th><th></th></tr>'+PN.map(p=>{const u=PUB+'/wd/'+p.token;
 return `<tr><td><b>${esc(p.name)}</b>${p.control?'':' <span class="tag">nur Anzeige</span>'}</td><td>${p.tiles.length}</td>
 <td>${p.bind?`<b>${esc(PUB)}</b> <span class="l">– kurz, nur vom ${p.bind_ip?esc(devName(p.bind)!==p.bind?devName(p.bind)+' ('+p.bind_ip+')':p.bind_ip):'gebundenen Gerät (IP noch unbekannt)'}</span><br>`:''}

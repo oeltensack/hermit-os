@@ -116,13 +116,19 @@ OPEN_PATHS = ("/api/login", "/api/info/public")
 @app.middleware("http")
 async def auth(request: Request, call_next):
     p = request.url.path
-    ha = p in hacompat.PATHS and request.client and panel.by_ip(request.client.host)   # Wall-Display-Pruefung
+    ip = request.client.host if request.client else None
+    ha = p in hacompat.PATHS and panel.by_ip(ip)                     # Wall-Display-Pruefung
     if p.startswith("/api/") and p not in OPEN_PATHS and not ha:
         u = current_user(request)
         if not u:
+            if hacompat.watched(p):
+                hacompat.note(ip, request.method, p, 401)
             return JSONResponse({"detail": "Anmeldung erforderlich"}, status_code=401)
         request.state.user = u
-    return await call_next(request)
+    resp = await call_next(request)
+    if hacompat.watched(p):
+        hacompat.note(ip, request.method, p, resp.status_code)
+    return resp
 
 
 @app.post("/api/login")
@@ -479,6 +485,13 @@ async def panels_save(request: Request):
     if d.get("new_token"):
         panel.new_token(pid)
     return {"id": pid}
+
+
+@app.get("/api/panels/log")
+def panels_log(request: Request):
+    """Letzte Anfragen von Displays an die Home-Assistant-Pruefung – zeigt, mit welcher IP das Display kommt."""
+    need(request, "admin")
+    return list(hacompat.LOG)
 
 
 @app.delete("/api/panels/{pid}")
