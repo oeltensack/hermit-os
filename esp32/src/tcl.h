@@ -101,6 +101,31 @@ class Ac {
   int pos = 0, need = 0;
   uint32_t nextPoll = 2000;
   bool pendingSet = false;
+
+public:
+  // Lernmodus: welche Bytes im Zustand aendern sich, wenn an der Fernbedienung eine Taste gedrueckt wird?
+  // Messwerte (Raum-/Ausblastemperatur, Luefter, Verdichter) werden nicht aufgezeichnet.
+  struct Change { uint32_t ms; uint8_t idx, from, to; };
+  bool learn = false;
+  Change chg[40]; uint8_t chgN = 0, chgPos = 0;
+  uint8_t prev[64]; uint8_t prevLen = 0;
+  uint16_t chgCount[64] = {0};
+  static bool noisy(uint8_t i) { return i == 0x0A || i == 0x0C || i == 0x0D || i == 0x19 || i == 0x1D || i == 0x22; }
+  void learnStart(bool on) { learn = on; chgN = chgPos = 0; prevLen = 0; memset(chgCount, 0, sizeof chgCount); }
+  void record(const uint8_t* p, int len) {
+    int n = len < 64 ? len : 64;
+    if (learn && prevLen) {
+      for (int i = 0; i < n && i < prevLen; i++) {
+        if (p[i] == prev[i] || noisy(i)) continue;
+        chg[chgPos] = {millis(), (uint8_t)i, prev[i], p[i]};
+        chgPos = (chgPos + 1) % 40;
+        if (chgN < 40) chgN++;
+        chgCount[i]++;
+      }
+    }
+    memcpy(prev, p, n); prevLen = n;
+  }
+private:
   uint8_t lastTx[40]; int lastTxLen = 0;
 
   void send(uint8_t cmd, const uint8_t* p, int len) {
@@ -146,6 +171,7 @@ class Ac {
     (void)fromAc;
     frames++;
     lastRx = millis();
+    record(p, len);
     State& s = st;
     uint8_t m = p[2] & 0x0F;
     if (m >= 1 && m <= 5) s.mode = m - 1;

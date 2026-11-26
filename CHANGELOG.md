@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus OS 1.19.3
+- TCL-Klima: „Fernbedienungstasten lernen“ auf der Modul-Webseite. Zeichnet auf, welche Bytes im Zustand der Anlage
+  sich ändern, wenn an der Fernbedienung eine Funktion geschaltet wird (für Sleep, Health, 8 °C, I Feel).
+
 ## Pagurus OS 1.19.2 / Pagurus Cloud 1.22.8
 - TCL-Klima: Anzeige am Innengerät schaltbar (Knopf „Anzeige“ in Cloud, Wandtafel, Portal und Modul-Webseite).
   Bisher schaltete jeder Befehl aus der Cloud die Anzeige wieder ein – auch wenn sie per Fernbedienung aus war.

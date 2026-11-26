@@ -36,6 +36,12 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div class="card"><h2>Betriebsart</h2><div class="row" id="md"></div>
 <h2 style="margin-top:16px">Lüfter</h2><div class="row" id="fn"></div>
 <h2 style="margin-top:16px">Extras</h2><div class="row" id="ex"></div></div>
+<div class="card" id="lr" style="display:none"><h2>Fernbedienungstasten lernen</h2>
+<div class="l">Aufzeichnung starten, dann an der Fernbedienung eine Funktion <b>einschalten</b>, ca. 10 s warten,
+wieder <b>ausschalten</b>, 10 s warten – danach die nächste Taste. Die Liste zeigt, welche Bytes sich dabei ändern.
+Messwerte (Temperaturen, Lüfter, Verdichter) werden nicht aufgezeichnet.</div>
+<div class="row"><button class="bt p" id="lr_b" onclick="learn()">Aufzeichnung starten</button>
+<button class="bt" onclick="copyL()">Liste kopieren</button></div><pre id="lr_l" class="l" style="white-space:pre-wrap;margin:0"></pre></div>
 </section>
 <section class="tab" id="w"><div class="card"><h2>WLAN</h2>
 <div id="ws" class="l"></div><label>Netz</label><select id="w_s"></select><button class="bt" style="margin-top:6px" onclick="scan()">Netze suchen</button>
@@ -106,5 +112,11 @@ function upl(){const f=$('u_f').files[0];if(!f)return toast('Datei wählen');con
  fetch('/update',{method:'POST',body:fd}).then(r=>r.text().then(t=>toast(t,r.ok))).catch(e=>toast(e.message))}
 function inst(){if(confirm('Update installieren? Das Gerät startet danach neu.'))run(()=>rpc('Shelly.Update'),'Update läuft …')}
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('a',x===a));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('a',t.id==a.dataset.t));if(a.dataset.t=='w'&&!$('w_s').options.length)scan()});
-cfg().then(load);setInterval(load,3000);
+let LR=null;const hx=v=>v.toString(16).toUpperCase().padStart(2,'0');
+function bits(a,b){const x=a^b,o=[];for(let i=7;i>=0;i--)if(x&(1<<i))o.push(`Bit ${i} (0x${hx(1<<i)}) ${b&(1<<i)?'an':'aus'}`);return o.join(', ')}
+async function lrLoad(){try{LR=await rpc('Klima.Changes')}catch(e){return}$('lr').style.display='';$('lr_b').textContent=LR.learn?'Aufzeichnung beenden':'Aufzeichnung starten';
+ $('lr_l').textContent=LR.changes.length?LR.changes.map(c=>`vor ${Math.round((LR.now-c.ms)/1000)} s · Byte ${c.byte}: ${hx(c.from)} → ${hx(c.to)} · ${bits(c.from,c.to)}${c.count>4?' · (ändert sich oft)':''}`).join('\n'):(LR.learn?'Läuft – jetzt Tasten an der Fernbedienung drücken …':'')}
+function learn(){run(async()=>{await rpc('Klima.Learn',{on:!(LR&&LR.learn)});await lrLoad()})}
+function copyL(){const t=$('lr_l').textContent;if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>toast('Kopiert',1));else{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();toast('Kopiert',1)}}
+cfg().then(load);setInterval(load,3000);lrLoad();setInterval(lrLoad,3000);
 </script></body></html>)HTML";
