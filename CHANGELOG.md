@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.21.1
+- Gen2/Gen3-Geräte ohne MQTT-Statusmeldungen (z. B. Shelly Plus 1 mit ausgeschalteten „Generic status update“ und „RPC status notifications“) blieben ohne Schaltzustand und ließen sich nicht schalten: Die Cloud holt den Status jetzt beim Verbinden per RPC und fragt solche Geräte alle 30 s ab; ein Hinweis erscheint unter Meldungen
+
 ## Pagurus Cloud 1.21.0 / Pagurus Portal 1.9
 - Mehrkanalige Geräte (2PM, 2.5): Kanäle wahlweise in einer Karte zusammenfassen (Kanal 1 bearbeiten → Kanäle). Je Kanal eigener Schaltknopf mit Namen (z. B. Stufe 1/Stufe 2), Leistung und Verbrauch, dazu die Summe; auch im Portal und in der App (ab 1.7.0). Zeitpläne, Regeln und Energieauswertung behandeln die Kanäle weiter einzeln
 

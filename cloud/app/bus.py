@@ -30,6 +30,7 @@ def row_id(dev, comp):
 
 
 SENSOR_COMPS = ("temperature:", "humidity:", "illuminance:")
+POLL_S = 30
 
 # Gen1-Batteriefuehler mit Original-Firmware (Shelly Door/Window 1/2, H&T): melden per MQTT im Gen1-Format
 # unter shellies/<id>/sensor/<wert>. Uebernommen werden nur Temperatur, Feuchte und Helligkeit (plus Batterie).
@@ -120,10 +121,13 @@ class Bus:
         self.ids = itertools.count(1)
         self.wait = {}
         self.topics = {}                          # Geraet -> gesehene Topics (zum Loeschen gespeicherter Nachrichten)
+        self.poll = set()                         # Geraete ohne eigene Statusmeldungen: Cloud fragt ab
+        self.ntf_checked = set()
 
     def start(self):
         self.c.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
         self.c.loop_start()
+        threading.Thread(target=self.poll_loop, daemon=True).start()
 
     def on_connect(self, c, userdata, flags, rc, props=None):
         self.connected = not rc.is_failure
@@ -174,6 +178,8 @@ class Bus:
                 seen(v, online=on)
             if on and not q("SELECT info FROM devices WHERE id=? AND info!='{}'", (dev,), one=True):
                 threading.Thread(target=self.fetch_info, args=(dev,), daemon=True).start()
+            if on:
+                threading.Thread(target=self.after_online, args=(dev,), daemon=True).start()
             return
         if not payload:
             return
@@ -186,14 +192,7 @@ class Bus:
         elif rest.startswith("status/"):
             comp = rest[7:]
             if comp.startswith(MAIN_COMPS):
-                rid = row_id(dev, comp)
-                if rid != dev and not q("SELECT 1 FROM devices WHERE id=?", (rid,), one=True):
-                    ensure(rid)                  # neuer Kanal: Grunddaten vom Geraet uebernehmen
-                    base = q("SELECT model, app, ver, mac, gen, ip, room FROM devices WHERE id=?", (dev,), one=True)
-                    if base:
-                        q("UPDATE devices SET model=?, app=?, ver=?, mac=?, gen=?, ip=?, room=? WHERE id=?",
-                          (base["model"], base["app"], base["ver"], base["mac"], base["gen"], base["ip"], base["room"], rid))
-                set_status(rid, comp, d, live=live)
+                set_status(self.chan_row(dev, comp), comp, d, live=live)
             elif comp.startswith(SENSOR_COMPS):
                 shade.sensor(dev, comp, d)
                 if live:
@@ -230,6 +229,60 @@ class Bus:
             for t in topics:
                 self.c.publish(t, b"", retain=True)
         return len(topics)
+
+    def chan_row(self, dev, comp):
+        rid = row_id(dev, comp)
+        if rid != dev and not q("SELECT 1 FROM devices WHERE id=?", (rid,), one=True):
+            ensure(rid)                          # neuer Kanal: Grunddaten vom Geraet uebernehmen
+            base = q("SELECT model, app, ver, mac, gen, ip, room FROM devices WHERE id=?", (dev,), one=True)
+            if base:
+                q("UPDATE devices SET model=?, app=?, ver=?, mac=?, gen=?, ip=?, room=? WHERE id=?",
+                  (base["model"], base["app"], base["ver"], base["mac"], base["gen"], base["ip"], base["room"], rid))
+        return rid
+
+    def fetch_status(self, dev):
+        """Vollstaendigen Status per RPC holen – fuer Geraete, die keinen Status per MQTT senden."""
+        st = self.rpc(dev, "Shelly.GetStatus")
+        for k, v in (st or {}).items():
+            if isinstance(v, dict) and k.startswith(MAIN_COMPS):
+                set_status(self.chan_row(dev, k), k, v, merge=True)
+            elif isinstance(v, dict) and k.startswith(SENSOR_COMPS):
+                shade.sensor(dev, k, v)
+
+    def after_online(self, dev):
+        """Nach dem Verbinden: fehlenden Status holen und pruefen, ob das Geraet Aenderungen selbst meldet.
+        Meldet es nichts (Statusmeldungen und RPC-Benachrichtigungen aus), fragt die Cloud regelmaessig ab."""
+        time.sleep(1)
+        try:
+            r = q("SELECT comp, status, gen FROM devices WHERE id=?", (dev,), one=True)
+            if not r or (r["gen"] or 2) < 2:
+                return
+            st = json.loads(r["status"] or "{}")
+            if not (r["comp"] or "").startswith(MAIN_COMPS) or not any(k in st for k in ("output", "state", "mode")):
+                self.fetch_status(dev)
+            if dev in self.ntf_checked:
+                return
+            c = self.rpc(dev, "MQTT.GetConfig")
+            self.ntf_checked.add(dev)
+            if c.get("status_ntf") is False and c.get("rpc_ntf") is False:
+                if dev not in self.poll:
+                    alert(dev, "info", f"{dev_name(dev)} meldet Änderungen nicht von selbst – die Cloud fragt alle "
+                          f"{POLL_S} s ab. Besser am Gerät unter MQTT „RPC status notifications“ einschalten.", push=False)
+                self.poll.add(dev)
+            else:
+                self.poll.discard(dev)
+        except Exception:
+            pass
+
+    def poll_loop(self):
+        while True:
+            time.sleep(POLL_S)
+            for dev in list(self.poll):
+                try:
+                    if q("SELECT 1 FROM devices WHERE id=? AND online=1", (dev,), one=True):
+                        self.fetch_status(dev)
+                except Exception:
+                    pass
 
     def fetch_info(self, dev):
         try:
