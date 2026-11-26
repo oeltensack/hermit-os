@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.6
+- Gerätekarten: Die Temperatur der Elektronik in Schaltern, Steckdosen und Messgeräten steht nur noch klein als „intern … °C“ unten in der Karte; als „Temperatur“ erscheinen nur noch echte Fühler. Das Portal zeigt sie gar nicht mehr.
+
 ## Pagurus Cloud 1.22.5
 - Wall Display: Antworten der Home-Assistant-Prüfung hatten eine zu große Längenangabe (Content-Length) – der Client des Displays wartete auf fehlende Bytes und meldete „keine gültige HA-Instanz“. Jetzt passend; Manifest wie bei Home Assistant, `/api` auch ohne Schrägstrich
 

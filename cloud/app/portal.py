@@ -31,13 +31,19 @@ def cfg():
     return url, tok
 
 
+def _chip(d, s):
+    """Temperatur stammt von der Elektronik im Schaltgeraet (nicht von einem Raumfuehler)."""
+    c = d.get("comp") or ""
+    return "output" in s or "apower" in s or c.startswith(("cover:", "pm1:", "climate:"))
+
+
 def _compact(d):
     s = d.get("status") or {}
     t = s.get("temperature")
     out = {"id": d["id"], "name": d["name"] or d["id"], "room": d["room"], "model": d.get("model") or "",
            "online": d["online"], "last_seen": d.get("last_seen"), "comp": d.get("comp") or "",
            "output": s.get("output"), "apower": s.get("apower"), "wh": d.get("today_wh"),
-           "tC": t.get("tC") if isinstance(t, dict) else None, "meter_only": bool(s.get("meter_only")),
+           "tC": t.get("tC") if isinstance(t, dict) and not _chip(d, s) else None, "meter_only": bool(s.get("meter_only")),
            "bri": s.get("brightness"), "locked": True if d.get("locked") else None}
     if (d.get("comp") or "").startswith("cover:"):
         out.update(state=s.get("state"), pos=s.get("current_pos"), output=None)

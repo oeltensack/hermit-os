@@ -249,6 +249,7 @@ const nIn=x=>+String(x).replace(',','.')||0;
 const CVS={open:'offen',closed:'geschlossen',opening:'öffnet …',closing:'schließt …',stopped:'angehalten',calibrating:'kalibriert …'};
 function devCard(d){const s=d.status||{},pm='apower' in s,err=(s.errors||[]),meter=s.meter_only,on=s.output,ap=d.appliance,cvr=(d.comp||'').startsWith('cover:'),cli=(d.comp||'').startsWith('climate:'),sen=d.comp=='sensor:0',pmo=(d.comp||'').startsWith('pm1:'),inp=nInputs(d)==4&&!('output' in s);const canD=x=>canSw()&&!x.locked;const chs=d.channels?[d,...d.channels]:null,tw=chs?chs.reduce((t,c)=>t+((c.status||{}).apower||0),0):s.apower,twh=chs?chs.reduce((t,c)=>t+(c.today_wh||0),0):d.today_wh,tco=chs?chs.reduce((t,c)=>t+(c.today_cost||0),0):d.today_cost;
 const lbl=meter&&!on?'AUS-<br>GELÖST':(on?'AN':'AUS');
+const chip=('output' in s||pm||cvr||pmo||cli),ctc=chip&&s.temperature?s.temperature.tC:null;
 return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="row sp" style="align-items:flex-start"><div><div class="dn">${esc(d.name||d.id)}</div>
 <div class="dm"><span class="dot ${d.online?'on':''}"></span>${sen?'Batteriefühler · zuletzt '+ago(d.last_seen):d.online?'online':'offline seit '+ago(d.last_seen)} · ${esc(d.model||'?')} ${esc(d.ver||'')}</div></div>
@@ -257,7 +258,7 @@ return `<div class="dev ${d.online?'':'off'} ${err.length?'err':''}">
 <div class="kv">${d.meter?`<div><div class="v">${d.meter.online&&d.meter.apower!=null?fmt(d.meter.apower,1,'W'):'–'}</div><div class="l">Leistung</div></div>
 <div><div class="v">${kwh(d.meter.today_wh)}</div><div class="l">heute · ${eur(d.meter.today_cost)}</div></div>`:''}${pm?`<div><div class="v">${fmt(tw,1,'W')}</div><div class="l">Leistung${chs?' gesamt':''}</div></div>
 <div><div class="v">${kwh(twh)}</div><div class="l">heute${chs?' gesamt':''} · ${eur(tco)}</div></div>`:''}
-${s.temperature?`<div><div class="v">${fmt(s.temperature.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`:''}
+${s.temperature&&!chip?`<div><div class="v">${fmt(s.temperature.tC,1,'°C')}</div><div class="l">Temperatur</div></div>`:''}
 ${s.humidity?`<div><div class="v">${fmt(s.humidity.rh,0,'%')}</div><div class="l">Feuchte</div></div>`:''}
 ${s.lux!=null?`<div><div class="v">${fmt(s.lux,0,'lx')}</div><div class="l">Helligkeit</div></div>`:''}
 ${s.battery!=null?`<div><div class="v">${fmt(s.battery,0,'%')}</div><div class="l">Batterie</div></div>`:''}
@@ -280,7 +281,7 @@ ${d.online&&canD(d)&&s.link!==false?`<div class="row" style="gap:6px;margin-top:
 ${!s.extras||s.extras.includes('swing_v')?`<button class="bt ${s.swing_v?'':'g'} s" onclick="clSet('${esc(d.id)}',{swing_v:${!s.swing_v}})">Swing</button>`:''}</div>`:''}</div>`:''}
 ${s.brightness!=null&&d.online&&canD(d)?`<input type="range" class="bri" min="1" max="100" value="${s.brightness}" aria-label="Helligkeit" onchange="setBri('${esc(d.id)}',+this.value)">`:''}
 ${err.length?`<div class="err-l">⚠ ${err.map(e=>({overpower:'Überlast',overtemp:'Übertemperatur',stm_no_response:'Dimmer-Chip antwortet nicht',pm_no_response:'Messchip antwortet nicht',obstruction:'Hindernis'}[e]||e)).join(', ')}</div>`:''}
-<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm&&!chs?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}${inp?`<a class="admin-only" onclick="btnDlg('${esc(d.id)}')">Taster …</a>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a></div></div>`}
+<div class="links">${d.ip?`<a href="http://${esc(d.ip)}/" target="_blank" rel="noopener">Gerät öffnen</a>`:''}${pm&&!chs?`<a onclick="showEn('${esc(d.id)}')">Energie</a>`:''}${d.meter?`<a onclick="showEn('${esc(d.meter.id)}')">Energie</a>`:''}${d.meter_of?`<span class="l">Energiemesser für ${esc(devName(d.meter_of))}</span>`:''}${inp?`<a class="admin-only" onclick="btnDlg('${esc(d.id)}')">Taster …</a>`:''}<a class="admin-only" onclick="devDlg('${esc(d.id)}')">Bearbeiten</a>${ctc!=null?`<span class="l" style="margin-left:auto;opacity:.7" title="Temperatur der Elektronik im Gerät">intern ${fmt(ctc,0,'°C')}</span>`:''}</div></div>`}
 function chLabel(c,b){if(c.id==b.id)return b.ch_label||'Kanal 1';const p=(b.name||b.id)+' · ';return (c.name||c.id).startsWith(p)?(c.name||c.id).slice(p.length):(c.name||c.id)}
 function chRow(c,b){const cs=c.status||{},on=cs.output,ok=c.online&&canSw()&&!c.locked&&!b.locked&&'output' in cs;
 return `<div class="row" style="gap:12px;flex-wrap:nowrap"><button class="sw sm ${on?'on':''}" ${ok?'':'disabled'} onclick="sw('${esc(c.id)}')" title="${c.locked||b.locked?'Nur Anzeige – Schalten von Hand gesperrt':''}">${on?'AN':'AUS'}</button>
