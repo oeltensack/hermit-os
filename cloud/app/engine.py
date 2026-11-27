@@ -25,6 +25,8 @@ TYPES = {
     "other":      {"label": "Gerät", "start_w": 10, "start_s": 60, "end_w": 3, "end_s": 300, "remind_min": 0},
 }
 LAUNDRY = ("washer", "dryer")
+START_GAP_LAUNDRY = 90    # s unter der Startschwelle, die den Start noch nicht abbrechen (Waesche)
+START_GAP = 30            # dto. andere Geraete
 _ap_mem = {}          # dev -> {"cand_total":…, "low_total":…, "last_ts":…, "acc_wh":…}
 
 
@@ -67,21 +69,44 @@ def _appliance_step(dev, st):
     tot = _total(st, dev, now, p)
     mem = _ap_mem[dev]
     state, cand, low = a["state"], a["cand"], a["low"]
+    # Shellys melden bei Aenderung: die Zeit seit der letzten Meldung gehoert zum vorherigen Wert
+    dt = min(120.0, max(0.0, now - mem.get("step_ts", now)))
+    was_on = mem.get("was_on", False)
+    mem["step_ts"] = now
+    mem["was_on"] = p >= a["start_w"]
     if state in ("idle", "finished"):
+        if cand and "act" not in mem:                  # nach Neustart der Cloud: Start neu beginnen
+            q("UPDATE appliances SET cand=NULL WHERE dev=?", (dev,))
+            cand = None
         if p >= a["start_w"]:
+            mem.pop("cand_dip", None)
             if not cand:
                 q("UPDATE appliances SET cand=? WHERE dev=?", (now, dev))
                 mem["cand_total"] = tot
-            elif now - cand >= a["start_s"]:
+                mem["act"] = 0.0
+                cand = now
+            elif was_on:
+                mem["act"] += dt
+            # Start: mindestens start_s vergangen und davon mind. die Haelfte ueber der Schwelle.
+            # So zaehlt eine Waschmaschine mit Pausen (Wasserzulauf, Trommel steht), Knitterschutz
+            # eines fertigen Trockners (kurze Drehungen alle paar Minuten) aber nicht.
+            if now - cand >= a["start_s"] and mem["act"] >= 0.5 * (now - cand):
                 rid = qid("INSERT INTO runs(dev, type, start, start_total, peak_w) VALUES(?,?,?,?,?)",
                           (dev, a["type"], cand, mem.get("cand_total", tot), p))
-                if state == "finished":                # neuer Lauf quittiert den alten
+                if state == "finished":                # neuer Lauf quittiert den alten ("fertig" weg)
                     q("UPDATE runs SET ack=1 WHERE dev=? AND id<?", (dev, rid))
+                mem.pop("act", None); mem.pop("cand_dip", None)
                 q("UPDATE appliances SET state='running', since=?, run_id=?, cand=NULL, low=NULL WHERE dev=?",
                   (cand, rid, dev))
                 on_appliance(dev, "started", a["label"])
         elif cand:
-            q("UPDATE appliances SET cand=NULL WHERE dev=?", (dev,))
+            # kurze Pausen unterbrechen den Start nicht
+            if was_on:
+                mem["act"] += dt
+            dip = mem.setdefault("cand_dip", now)
+            if now - dip > (START_GAP_LAUNDRY if a["type"] in LAUNDRY else START_GAP):
+                q("UPDATE appliances SET cand=NULL WHERE dev=?", (dev,))
+                mem.pop("cand_dip", None); mem.pop("act", None)
     elif state == "running":
         q("UPDATE runs SET peak_w=MAX(COALESCE(peak_w,0), ?) WHERE id=?", (p, a["run_id"]))
         if p < a["end_w"]:

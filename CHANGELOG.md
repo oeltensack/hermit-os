@@ -1,5 +1,12 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.1
+- Fertig-Erkennung: Ein neuer Lauf nach „fertig“ wird zuverlässig erkannt und setzt „fertig“ samt Erinnerung zurück.
+  Bisher musste die Leistung die ganze Startzeit am Stück über der Schwelle liegen – Waschmaschinen mit Pausen
+  (Wasserzulauf, Trommel steht) wurden erst beim Heizen erkannt, Kaltwäsche gar nicht. Jetzt reicht: Startzeit
+  vergangen und davon mindestens die Hälfte über der Schwelle; Pausen bis 90 s (Wäsche) bzw. 30 s brechen den Start
+  nicht ab. Knitterschutz eines fertigen Trockners (kurze Drehungen) zählt weiterhin nicht als neuer Lauf.
+
 ## Pagurus OS ESP32: Heizungsanzeige AZ-Touch
 - Neue Variante **`hermit-aztouch-esp32`**: die Heizungsanzeige (bisher Arduino-Sketch AZ_Touch_Heizung v12.1)
   auf Pagurus OS. Gleiche Anzeige und Bedienung (Boost, Zirkulation), aber WLAN über den Zugangspunkt,
