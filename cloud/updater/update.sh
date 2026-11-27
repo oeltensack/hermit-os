@@ -3,6 +3,9 @@
 # Pagurus Cloud Updater: wartet auf data/update.request (von der Cloud-App angelegt),
 # holt den neuen Stand von GitHub und baut die Container neu.
 CLOUD="${HERMIT_CLOUD_DIR:?HERMIT_CLOUD_DIR fehlt}"
+# Uhrzeiten im Protokoll in deutscher Zeit. POSIX-Regel statt Europe/Berlin: funktioniert auch ohne tzdata
+# im Updater-Image (busybox date); der Container wird beim Update nicht neu gebaut.
+case "$TZ" in ""|UTC|Etc/UTC|Europe/Berlin) export TZ="CET-1CEST,M3.5.0,M10.5.0/3" ;; esac
 REPO="$(dirname "$CLOUD")"
 DATA="$CLOUD/data"
 SRC_TGZ="https://codeload.github.com/oeltensack/pagurus-os/tar.gz/refs/heads/main"
@@ -29,7 +32,7 @@ do_update() {
   echo "-- Container neu starten"
   docker compose up -d mosquitto cloud || return 1
   docker image prune -f >/dev/null 2>&1
-  echo "== FERTIG $(date '+%H:%M:%S')"
+  echo "== FERTIG $(date '+%d.%m.%Y %H:%M:%S')"
 }
 
 echo "Pagurus Cloud Updater läuft ($CLOUD)"

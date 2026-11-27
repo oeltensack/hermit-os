@@ -63,6 +63,7 @@ services:
     command: ["sh", "${PWD}/updater/update.sh"]
     environment:
       HERMIT_CLOUD_DIR: ${PWD}
+      TZ: ${TZ:-Europe/Berlin}
     working_dir: ${PWD}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

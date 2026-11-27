@@ -1,5 +1,10 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.2
+- Update-Protokoll: Uhrzeiten in deutscher Zeit statt UTC (der Updater-Container hatte keine Zeitzone), „FERTIG“
+  jetzt mit Datum. Greift ab dem nächsten Update ohne Neubau des Updaters; `docker-compose.yml` und das
+  Updater-Image setzen die Zeitzone künftig auch selbst.
+
 ## Pagurus Cloud 1.27.1
 - Fertig-Erkennung: Ein neuer Lauf nach „fertig“ wird zuverlässig erkannt und setzt „fertig“ samt Erinnerung zurück.
   Bisher musste die Leistung die ganze Startzeit am Stück über der Schwelle liegen – Waschmaschinen mit Pausen
