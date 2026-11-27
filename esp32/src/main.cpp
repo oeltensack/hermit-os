@@ -622,6 +622,9 @@ void loop() {
 #endif
     String e = updInstall();
     if (e.length()) updErr = e;
+#ifdef DEV_DISPLAY
+    if (e.length()) dispUpdateFailed(e);
+#endif
   }
   if (rebootAt && (int32_t)(millis() - rebootAt) >= 0) ESP.restart();
   delay(2);

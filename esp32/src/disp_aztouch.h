@@ -523,6 +523,13 @@ void dispUpdating() {
   drawUpdate();
 }
 
+// Update gescheitert (kein Neustart): Watchdog wieder an, normale Anzeige zurueck
+void dispUpdateFailed(const String& e) {
+  Serial.printf("[disp] Update abgebrochen: %s\n", e.c_str());
+  esp_task_wdt_add(NULL);
+  screen = SC_NONE; setupKey = ""; dataDirty = true;
+}
+
 // ======================= Status / Config / RPC =======================
 void dispStatus(JsonObject o) {
   o["id"] = 0;

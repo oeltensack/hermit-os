@@ -22,6 +22,8 @@
   im Reiter *Anzeige*, Wechsel über die Kopfzeile. Startausgabe auf der seriellen Schnittstelle (115200).
 - WLAN-Seite (Anzeige und Klima): nach „Netze suchen“ ist kein Netz mehr vorausgewählt – vorher wurde beim Speichern
   ohne Auswahl das stärkste fremde Netz übernommen. Rückfrage mit dem Netznamen vor dem Speichern.
+- AZ-Touch: Scheitert ein Firmware-Update (Download, Prüfsumme), blieb die Anzeige auf „Firmware-Update …“ stehen
+  und der Watchdog aus. Jetzt geht es mit Watchdog normal weiter.
 
 ## Pagurus Cloud 1.27.0
 - Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der
