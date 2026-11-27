@@ -35,8 +35,36 @@ do_update() {
   echo "== FERTIG $(date '+%d.%m.%Y %H:%M:%S')"
 }
 
+# Waechter: laeuft die Cloud nicht (beendet) oder antwortet sie 4 min lang nicht, wird sie wieder gestartet.
+# Protokoll in data/watchdog.log (die letzten 200 Zeilen).
+WD_N=0; WD_FAIL=0
+watchdog() {
+  WD_N=$((WD_N + 1)); [ $((WD_N % 4)) -eq 0 ] || return 0      # etwa jede Minute
+  st="$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}} {{.State.FinishedAt}}' hermit-cloud 2>/dev/null)"
+  case "$st" in
+    running*)
+      if wget -q -T 10 -O /dev/null "http://cloud:8080/api/info/public" 2>/dev/null; then WD_FAIL=0; return 0; fi
+      WD_FAIL=$((WD_FAIL + 1))
+      [ "$WD_FAIL" -ge 4 ] || return 0
+      wd_log "Cloud antwortet seit 4 min nicht – Neustart"
+      docker logs --tail 40 hermit-cloud >> "$DATA/watchdog.log" 2>&1
+      docker restart hermit-cloud >/dev/null 2>&1; WD_FAIL=0 ;;
+    "")
+      wd_log "Cloud-Container fehlt – starte"; (cd "$CLOUD" && docker compose up -d mosquitto cloud) >> "$DATA/watchdog.log" 2>&1 ;;
+    *)
+      wd_log "Cloud-Container nicht aktiv ($st) – starte"
+      docker logs --tail 40 hermit-cloud >> "$DATA/watchdog.log" 2>&1
+      (cd "$CLOUD" && docker compose up -d mosquitto cloud) >> "$DATA/watchdog.log" 2>&1 ;;
+  esac
+}
+wd_log() {
+  echo "== $(date '+%d.%m.%Y %H:%M:%S') $*" >> "$DATA/watchdog.log"
+  tail -n 200 "$DATA/watchdog.log" > "$DATA/watchdog.tmp" 2>/dev/null && mv "$DATA/watchdog.tmp" "$DATA/watchdog.log"
+}
+
 echo "Pagurus Cloud Updater läuft ($CLOUD)"
 while true; do
+  watchdog
   date +%s > "$DATA/updater.alive"
   if [ -f "$DATA/update.request" ]; then
     { do_update || echo "== FEHLER beim Update"; } > "$DATA/update.log" 2>&1

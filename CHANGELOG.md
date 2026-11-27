@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.4
+- **Wächter:** Der Updater prüft jede Minute, ob die Cloud läuft und antwortet. Ist der Container beendet, startet er
+  ihn wieder; antwortet die Cloud 4 Minuten lang nicht, startet er sie neu. Jeder Eingriff steht mit den letzten
+  Protokollzeilen der Cloud in `data/watchdog.log` und unter Einstellungen → System beim Update („Wächter: Cloud
+  wurde neu gestartet“). Aktiv nach dem Update auf 1.27.4 (der Updater liest sein Skript danach neu ein).
+
 ## Pagurus Cloud 1.27.3
 - Fertig-Erkennung: im Dialog des Geräts neuer Link **„Regel ‚bei fertig' anlegen“** – öffnet eine vorbereitete Regel
   (Auslöser „Gerät fertig“, Aktion Push-Nachricht), die sich um Schalten, Szenen oder Rollläden erweitern lässt.

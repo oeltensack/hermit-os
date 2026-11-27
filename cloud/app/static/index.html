@@ -213,7 +213,7 @@ sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
 <div class="row"><button class="bt g" onclick="updCheck()">Jetzt prüfen</button><button class="bt" id="u_btn" onclick="updInstall()" style="display:none">Jetzt aktualisieren</button></div></div>
 <div class="row" style="margin-top:12px"><label class="l">Modus</label><select id="u_mode" onchange="updCfg()"><option value="off">Aus</option><option value="check">Nur prüfen</option><option value="install">Automatisch installieren</option></select>
 <label class="l">um</label><select id="u_hour" onchange="updCfg()"></select></div>
-<p class="l" id="u_hint"></p><pre id="u_log" style="display:none;white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre></div>
+<p class="l" id="u_hint"></p><pre id="u_log" style="display:none;white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre><details id="u_wdd" style="display:none;margin-top:8px"><summary class="l">Wächter: Cloud wurde neu gestartet</summary><pre id="u_wd" style="white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre></details></div>
 
 <div data-sg="dev" class="card"><h2>So verbinden sich Geräte</h2>
 <p>Am Gerät unter <b>System → Cloud / MQTT</b> einschalten und als Server <code id="bk">…:1883</code> eintragen, dazu Benutzer und Passwort
@@ -812,7 +812,7 @@ function showUpd(u){$('u_v').textContent='Version '+u.current+(u.available?' →
 $('u_s').textContent=u.running?'Update läuft … die Seite lädt danach neu.':(u.error||(u.last_check?'zuletzt geprüft '+dt(u.last_check):''));
 $('u_btn').style.display=u.available&&u.updater&&!u.running?'':'none';$('u_mode').value=u.mode;$('u_hour').value=u.hour;
 $('u_hint').textContent=u.updater?'':'Der Updater-Container läuft nicht. Auf dem Server im Ordner cloud/ einmal „docker compose up -d“ ausführen (siehe cloud/README.md).';
-$('u_log').textContent=u.log;$('u_log').style.display=u.log?'':'none';if(u.running&&!window._ur){window._ur=u.current;waitUpd()}}
+$('u_log').textContent=u.log;$('u_log').style.display=u.log?'':'none';$('u_wd').textContent=u.watchdog||'';$('u_wdd').style.display=u.watchdog?'':'none';if(u.running&&!window._ur){window._ur=u.current;waitUpd()}}
 async function loadUpd(){showUpd(await api('update'))}
 function updCheck(){run(async()=>showUpd(await api('update/check',{method:'POST'})))}
 function updInstall(){if(!confirm('Cloud jetzt aktualisieren? Die Oberfläche ist dabei kurz nicht erreichbar.'))return;run(async()=>showUpd(await api('update/install',{method:'POST'})))}

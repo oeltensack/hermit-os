@@ -1423,7 +1423,8 @@ def update_info():
             return ""
     return {"current": VERSION, "available": UPD["available"], "last_check": UPD["last_check"],
             "error": UPD["error"], "mode": setting("upd_mode", "install"), "hour": int(setting("upd_hour", 4)),
-            "updater": updater_present(), "running": (DATA / "update.request").exists(), "log": rd("update.log")}
+            "updater": updater_present(), "running": (DATA / "update.request").exists(), "log": rd("update.log"),
+            "watchdog": rd("watchdog.log")}
 
 
 @app.post("/api/update/check")
