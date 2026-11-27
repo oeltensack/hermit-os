@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.24.0
+- Heizung: **Warmwasser-Verlauf**. Die Cloud zeichnet jede Minute Speicher, Kessel, Rücklauf, Soll, Brenner,
+  Pumpe und Ölzähler auf. Diagramm über 24 h, 3 oder 7 Tage (Brenner und Pumpe als Balken darunter, Werte beim
+  Darüberfahren) und eine Tabelle der letzten 14 Tage: Öl, Brennerlaufzeit, Starts, Ø Laufzeit je Start, Pumpe,
+  Speicher min–max. Aufbewahrung wie der Leistungsverlauf (mindestens 30 Tage).
+
 ## Pagurus Cloud 1.23.1
 - Heizung: Warmwasser-Logik ohne externe Cloud (ab V13.2) – der Schalter „Cloud darf vorgeben“ wird dann ausgeblendet.
 

@@ -105,6 +105,7 @@ kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
 <section class="tab" id="hz">
 <div class="row sp"><h3 style="margin:8px 0">Heizung</h3><div class="row"><span class="l" id="hz_ts"></span><button class="bt g s" id="hz_cfgb" onclick="hzCfg()">Geräte</button></div></div>
 <div class="apps" id="hz_list" style="grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))"></div>
+<div class="card" id="hz_log" style="display:none"></div>
 <p class="l">Die Regelung läuft auf den Shellys selbst. Die Cloud liest mit und schreibt Einstellungen und Befehle in die Scripts
 (Warmwasser ab Heizung Logik V13.1, Raumheizer mit Heizlüfter-Script v11 bzw. Konvektor-Logik v1.6). Die Heizer übernehmen Änderungen innerhalb von 5 s.</p>
 </section>
@@ -873,7 +874,7 @@ return hzCard(hzCol(s.status,s.err,heat),x)}
 async function loadHz(){if($('dlg').open)return;HZ=await api('heizung');let x='';
 if(HZ.ww)x+=hzWwCard(HZ.ww);if(HZ.zirk)x+=hzZirkCard(HZ.zirk);HZ.rooms.forEach(r=>x+=hzRoomCard(r));
 $('hz_list').innerHTML=x||'<div class="empty">Noch keine Heizungsgeräte – oben rechts unter „Geräte“ eintragen.</div>';
-$('hz_cfgb').style.display=isAdmin()?'':'none';$('hz_ts').textContent='Stand '+new Date(HZ.ts*1000).toLocaleTimeString('de-DE')}
+$('hz_cfgb').style.display=isAdmin()?'':'none';$('hz_ts').textContent='Stand '+new Date(HZ.ts*1000).toLocaleTimeString('de-DE');await loadHzLog()}
 const hzAfter=()=>setTimeout(()=>refresh(true),5500);
 function hzBoost(on){run(async()=>{await api('heizung/ww/boost',{method:'POST',body:{on}});await loadHz()},on?'Boost aktiviert':'Boost beendet')}
 function hzZirk(on){run(async()=>{await api('heizung/zirk',{method:'POST',body:{on}});await loadHz()},'Zirkulation '+(on?'ein':'aus'))}
@@ -930,6 +931,43 @@ c.rooms=c.rooms.map((r,i)=>({...r,on:g(`hc_r${i}_on`).checked,name:g(`hc_r${i}_n
 function hzCfgAdd(){const c=hzCfgRead();c.rooms.push({id:'r'+Date.now().toString(36),name:'Neuer Heizer',typ:'hl',dev:'',ip:'',on:true});hzCfgDlg()}
 function hzCfgDel(i){const c=hzCfgRead();c.rooms.splice(i,1);hzCfgDlg()}
 function hzCfgSave(){const c=hzCfgRead();run(async()=>{await api('heizung/config',{method:'POST',body:c});closeDlg();await loadHz()},'Gespeichert')}
+
+// ---------- Heizung: Verlauf Warmwasser ----------
+let HZL=null,HZL_H=24,HZL_T=0;
+async function loadHzLog(force){if(!HZ||!HZ.ww){$('hz_log').style.display='none';return}
+if(!force&&Date.now()-HZL_T<60000&&HZL)return;HZL_T=Date.now();HZL=await api('heizung/log?hours='+HZL_H);hzLogRender()}
+function hzRange(h){HZL_H=h;loadHzLog(true)}
+function hzLogRender(){const box=$('hz_log');box.style.display='';const S=HZL.series.rows,step=HZL.series.step;
+const rng=[[24,'24 h'],[72,'3 Tage'],[168,'7 Tage']].map(([h,t])=>`<a class="${HZL_H==h?'a':''}" onclick="hzRange(${h})">${t}</a>`).join('');
+let h=`<div class="row sp"><h2 style="margin:0">Warmwasser – Verlauf</h2><div class="row rng">${rng}</div></div>`;
+h+=`<div class="row l" style="margin:6px 0;gap:14px"><span><b style="color:#e6e9ec">━</b> Speicher</span><span><b style="color:#e8833a">━</b> Kessel</span><span><b style="color:#2f9be0">━</b> Rücklauf</span><span><b style="color:#8a96a3">┅</b> Soll</span><span><b style="color:#f85149">▮</b> Brenner</span><span><b style="color:#3fb950">▮</b> Pumpe</span></div>`;
+h+=`<div class="chart" id="hzl_c">${hzChart(S,step)}<div class="tt"></div></div>`;
+const D=HZL.days,mo=Math.max(1,...D.map(d=>d.oil||0));
+h+=`<h3 style="margin-top:14px">Je Tag – 14 Tage</h3><div class="scroll"><table><tr><th>Tag</th><th class="n">Öl</th><th class="n">Brenner</th><th class="n">Starts</th><th class="n">Ø Lauf</th><th class="n">Pumpe</th><th class="n">Speicher</th><th style="width:30%"></th></tr>`+
+D.slice().reverse().map(d=>{const has=d.min>0,day=new Date(d.day+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+return `<tr class="${has?'':'ack'}"><td>${day}</td><td class="n">${d.oil!=null?num(d.oil,2)+' L':'–'}</td><td class="n">${has?dur(d.burn_m*60):'–'}</td><td class="n">${has?d.starts:'–'}</td>
+<td class="n">${d.starts?dur(d.burn_m*60/d.starts):'–'}</td><td class="n">${has?dur(d.pump_m*60):'–'}</td><td class="n">${d.smin!=null?num(d.smin,0)+'–'+num(d.smax,0)+' °C':'–'}</td>
+<td><div style="height:8px;border-radius:4px;background:#f0883e;width:${(d.oil||0)/mo*100}%"></div></td></tr>`}).join('')+'</table></div>';
+const tot=D.reduce((a,d)=>({oil:a.oil+(d.oil||0),starts:a.starts+d.starts,bm:a.bm+d.burn_m}),{oil:0,starts:0,bm:0});
+h+=`<p class="l">14 Tage: ${num(tot.oil,1)} L Öl, ${tot.starts} Brennerstarts, Brenner ${dur(tot.bm*60)}${tot.starts?' (Ø '+dur(tot.bm*60/tot.starts)+' je Start)':''}. Aufzeichnung jede Minute, ${HZL_H<=48?'Diagramm in 5-Minuten-':'Diagramm in 30-Minuten-'}Schritten. Öl aus dem Zähler der Logik.</p>`;
+box.innerHTML=h;hzHover()}
+function hzChart(S,step){const W2=400,H=170,t1=Date.now()/1000,span=HZL_H*3600,t0=t1-span,X=t=>(t-t0)/span*W2;
+if(!S.length)return `<div class="empty" style="padding:20px">Noch keine Aufzeichnung – die Cloud zeichnet ab jetzt jede Minute auf.</div>`;
+const tv=S.flatMap(p=>[p[1],p[2],p[3],p[4]]).filter(v=>v!=null);let lo=Math.floor((Math.min(...tv)-2)/5)*5,hi=Math.ceil((Math.max(...tv)+2)/5)*5;if(hi-lo<20)hi=lo+20;
+const top=6,bot=H-36,Y=v=>top+(bot-top)*(1-(v-lo)/(hi-lo)),bw=step/span*W2+0.3;
+let g='';for(let v=lo;v<=hi;v+=hi-lo>40?10:5)g+=`<line x1="0" x2="${W2}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2a333c"/><text x="2" y="${Y(v)-2}" font-size="9" fill="#8a96a3">${v}°</text>`;
+const line=(i,col,extra)=>{let d='',prev=null;S.forEach(p=>{if(p[i]==null){prev=null;return}d+=(prev==null||p[0]-prev>step*3?'M':'L')+X(p[0]).toFixed(1)+','+Y(p[i]).toFixed(1);prev=p[0]});return d?`<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" ${extra||''}/>`:''};
+g+=line(4,'#8a96a3','stroke-dasharray="4 3"')+line(3,'#2f9be0','stroke-opacity=".75"')+line(2,'#e8833a','stroke-opacity=".85"')+line(1,'#e6e9ec','stroke-width="2"');
+S.forEach(p=>{if(p[5]>0)g+=`<rect x="${X(p[0])}" y="${bot+4}" width="${bw}" height="7" fill="#f85149" fill-opacity="${Math.max(.25,p[5])}"/>`;if(p[6]>0)g+=`<rect x="${X(p[0])}" y="${bot+13}" width="${bw}" height="7" fill="#3fb950" fill-opacity="${Math.max(.25,p[6])}"/>`});
+const ticks=HZL_H<=24?[0,6,12,18,24].map(x=>x/24):HZL_H<=72?[0,1,2,3].map(x=>x/3):[0,1,2,3,4,5,6,7].map(x=>x/7);
+ticks.forEach((f,i)=>{const x=f*W2,t=t0+f*span,lab=f==1?'jetzt':HZL_H<=24?'−'+Math.round((1-f)*24)+' h':new Date(t*1000).toLocaleDateString('de-DE',{weekday:'short'});
+g+=`<text x="${x}" y="${H-3}" font-size="10" fill="#8a96a3" text-anchor="${f==0?'start':f==1?'end':'middle'}">${lab}</text>`});
+return `<svg viewBox="0 0 ${W2} ${H}">${g}<line class="ch" y1="${top}" y2="${bot+20}" stroke="#8a96a3" stroke-dasharray="3 3" style="display:none"/></svg>`}
+function hzHover(){const box=$('hzl_c'),svg=box&&box.querySelector('svg');if(!svg)return;const S=HZL.series.rows,span=HZL_H*3600,t0=Date.now()/1000-span,ch=svg.querySelector('.ch');
+svg.onmousemove=e=>{const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)*400/r.width,t=t0+x/400*span;let b=S[0];for(const p of S)if(Math.abs(p[0]-t)<Math.abs(b[0]-t))b=p;
+const bx=(b[0]-t0)/span*400;ch.setAttribute('x1',bx);ch.setAttribute('x2',bx);ch.style.display='';
+tip(box,`<b>${HZL_H<=24?hm(b[0]):dt(b[0])}</b><br>Speicher ${fmt(b[1],1,'°C')} · Soll ${fmt(b[4],0,'°C')}<br>Kessel ${fmt(b[2],1,'°C')} · Rücklauf ${fmt(b[3],1,'°C')}<br>Brenner ${Math.round(b[5]*100)} % · Pumpe ${Math.round(b[6]*100)} %`,bx*r.width/400,20)};
+svg.onmouseleave=()=>{ch.style.display='none';box.querySelector('.tt').style.display='none'}}
 
 // ---------- Beschattung ----------
 let SH=null;

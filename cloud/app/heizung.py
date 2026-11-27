@@ -9,6 +9,8 @@ dorthin, wo die Scripts sie ohnehin erwarten:
 - Zirkulation: Switch.GetStatus / Switch.Set, Temperatur vom Add-on
 - Raumheizer: KVS hl_state, hl_cfg, hl_stats lesen, hl_cfg und hl_cmd schreiben (das Script uebernimmt in 5 s)
 Bei Stoerungen gibt es eine Meldung (Art "heating").
+Das Warmwasser wird jede Minute aufgezeichnet (Speicher, Kessel, Ruecklauf, Soll, Brenner, Pumpe, Oelzaehler):
+Verlauf 24 h / 7 Tage und Tageswerte (Brennerstarts, Laufzeiten, Oel, Speicher min/max).
 """
 import json
 import threading
@@ -21,7 +23,9 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException, Request
 
 import gen2
-from core import alert, q, set_setting, setting
+from datetime import timedelta
+
+from core import KEEP_POWER_DAYS, alert, now_local, q, set_setting, setting
 
 router = APIRouter()
 POOL = ThreadPoolExecutor(max_workers=8)
@@ -237,6 +241,69 @@ def _drop_cache():
         _cache["t"] = 0
 
 
+# ======================= Aufzeichnung Warmwasser =======================
+def init_db():
+    q("""CREATE TABLE IF NOT EXISTS heat_log(ts INTEGER PRIMARY KEY, s REAL, k REAL, r REAL, soll REAL,
+         burn INTEGER, pump INTEGER, mode TEXT, cons REAL, boost INTEGER, sperr INTEGER, w REAL)""")
+
+
+def _f(v):
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def record(w):
+    """Eine Zeile je Minute aus dem status-Endpunkt der Logik."""
+    if not w or not w.get("ok"):
+        return
+    st = w.get("st") or {}
+    q("""INSERT OR REPLACE INTO heat_log(ts, s, k, r, soll, burn, pump, mode, cons, boost, sperr, w)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+      (int(time.time()) // 60 * 60, _f(st.get("temp_s")), _f(st.get("temp_k")), _f(st.get("temp_r")),
+       _f(st.get("soll")), 1 if st.get("burn") else 0, 1 if st.get("pump") else 0, str(st.get("mode") or ""),
+       _f(st.get("cons_total")), 1 if st.get("boost_manual") else 0, 1 if st.get("kessel_sperre") else 0,
+       _f(st.get("power"))))
+
+
+def _day_start(back=0):
+    d = now_local().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=back)
+    return int(d.timestamp())
+
+
+def log_series(hours=24):
+    """Verlauf: [ts, speicher, kessel, ruecklauf, soll, brenner-Anteil, pumpen-Anteil] je 5 min (24 h) bzw. 30 min."""
+    hours = max(1, min(24 * 30, int(hours)))
+    step = 300 if hours <= 48 else 1800
+    t0 = int(time.time()) - hours * 3600
+    rnd = lambda v: None if v is None else round(v, 1)
+    return {"step": step, "t0": t0, "rows": [
+        [r["b"], rnd(r["s"]), rnd(r["k"]), rnd(r["r"]), rnd(r["soll"]), round(r["burn"] or 0, 2), round(r["pump"] or 0, 2)]
+        for r in q(f"""SELECT ts/{step}*{step} AS b, AVG(s) AS s, AVG(k) AS k, AVG(r) AS r, AVG(soll) AS soll,
+                          AVG(burn) AS burn, AVG(pump) AS pump FROM heat_log WHERE ts>=? GROUP BY b ORDER BY b""", (t0,))]}
+
+
+def log_days(n=14):
+    """Je Tag: Brennerstarts, Brenner-/Pumpenlaufzeit (min), Oel (L, aus dem Zaehler der Logik), Speicher min/max."""
+    out = []
+    for i in range(n - 1, -1, -1):
+        t0 = _day_start(i)
+        t1 = t0 + 86400
+        r = q("""SELECT COUNT(*) AS n, SUM(burn) AS bm, SUM(pump) AS pm, MIN(s) AS smin, MAX(s) AS smax,
+                        0 AS c0 FROM heat_log WHERE ts>=? AND ts<?""", (t0, t1), one=True)
+        st = q("""SELECT COUNT(*) AS n FROM (SELECT burn, LAG(burn) OVER (ORDER BY ts) AS pb FROM heat_log
+                  WHERE ts>=? AND ts<?) WHERE burn=1 AND COALESCE(pb,0)=0""", (t0 - 60, t1), one=True)
+        # nur Zuwaechse von Minute zu Minute zaehlen (ein zurueckgesetzter Zaehler verfaelscht den Tag nicht)
+        o = q("""SELECT SUM(CASE WHEN d>0 AND d<1 THEN d ELSE 0 END) AS l, COUNT(d) AS n FROM
+                 (SELECT cons - LAG(cons) OVER (ORDER BY ts) AS d FROM heat_log WHERE ts>=? AND ts<?)""",
+              (t0 - 60, t1), one=True)
+        oil = o["l"] if o["n"] else None
+        out.append({"day": time.strftime("%Y-%m-%d", time.localtime(t0)), "min": r["n"] or 0,
+                    "starts": st["n"] or 0, "burn_m": r["bm"] or 0, "pump_m": r["pm"] or 0,
+                    "oil": None if oil is None else round(oil or 0, 2),
+                    "smin": None if r["smin"] is None else round(r["smin"], 1),
+                    "smax": None if r["smax"] is None else round(r["smax"], 1)})
+    return out
+
+
 # ======================= Meldungen bei Stoerung =======================
 _last = {}
 
@@ -246,6 +313,10 @@ def _check():
         v = view(max_age=10)
     except Exception:
         return
+    try:
+        record(v.get("ww"))
+    except Exception as e:
+        print("Heizung-Aufzeichnung:", e, flush=True)
     found = {}
     w = v.get("ww")
     if w and w.get("ok") and (w.get("st") or {}).get("fault"):
@@ -263,13 +334,18 @@ def _check():
 
 
 def _loop():
-    time.sleep(20)
+    time.sleep(15)
+    n = 0
     while True:
         _check()
-        time.sleep(60)
+        n += 1
+        if n % 360 == 0:
+            q("DELETE FROM heat_log WHERE ts<?", (int(time.time()) - max(KEEP_POWER_DAYS, 30) * 86400,))
+        time.sleep(60 - time.time() % 60 + 2)
 
 
 def start():
+    init_db()
     threading.Thread(target=_loop, daemon=True).start()
 
 
@@ -277,6 +353,11 @@ def start():
 @router.get("/api/heizung")
 def api_view(request: Request):
     return {**view(), "types": TYPES, "can": request.state.user["role"]}
+
+
+@router.get("/api/heizung/log")
+def api_log(request: Request, hours: int = 24):
+    return {"series": log_series(hours), "days": log_days(14)}
 
 
 @router.get("/api/heizung/config")
