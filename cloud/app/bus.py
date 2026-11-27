@@ -314,7 +314,7 @@ class Bus:
             req = {"id": rid, "src": SRC, "method": method}
             if params is not None:
                 req["params"] = params
-            self.c.publish(f"{real_id(dev)}/rpc", json.dumps(req))
+            self.c.publish(f"{real_id(dev)}/rpc", json.dumps(req, ensure_ascii=False).encode())  # Shelly-JSON versteht nur \u00XX-Escapes
             if not ev.wait(timeout):
                 raise TimeoutError(f"{dev_name(dev)} antwortet nicht")
             r = box[0]

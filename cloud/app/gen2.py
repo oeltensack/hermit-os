@@ -41,7 +41,7 @@ def _digest(header, password, uri="/rpc", method="POST"):
 
 
 def rpc(ip, method, params=None, password="", timeout=6):
-    body = json.dumps({"id": 1, "method": method, "params": params or {}}).encode()
+    body = json.dumps({"id": 1, "method": method, "params": params or {}}, ensure_ascii=False).encode()  # Shelly-JSON versteht nur \u00XX-Escapes
     url = f"http://{ip}/rpc"
 
     def send(auth=None):

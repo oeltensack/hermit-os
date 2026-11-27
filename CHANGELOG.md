@@ -1,5 +1,10 @@
 # Änderungen
 
+## Pagurus Cloud 1.25.1
+- Scripte: Übertragen auf die Shellys schlug mit „Missing or bad argument 'code'“ fehl, sobald der Code Zeichen
+  außerhalb von Latin-1 enthielt (z. B. Gedankenstrich, Emojis). Die Cloud sendet RPC jetzt als UTF-8 statt mit
+  \uXXXX-Escapes, die der JSON-Parser der Shellys nicht versteht. Umlaute kamen vorher ebenfalls verfälscht an.
+
 ## Pagurus Cloud 1.25.0
 - Neuer Reiter **Scripte** (nur Administratoren): alle Scripte der Shelly Gen2+ mit Version (aus der ersten
   Kommentarzeile), Zustand, Autostart und freiem Speicher. Code in der Cloud bearbeiten und auf das Gerät speichern,
