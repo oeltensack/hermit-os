@@ -1,5 +1,12 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.0
+- Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der
+  Speicher schnell (ab 0,3 K in 3 min, insgesamt ab 0,8 K), ist das eine Zapfung – kleine Zapfung, Duschen (ab 1,5 K)
+  oder Baden (ab 5 K oder 20 min). Liste der letzten 14 Tage und Wochenprofil (Mo–Fr / Sa–So in 30-Minuten-Fenstern,
+  28 Tage) im Heizung-Reiter unter dem Verlauf. Gespeichert wird ein Jahr lang. Vorerst nur Erfassung, die Heizzeiten
+  werden nicht verstellt. API: `GET /api/heizung/draws?days=28`.
+
 ## Pagurus Cloud 1.26.0
 - Beschattung: neue Bedingung **Lichtsensor**. Ein Helligkeitsfühler vor Ort (z. B. Shelly BLU Motion oder
   BLU Door/Window) mit Schwelle in Lux entscheidet, ob die Sonne scheint – genauer als die Einstrahlung aus dem

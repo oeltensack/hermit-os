@@ -1014,7 +1014,7 @@ function hzCfgSave(){const c=hzCfgRead();run(async()=>{await api('heizung/config
 // ---------- Heizung: Verlauf Warmwasser ----------
 let HZL=null,HZL_H=24,HZL_T=0;
 async function loadHzLog(force){if(!HZ||!HZ.ww){$('hz_log').style.display='none';return}
-if(!force&&Date.now()-HZL_T<60000&&HZL)return;HZL_T=Date.now();HZL=await api('heizung/log?hours='+HZL_H);hzLogRender()}
+if(!force&&Date.now()-HZL_T<60000&&HZL)return;HZL_T=Date.now();[HZL,HZD]=await Promise.all([api('heizung/log?hours='+HZL_H),api('heizung/draws?days=28').catch(()=>null)]);hzLogRender()}
 function hzRange(h){HZL_H=h;loadHzLog(true)}
 function hzLogRender(){const box=$('hz_log');box.style.display='';const S=HZL.series.rows,step=HZL.series.step;
 const rng=[[24,'24 h'],[72,'3 Tage'],[168,'7 Tage']].map(([h,t])=>`<a class="${HZL_H==h?'a':''}" onclick="hzRange(${h})">${t}</a>`).join('');
@@ -1029,7 +1029,19 @@ return `<tr class="${has?'':'ack'}"><td>${day}</td><td class="n">${d.oil!=null?n
 <td><div style="height:8px;border-radius:4px;background:#f0883e;width:${(d.oil||0)/mo*100}%"></div></td></tr>`}).join('')+'</table></div>';
 const tot=D.reduce((a,d)=>({oil:a.oil+(d.oil||0),starts:a.starts+d.starts,bm:a.bm+d.burn_m}),{oil:0,starts:0,bm:0});
 h+=`<p class="l">14 Tage: ${num(tot.oil,1)} L Öl, ${tot.starts} Brennerstarts, Brenner ${dur(tot.bm*60)}${tot.starts?' (Ø '+dur(tot.bm*60/tot.starts)+' je Start)':''}. Aufzeichnung jede Minute, ${HZL_H<=48?'Diagramm in 5-Minuten-':'Diagramm in 30-Minuten-'}Schritten. Öl aus dem Zähler der Logik.</p>`;
-box.innerHTML=h;hzHover()}
+h+=hzDraws();box.innerHTML=h;hzHover()}
+let HZD=null;
+function hzDraws(){if(!HZD)return '';const P=HZD.profile,D=HZD.days,K={small:'kleine Zapfung',shower:'Duschen',bath:'Baden'},col={shower:'#2f9be0',bath:'#a371f7',small:'#8a96a3'};
+const mx=Math.max(1,...P.wd,...P.we);
+const strip=(a,lab,nd)=>`<div class="row" style="gap:6px;align-items:center;margin:3px 0"><span class="l" style="width:52px">${lab}</span><div style="flex:1;display:grid;grid-template-columns:repeat(48,1fr);gap:1px">${a.map((v,i)=>`<div title="${String(i>>1).padStart(2,'0')}:${i%2?'30':'00'} – ${v}× in ${nd} Tagen" style="height:16px;border-radius:2px;background:${v?'#2f9be0':'#1c232b'};opacity:${v?Math.max(.3,v/mx):1}"></div>`).join('')}</div></div>`;
+let h=`<h3 style="margin-top:16px">Duschen &amp; Baden – erkannt</h3>`;
+h+=strip(P.wd,'Mo–Fr',D.wd)+strip(P.we,'Sa–So',D.we);
+h+=`<div class="row" style="gap:6px"><span style="width:52px"></span><div style="flex:1;display:flex;justify-content:space-between" class="l"><span>0 Uhr</span><span>6</span><span>12</span><span>18</span><span>24</span></div></div>`;
+const E=HZD.events.filter(e=>e.ts>Date.now()/1000-14*86400);
+h+=E.length?`<div class="scroll" style="max-height:260px;margin-top:8px"><table><tr><th>Wann</th><th>Art</th><th class="n">Abfall</th><th class="n">Dauer</th><th class="n">Speicher</th></tr>`+E.map(e=>`<tr class="${e.kind=='small'?'ack':''}"><td>${new Date(e.ts*1000).toLocaleString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td><span style="color:${col[e.kind]}">●</span> ${K[e.kind]||e.kind}</td><td class="n">${num(e.drop,1)} K</td><td class="n">${e.dur} min</td><td class="n">${num(e.s0,1)} → ${num(e.s1,1)} °C${e.burn?' · Brenner':''}</td></tr>`).join('')+'</table></div>'
+:`<div class="empty" style="padding:12px">Noch keine Zapfung erkannt.</div>`;
+const c=HZD.cfg;h+=`<p class="l">Erkannt am Abfall der Speichertemperatur (ab ${num(c.rate,1)} K in 3 min, insgesamt ab ${num(c.trig,1)} K). Duschen ab ${num(c.small,1)} K, Baden ab ${num(c.bath,0)} K oder ${c.bath_min} min. Profil aus 28 Tagen (Mo–Fr ${D.wd}, Sa–So ${D.we} Tage mit Aufzeichnung). Nur Erfassung – die Heizzeiten werden noch nicht verstellt.</p>`;
+return h}
 function hzChart(S,step){const W2=400,H=170,t1=Date.now()/1000,span=HZL_H*3600,t0=t1-span,X=t=>(t-t0)/span*W2;
 if(!S.length)return `<div class="empty" style="padding:20px">Noch keine Aufzeichnung – die Cloud zeichnet ab jetzt jede Minute auf.</div>`;
 const tv=S.flatMap(p=>[p[1],p[2],p[3],p[4]]).filter(v=>v!=null);let lo=Math.floor((Math.min(...tv)-2)/5)*5,hi=Math.ceil((Math.max(...tv)+2)/5)*5;if(hi-lo<20)hi=lo+20;

@@ -11,6 +11,9 @@ dorthin, wo die Scripts sie ohnehin erwarten:
 Bei Stoerungen gibt es eine Meldung (Art "heating").
 Das Warmwasser wird jede Minute aufgezeichnet (Speicher, Kessel, Ruecklauf, Soll, Brenner, Pumpe, Oelzaehler):
 Verlauf 24 h / 7 Tage und Tageswerte (Brennerstarts, Laufzeiten, Oel, Speicher min/max).
+Zapfungen (Duschen, Baden) werden am schnellen Abfall der Speichertemperatur erkannt und gesammelt
+(Tabelle hw_draw, 1 Jahr). Daraus entsteht ein Wochenprofil (Mo-Fr / Sa-So in 30-min-Fenstern).
+Noch nur Anzeige - die Heizzeiten werden nicht verstellt.
 """
 import json
 import threading
@@ -247,6 +250,109 @@ def init_db():
          burn INTEGER, pump INTEGER, mode TEXT, cons REAL, boost INTEGER, sperr INTEGER, w REAL)""")
 
 
+# ======================= Zapfungen erkennen =======================
+# Schwellen (K bzw. min); nach den ersten echten Duschen pruefen und ggf. anpassen
+DRAW = {"rate": 0.3,      # schnell fallend: mindestens so viel K in 3 min (Ruhe-/Zirkulationsverlust ~0,05 K)
+        "trig": 0.8,      # so viel muss eine Zapfung insgesamt fallen, sonst ist es keine
+        "gap": 2,         # kurze Pausen im Abfall (min), die noch zur selben Zapfung gehoeren
+        "small": 1.5,     # darunter: nur kleine Zapfung (Haende, Kueche) - wird erfasst, zaehlt nicht im Profil
+        "bath": 5.0,      # ab diesem Gesamtabfall: Baden
+        "bath_min": 20,   # oder ab dieser Dauer (min): Baden
+        "quiet": 4}       # Zapfung ist vorbei, wenn der Speicher so lange nicht weiter faellt (min)
+KINDS = {"small": "kleine Zapfung", "shower": "Duschen", "bath": "Baden"}
+
+
+def init_draw_db():
+    q("""CREATE TABLE IF NOT EXISTS hw_draw(ts INTEGER PRIMARY KEY, te INTEGER, s0 REAL, s1 REAL, dk REAL,
+         dur INTEGER, burn INTEGER, kind TEXT)""")
+
+
+def _kind(drop, dur):
+    if drop >= DRAW["bath"] or dur >= DRAW["bath_min"]:
+        return "bath"
+    return "shower" if drop >= DRAW["small"] else "small"
+
+
+def detect_draws(rows, final_ts):
+    """rows: [(ts, s, burn)] je Minute, aufsteigend. -> Liste abgeschlossener Zapfungen (dict).
+    'Schnell fallend' heisst: in den letzten 3 min mindestens rate K gefallen (Ruheverlust ~0,05 K / 3 min).
+    Eine Zapfung ist eine Folge schnell fallender Minuten (Luecken bis gap min erlaubt), insgesamt mindestens
+    trig K. Abgeschlossen ist sie, wenn quiet min lang nichts mehr schnell faellt (bezogen auf final_ts)."""
+    n = len(rows)
+
+    def back(i, sec):                   # Index des Werts vor ca. sec Sekunden (oder None)
+        k = i
+        while k > 0 and rows[k - 1][0] >= rows[i][0] - sec - 30:
+            k -= 1
+        return k if k < i and rows[i][0] - rows[k][0] >= sec - 30 else None
+
+    fast = []
+    for i in range(n):
+        k = back(i, 180)
+        fast.append(k is not None and rows[k][1] - rows[i][1] >= DRAW["rate"])
+    out, i = [], 0
+    while i < n:
+        if not fast[i]:
+            i += 1
+            continue
+        k0 = back(i, 180)
+        e, x = i, i + 1
+        while x < n and rows[x][0] - rows[e][0] <= DRAW["gap"] * 60:
+            if fast[x]:
+                e = x
+            x += 1
+        if final_ts - rows[e][0] < DRAW["quiet"] * 60:
+            break                       # laeuft noch
+        a = k0
+        z = min(range(a, min(n, e + 3)), key=lambda y: rows[y][1])
+        drop = rows[a][1] - rows[z][1]
+        if a == 0 and rows[0][0] > rows[i][0] - 240:
+            i = e + 1                   # Beginn liegt vor dem Ausschnitt
+            continue
+        if drop >= DRAW["trig"]:
+            dur = max(1, round((rows[e][0] - rows[a][0]) / 60))
+            out.append({"ts": rows[a][0], "te": rows[e][0], "s0": rows[a][1], "s1": rows[z][1],
+                        "drop": round(drop, 1), "dur": dur,
+                        "burn": sum(1 for y in range(a, e + 1) if rows[y][2]), "kind": _kind(drop, dur)})
+        i = e + 1
+    return out
+
+
+def scan_draws(t0, t1=None):
+    t1 = t1 or int(time.time())
+    rows = [(r["ts"], r["s"], r["burn"]) for r in
+            q("SELECT ts, s, burn FROM heat_log WHERE ts>=? AND ts<=? AND s IS NOT NULL ORDER BY ts", (t0, t1))]
+    last = q("SELECT MAX(te) AS te FROM hw_draw", one=True)
+    last_te = (last and last["te"]) or 0
+    for d in detect_draws(rows, t1):
+        if d["ts"] <= last_te:
+            continue                    # schon erfasst (oder ueberlappt eine erfasste)
+        q("""INSERT OR IGNORE INTO hw_draw(ts, te, s0, s1, dk, dur, burn, kind) VALUES(?,?,?,?,?,?,?,?)""",
+          (d["ts"], d["te"], d["s0"], d["s1"], d["drop"], d["dur"], d["burn"], d["kind"]))
+        last_te = d["te"]
+
+
+def draws(days=28):
+    t0 = int(time.time()) - int(days) * 86400
+    ev = [dict(r) for r in q("SELECT ts, te, s0, s1, dk AS \"drop\", dur, burn, kind FROM hw_draw WHERE ts>=? ORDER BY ts DESC", (t0,))]
+    # Wochenprofil: Anzahl Duschen/Baden je 30-min-Fenster, getrennt nach Mo-Fr und Sa-So
+    prof = {"wd": [0] * 48, "we": [0] * 48}
+    days_seen = {"wd": set(), "we": set()}
+    first = q("SELECT MIN(ts) AS t FROM heat_log WHERE ts>=?", (t0,), one=True)
+    t = (first and first["t"]) or int(time.time())
+    while t < time.time():              # Tage mit Aufzeichnung zaehlen (fuer "an x von y Tagen")
+        lt = time.localtime(t)
+        days_seen["we" if lt.tm_wday >= 5 else "wd"].add(time.strftime("%Y-%m-%d", lt))
+        t += 3600
+    for d in ev:
+        if d["kind"] == "small":
+            continue
+        lt = time.localtime(d["ts"])
+        prof["we" if lt.tm_wday >= 5 else "wd"][lt.tm_hour * 2 + lt.tm_min // 30] += 1
+    return {"events": ev, "profile": prof, "days": {k: len(v) for k, v in days_seen.items()},
+            "kinds": KINDS, "cfg": DRAW}
+
+
 def _f(v):
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
@@ -335,17 +441,27 @@ def _check():
 
 def _loop():
     time.sleep(15)
+    try:
+        scan_draws(int(time.time()) - 35 * 86400)        # vorhandene Aufzeichnung einmal durchsehen
+    except Exception as e:
+        print("Zapfungen:", e, flush=True)
     n = 0
     while True:
         _check()
+        try:
+            scan_draws(int(time.time()) - 7200)
+        except Exception as e:
+            print("Zapfungen:", e, flush=True)
         n += 1
         if n % 360 == 0:
             q("DELETE FROM heat_log WHERE ts<?", (int(time.time()) - max(KEEP_POWER_DAYS, 30) * 86400,))
+            q("DELETE FROM hw_draw WHERE ts<?", (int(time.time()) - 366 * 86400,))
         time.sleep(60 - time.time() % 60 + 2)
 
 
 def start():
     init_db()
+    init_draw_db()
     threading.Thread(target=_loop, daemon=True).start()
 
 
@@ -358,6 +474,11 @@ def api_view(request: Request):
 @router.get("/api/heizung/log")
 def api_log(request: Request, hours: int = 24):
     return {"series": log_series(hours), "days": log_days(14)}
+
+
+@router.get("/api/heizung/draws")
+def api_draws(request: Request, days: int = 28):
+    return draws(max(1, min(366, days)))
 
 
 @router.get("/api/heizung/config")

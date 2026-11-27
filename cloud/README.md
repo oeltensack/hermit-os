@@ -22,7 +22,7 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
   **Regeln** (Wenn Leistung/Schalter/Ereignis/offline/fertig/URL-Aufruf → schalten, verzögert, automatisch
   wieder aus, Push), mit Zeitfenster; Rollläden: öffnen, schließen oder auf Position
 - **Heizung:** Warmwasser (Ölkessel mit Shelly-Logik-Script), Zirkulationspumpe und Raumheizer (Heizlüfter,
-  Konvektor) mit Live-Werten, Boost und allen Einstellungen; Warmwasser-Verlauf mit Brennerstarts und Öl je Tag;
+  Konvektor) mit Live-Werten, Boost und allen Einstellungen; Warmwasser-Verlauf mit Brennerstarts und Öl je Tag; erkennt Duschen und Baden am Speicherabfall und zeigt ein Wochenprofil;
   Meldung bei Störung. Die Regelung bleibt auf den Shellys
 - **Scripte:** Shelly-Scripte aller Gen2+-Geräte mit Version anzeigen, in der Cloud bearbeiten und übertragen,
   mit Sicherung der vorigen Fassung und Bibliothek zum Verteilen auf mehrere Geräte
