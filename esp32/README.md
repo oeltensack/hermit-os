@@ -1,4 +1,4 @@
-# Pagurus OS für ESP32 – Klimaanlagen
+# Pagurus OS für ESP32 – Klimaanlagen und Heizungsanzeige
 
 Ersetzt das WLAN-Modul bzw. ESPHome auf einem ESP32 am UART der Klimaanlage. Spricht dieselbe
 Schnittstelle wie Pagurus OS auf den Shellys (JSON-RPC über HTTP und MQTT im Gen2-Format) und
@@ -89,3 +89,36 @@ Jede Datei wird vor dem Umschalten per SHA-256 geprüft.
 - Midea: Einen Modus bei ausgeschalteter Anlage wählen merkt ihn nur vor; er gilt beim Einschalten.
 - Kommt keine Antwort von der Anlage, zeigt die Oberfläche „Keine Antwort“ – dann TX/RX prüfen
   (`Climate.SetConfig` mit `{"swap_pins": true}` tauscht sie ohne Umlöten).
+
+## Heizungsanzeige AZ-Touch (`hermit-aztouch-esp32`)
+
+Die Anzeige der Arduino-Sketche *AZ_Touch_Heizung* (v12.1) auf Pagurus OS: AZ-Touch MOD 2,4" (ESP32,
+ILI9341, XPT2046). Gleiches Bild und gleiche Bedienung – Speicher und Kessel mit Balken, Pumpe (P),
+Brenner (B), Öl heute, unten links **BOOST**, unten rechts **ZIRKULATION** mit Temperatur. Anders als im Sketch:
+
+- **Kein WLAN und keine Adressen im Programm.** WLAN über den Zugangspunkt `hermit-aztouch-xxxxxx`
+  (192.168.33.1), die Adressen im Reiter *Anzeige* der Weboberfläche: Shelly mit der Warmwasser-Logik und
+  Nummer des Logik-Scripts (liest `/script/<Nr>/api_data`, Boost über `boost_trigger`), Shelly der
+  Zirkulation und Nummer des Temperaturfühlers (`Switch.GetStatus`/`Switch.Set` für `switch:0`,
+  `Temperature.GetStatus`). Bis das eingerichtet ist, zeigt das Display, was zu tun ist.
+- **Pagurus Cloud:** MQTT wie bei den anderen Geräten, Firmware-Updates über `update.json`.
+- **Weboberfläche:** Reiter *Heizung* mit den Werten, Boost und Zirkulation; dazu WLAN, MQTT, System.
+- Kopfzeile **orange**, wenn von der Warmwasser-Logik seit 30 s keine Daten kamen. Antwortet eine Quelle
+  nicht, wird sie nur noch alle 15 s gefragt, damit die Bedienung flott bleibt.
+- Watchdog (30 s), Neustart bei weniger als 20 KB freiem Speicher – wie v12.1. Ohne WLAN startet nach
+  1 Minute der Zugangspunkt, das Display versucht es parallel weiter.
+
+| `display:0` | |
+| :--- | :--- |
+| Status | `ww` (`ok`, `age_s`, `temp_s`, `temp_k`, `burn`, `pump`, `boost`, `cons_today`, `error`), `zirk` (`ok`, `output`, `tC`, `error`) |
+| Config | `ww_ip`, `ww_sid`, `zirk_ip`, `zirk_tid` (-1 = kein Fühler), `rotation` (3 normal, 1 auf dem Kopf) |
+| RPC | `Display.GetStatus`, `Display.GetConfig`, `Display.SetConfig`, `Display.Boost`, `Display.Zirk` (`on` true/false, ohne = umschalten) |
+
+Erstes Aufspielen per USB (der alte Sketch hat kein OTA):
+
+```
+esptool.py --chip esp32 --port COM5 write_flash 0x0 hermit-aztouch-esp32-factory.bin
+```
+
+Danach mit `hermit-aztouch-xxxxxx` verbinden → `http://192.168.33.1` → *WLAN* → Netz und Passwort →
+nach dem Neustart unter der neuen IP Reiter *Anzeige* (Adressen) und *MQTT* (Cloud).

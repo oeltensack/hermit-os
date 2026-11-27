@@ -1,5 +1,12 @@
 # Änderungen
 
+## Pagurus OS ESP32: Heizungsanzeige AZ-Touch
+- Neue Variante **`hermit-aztouch-esp32`**: die Heizungsanzeige (bisher Arduino-Sketch AZ_Touch_Heizung v12.1)
+  auf Pagurus OS. Gleiche Anzeige und Bedienung (Boost, Zirkulation), aber WLAN über den Zugangspunkt,
+  Adressen von Warmwasser-Logik und Zirkulation in der Weboberfläche, MQTT für die Pagurus Cloud und
+  Firmware-Updates über `update.json`. Komponente `display:0`, RPC `Display.*`. Firmware-Stand 1.19.4 wie die
+  übrigen ESP32-Varianten; Klima-Varianten unverändert.
+
 ## Pagurus Cloud 1.27.0
 - Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der
   Speicher schnell (ab 0,3 K in 3 min, insgesamt ab 0,8 K), ist das eine Zapfung – kleine Zapfung, Duschen (ab 1,5 K)

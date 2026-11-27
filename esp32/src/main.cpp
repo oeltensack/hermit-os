@@ -2,6 +2,7 @@
 // Copyright (C) 2026 D.Koch – Pagurus OS
 // Pagurus OS fuer ESP32 – Klimaanlagen am UART des WLAN-Moduls. Gemeinsamer Kern, die Anlage selbst
 // steckt in ac_tcl.h (TCL/Kesser, ESP32 mit DHT22) bzw. ac_midea.h (Midea/Dimstal, ESP32-C3).
+// Variante DEV_DISPLAY: Heizungsanzeige auf dem AZ-Touch MOD (disp_aztouch.h) statt Klimaanlage.
 // Spricht dieselbe Schnittstelle wie Pagurus OS auf den Shellys: JSON-RPC ueber HTTP und MQTT
 // (Gen2-Format), Updates aus update.json mit SHA-256-Pruefung.
 //   climate:0      Klimaanlage (output = an/aus, mode, target_C, current_C, fan, swing …)
@@ -20,14 +21,25 @@
 #include <Update.h>
 #include <mbedtls/sha256.h>
 #include <time.h>
+#ifdef DEV_DISPLAY
+#include "webui_disp_gz.h"
+#else
 #include "webui_gz.h"
+#endif
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.0.0"
 #endif
 #define DEF_UPD_URL "https://raw.githubusercontent.com/oeltensack/pagurus-os/main/update.json"
 
-#if defined(AC_MIDEA)
+#if defined(DEV_DISPLAY)
+// Heizungsanzeige AZ-Touch MOD 2,4" (ESP32)
+#define DEV_PREFIX  "hermit-aztouch"
+#define DEV_MODEL   "HERMIT-AZTOUCH-ESP32"
+#define DEV_VARIANT "hermit-aztouch-esp32"
+#define DEV_APP     "HeatDisplay"
+#define DEF_BEEP    false
+#elif defined(AC_MIDEA)
 // Midea/Dimstal am ESP32-C3 – Belegung wie in der bisherigen ESPHome-Konfiguration
 #define DEV_PREFIX  "hermit-midea"
 #define DEV_MODEL   "HERMIT-MIDEA-ESP32C3"
@@ -122,13 +134,16 @@ void saveCfg() {
 String jstr(JsonVariantConst v, const char* def) { return v.is<const char*>() ? String(v.as<const char*>()) : String(def); }
 int idxOf(const char* const* arr, int n, const String& s) { for (int i = 0; i < n; i++) if (s == arr[i]) return i; return -1; }
 
-#if defined(AC_MIDEA)
+#if defined(DEV_DISPLAY)
+#include "disp_aztouch.h"
+#elif defined(AC_MIDEA)
 #include "ac_midea.h"
 #else
 #include "ac_tcl.h"
 #endif
 
 // ======================= Status =======================
+#ifndef DEV_DISPLAY
 void climateStatus(JsonObject o) {
   o["id"] = 0;
   acStatus(o);
@@ -138,6 +153,7 @@ void climateStatus(JsonObject o) {
   if (!isnan(dhtH)) o["ext_humidity"] = roundf(dhtH);
 #endif
 }
+#endif
 #ifdef HAS_DHT
 void tempStatus(JsonObject o) { o["id"] = 0; o["reads_ok"] = dhtOk; o["reads_failed"] = dhtFail; if (!isnan(dhtT)) o["tC"] = roundf((dhtT + cfg.tOffset) * 10) / 10; else o["errors"].add("read"); }
 void humStatus(JsonObject o) { o["id"] = 0; if (!isnan(dhtH)) o["rh"] = roundf(dhtH * 10) / 10; else o["errors"].add("read"); }
@@ -174,7 +190,11 @@ void fullStatus(JsonObject o) {
   sysStatus(o["sys"].to<JsonObject>());
   wifiStatus(o["wifi"].to<JsonObject>());
   o["mqtt"]["connected"] = mq.connected();
+#ifdef DEV_DISPLAY
+  dispStatus(o["display:0"].to<JsonObject>());
+#else
   climateStatus(o["climate:0"].to<JsonObject>());
+#endif
 #ifdef HAS_DHT
   tempStatus(o["temperature:0"].to<JsonObject>());
   humStatus(o["humidity:0"].to<JsonObject>());
@@ -188,7 +208,11 @@ void fullConfig(JsonObject o) {
   m["enable"] = cfg.mqEnable; m["server"] = cfg.mqServer; m["user"] = cfg.mqUser;
   m["topic_prefix"] = cfg.mqPrefix.length() ? cfg.mqPrefix : devId;
   o["wifi"]["sta"]["ssid"] = cfg.ssid;
+#ifdef DEV_DISPLAY
+  dispConfig(o["display:0"].to<JsonObject>());
+#else
   acConfig(o["climate:0"].to<JsonObject>());
+#endif
 #ifdef HAS_DHT
   o["temperature:0"]["offset_C"] = cfg.tOffset;
 #endif
@@ -206,7 +230,11 @@ void mqPub(const String& topic, JsonDocument& d, bool retain = false) {
 }
 
 void mqStatusAll() {
+#ifdef DEV_DISPLAY
+  JsonDocument a; dispStatus(a.to<JsonObject>()); mqPub(mqPre() + "/status/display:0", a, true);
+#else
   JsonDocument a; climateStatus(a.to<JsonObject>()); mqPub(mqPre() + "/status/climate:0", a, true);
+#endif
 #ifdef HAS_DHT
   JsonDocument b; tempStatus(b.to<JsonObject>());    mqPub(mqPre() + "/status/temperature:0", b, true);
   JsonDocument c; humStatus(c.to<JsonObject>());     mqPub(mqPre() + "/status/humidity:0", c, true);
@@ -215,7 +243,11 @@ void mqStatusAll() {
   JsonDocument n;
   n["src"] = devId; n["dst"] = mqPre() + "/events"; n["method"] = "NotifyStatus";
   n["params"]["ts"] = (double)time(nullptr);
+#ifdef DEV_DISPLAY
+  dispStatus(n["params"]["display:0"].to<JsonObject>());
+#else
   climateStatus(n["params"]["climate:0"].to<JsonObject>());
+#endif
   mqPub(mqPre() + "/events/rpc", n);
   mqLast = millis();
 }
@@ -375,7 +407,10 @@ int rpcCall(const String& method, JsonVariantConst p, JsonDocument& out, String&
     for (const char* x : {"Shelly.GetDeviceInfo", "Shelly.GetStatus", "Shelly.GetConfig", "Shelly.Reboot",
                           "Shelly.CheckForUpdate", "Shelly.Update", "Sys.GetStatus", "Sys.SetConfig",
                           "WiFi.GetStatus", "WiFi.SetConfig", "WiFi.Scan", "MQTT.GetConfig", "MQTT.SetConfig",
-                          "Climate.GetStatus", "Climate.Set", "Climate.Toggle", "Climate.SetConfig", AC_METHODS
+#ifndef DEV_DISPLAY
+                          "Climate.GetStatus", "Climate.Set", "Climate.Toggle", "Climate.SetConfig",
+#endif
+                          AC_METHODS
 #ifdef HAS_DHT
                           "Temperature.GetStatus", "Temperature.SetConfig", "Humidity.GetStatus"
 #endif
@@ -424,6 +459,7 @@ int rpcCall(const String& method, JsonVariantConst p, JsonDocument& out, String&
     return 0;
   }
   if (m == "shelly.update") { updPending = true; return 0; }
+#ifndef DEV_DISPLAY
   if (m == "climate.getstatus") { climateStatus(o); return 0; }
   if (m == "climate.set") { String e = acSet(p); if (e.length()) ERR(-103, e); o["was_on"] = acPower(); return 0; }
   if (m == "climate.toggle") {
@@ -431,6 +467,7 @@ int rpcCall(const String& method, JsonVariantConst p, JsonDocument& out, String&
     String e = acSet(q.as<JsonVariantConst>()); if (e.length()) ERR(-103, e); return 0;
   }
   if (m == "climate.setconfig") { acSetConfig(p["config"]); o["restart_required"] = false; return 0; }
+#endif
   { String e; if (acRpc(m, p, o, e)) { if (e.length()) ERR(-103, e); mqDirty = true; return 0; } }
 #ifdef HAS_DHT
   if (m == "temperature.getstatus") { tempStatus(o); return 0; }
@@ -508,7 +545,11 @@ void setup() {
   mac = String(b); mac.toUpperCase();
   devId = String(DEV_PREFIX) + "-" + String(b);
   loadCfg();
+#ifdef DEV_DISPLAY
+  dispBegin();
+#else
   acBegin();
+#endif
 #ifdef HAS_DHT
   dht.begin();
 #endif
@@ -535,6 +576,9 @@ void setup() {
     if (ok) rebootAt = millis() + 1000;
   }, []() {
     HTTPUpload& u = server.upload();
+#ifdef DEV_DISPLAY
+    esp_task_wdt_reset();                     // grosse Datei: Watchdog nicht ausloesen
+#endif
     if (u.status == UPLOAD_FILE_START) Update.begin(UPDATE_SIZE_UNKNOWN);
     else if (u.status == UPLOAD_FILE_WRITE) Update.write(u.buf, u.currentSize);
     else if (u.status == UPLOAD_FILE_END) Update.end(true);
@@ -556,7 +600,11 @@ void loop() {
   server.handleClient();
   if (apActive) dns.processNextRequest();
   handleWifi();
+#ifdef DEV_DISPLAY
+  dispLoop();
+#else
   acLoop();
+#endif
 #ifdef HAS_DHT
   if (millis() - dhtAt > (dhtOk ? 30000UL : 5000UL) && millis() > 3000) {   // DHT22 braucht ~2 s nach dem Start
     dhtAt = millis();
@@ -569,6 +617,9 @@ void loop() {
   handleUpdates();
   if (updPending) {
     updPending = false;
+#ifdef DEV_DISPLAY
+    dispUpdating();
+#endif
     String e = updInstall();
     if (e.length()) updErr = e;
   }

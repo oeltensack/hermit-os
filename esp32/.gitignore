@@ -1,2 +1,3 @@
 .pio/
 src/webui_gz.h
+src/webui_disp_gz.h

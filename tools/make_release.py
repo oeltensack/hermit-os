@@ -34,7 +34,7 @@ version = re.search(r'FW_VERSION=\\"([0-9.]+)\\"', ini).group(1)
 
 subprocess.run(["pio", "run"], cwd=ROOT, check=True)
 
-# ESP32 (Klimaanlagen TCL und Midea): eigenes PlatformIO-Projekt in esp32/, gleiche Versionsnummer
+# ESP32 (Klimaanlagen TCL und Midea, Heizungsanzeige AZ-Touch): eigenes PlatformIO-Projekt in esp32/, gleiche Versionsnummer
 e32 = ROOT / "esp32"
 e32ini = (e32 / "platformio.ini").read_text()
 (e32 / "platformio.ini").write_text(re.sub(r'FW_VERSION=\\"[0-9.]+\\"', f'FW_VERSION=\\\\"{version}\\\\"', e32ini))
@@ -58,7 +58,8 @@ for env, name in VARIANTS.items():
 # ESP32: Programm fuer OTA (update.json) und Komplettabbild fuer das erste Flashen per Kabel (ab 0x0).
 # Env -> (Name, Chip, Adresse des Bootloaders: ESP32 0x1000, ESP32-C3 0x0)
 ESP32 = {"tclac": ("hermit-tclac-esp32", "esp32", "0x1000"),
-         "midea_c3": ("hermit-midea-esp32c3", "esp32c3", "0x0")}
+         "midea_c3": ("hermit-midea-esp32c3", "esp32c3", "0x0"),
+         "aztouch": ("hermit-aztouch-esp32", "esp32", "0x1000")}
 boot_app0 = next(pathlib.Path.home().glob(".platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"))
 esptool = str(next(pathlib.Path.home().glob(".platformio/packages/tool-esptoolpy/esptool.py")))
 for env, (name, chip, boot) in ESP32.items():
@@ -118,7 +119,8 @@ MODELS = {
     "Steckdose-1MB-ESP8285": ["hermit-plug1m"],
 }
 EXTRA = {"Klima-TCL-ESP32": ["hermit-tclac-esp32.bin", "hermit-tclac-esp32-factory.bin"],
-         "Klima-Midea-ESP32-C3": ["hermit-midea-esp32c3.bin", "hermit-midea-esp32c3-factory.bin"]}
+         "Klima-Midea-ESP32-C3": ["hermit-midea-esp32c3.bin", "hermit-midea-esp32c3-factory.bin"],
+         "Heizungsanzeige-AZ-Touch": ["hermit-aztouch-esp32.bin", "hermit-aztouch-esp32-factory.bin"]}
 dist = ROOT / "dist"
 dist.mkdir(exist_ok=True)
 for f in dist.glob("*.zip"):
