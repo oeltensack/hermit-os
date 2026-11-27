@@ -94,7 +94,11 @@ Jede Datei wird vor dem Umschalten per SHA-256 geprüft.
 
 Die Anzeige der Arduino-Sketche *AZ_Touch_Heizung* (v12.1) auf Pagurus OS: AZ-Touch MOD 2,4" (ESP32,
 ILI9341, XPT2046). Gleiches Bild und gleiche Bedienung – Speicher und Kessel mit Balken, Pumpe (P),
-Brenner (B), Öl heute, unten links **BOOST**, unten rechts **ZIRKULATION** mit Temperatur. Anders als im Sketch:
+Brenner (B), Öl heute, unten links **BOOST**, unten rechts **ZIRKULATION** mit Temperatur. Optional eine zweite
+Seite **BAD** für einen Heizlüfter (Script ab v11) wie in v13.0: Raum, Soll, Status, Lüfter (L), Heizung (H), Leistung,
+Verbrauch heute; Tasten **SOLL −**, **BETRIEB** ein/aus, **BOOST** (bei Störung **QUITTIEREN**), **SOLL +**. Wechsel durch
+Tipp auf die Kopfzeile, nach 2 Minuten zurück zu HEIZUNG; abgefragt wird nur die sichtbare Seite. Soll und Betrieb
+schreibt das Display in `hl_cfg` (die übrigen Einstellungen bleiben), Boost und Quittieren in `hl_cmd`. Anders als im Sketch:
 
 - **Kein WLAN und keine Adressen im Programm.** WLAN über den Zugangspunkt `hermit-aztouch-xxxxxx`
   (192.168.33.1), die Adressen im Reiter *Anzeige* der Weboberfläche: Shelly mit der Warmwasser-Logik und
@@ -110,9 +114,9 @@ Brenner (B), Öl heute, unten links **BOOST**, unten rechts **ZIRKULATION** mit 
 
 | `display:0` | |
 | :--- | :--- |
-| Status | `ww` (`ok`, `age_s`, `temp_s`, `temp_k`, `burn`, `pump`, `boost`, `cons_today`, `error`), `zirk` (`ok`, `output`, `tC`, `error`) |
-| Config | `ww_ip`, `ww_sid`, `zirk_ip`, `zirk_tid` (-1 = kein Fühler), `rotation` (3 normal, 1 auf dem Kopf) |
-| RPC | `Display.GetStatus`, `Display.GetConfig`, `Display.SetConfig`, `Display.Boost`, `Display.Zirk` (`on` true/false, ohne = umschalten) |
+| Status | `page`, `bad` (`ok`, `temp`, `soll`, `status`, `on`, `boost`, `pwr`), `ww` (`ok`, `age_s`, `temp_s`, `temp_k`, `burn`, `pump`, `boost`, `cons_today`, `error`), `zirk` (`ok`, `output`, `tC`, `error`) |
+| Config | `ww_ip`, `ww_sid`, `zirk_ip`, `zirk_tid` (-1 = kein Fühler), `hl_ip`, `hl_name` (Seite BAD, leer = keine), `rotation` (3 normal, 1 auf dem Kopf) |
+| RPC | `Display.GetStatus`, `Display.GetConfig`, `Display.SetConfig`, `Display.Boost`, `Display.Zirk` (`on` true/false, ohne = umschalten), `Display.Page` (`page` heizung/bad) |
 
 Erstes Aufspielen per USB (der alte Sketch hat kein OTA):
 

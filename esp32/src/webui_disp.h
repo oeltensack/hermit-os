@@ -28,6 +28,8 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div class="row"><button class="bt" id="b_bo" onclick="run(()=>rpc('Display.Boost').then(()=>setTimeout(load,1800)))">Boost</button></div></div>
 <div class="card"><h2>Zirkulation</h2><div id="z_st" class="l"></div><div class="kv" id="zi" style="margin-top:10px"></div>
 <div class="row"><button class="bt" id="b_zi" onclick="run(()=>rpc('Display.Zirk').then(()=>setTimeout(load,1800)))">Ein/Aus</button></div></div>
+<div class="card" id="bad_c" style="display:none"><h2 id="bad_h">Bad</h2><div id="b_st" class="l"></div><div class="kv" id="ba" style="margin-top:10px"></div>
+<div class="l" style="margin-top:8px">Werte kommen, solange am Display die Seite BAD offen ist – <a href="#" onclick="run(()=>rpc('Display.Page',{page:'bad'}).then(()=>setTimeout(load,3000)));return false" style="color:var(--a)">jetzt dorthin wechseln</a>.</div></div>
 </section>
 <section class="tab" id="d"><div class="card"><h2>Quellen</h2>
 <div class="g2"><div><label>Warmwasser-Logik: IP-Adresse des Shelly</label><input id="d_wi" placeholder="192.168.3.77"></div>
@@ -36,6 +38,9 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div class="g2"><div><label>Zirkulationspumpe: IP-Adresse des Shelly</label><input id="d_zi" placeholder="192.168.3.34"></div>
 <div><label>Temperaturfühler (Add-on, -1 = keiner)</label><input id="d_zt" type="number" min="-1" max="199"></div></div>
 <div class="l">Schaltet <code>switch:0</code>, Temperatur aus <code>temperature:&lt;Nr&gt;</code> (meist 100 oder 101).</div>
+<div class="g2"><div><label>Heizlüfter für die Seite BAD: IP-Adresse (leer = keine Seite BAD)</label><input id="d_hi" placeholder="192.168.3.181"></div>
+<div><label>Name in der Kopfzeile</label><input id="d_hn" maxlength="9" placeholder="BAD"></div></div>
+<div class="l">Heizlüfter-Script ab v11: liest <code>hl_state</code>, <code>hl_cfg</code>, <code>hl_stats</code>, schreibt Soll/Betrieb in <code>hl_cfg</code> und Boost/Quittieren in <code>hl_cmd</code>.</div>
 <label>Bild</label><select id="d_r"><option value="3">normal</option><option value="1">auf dem Kopf</option></select>
 <div class="row"><button class="bt p" onclick="saveD()">Speichern</button></div></div></section>
 <section class="tab" id="w"><div class="card"><h2>WLAN</h2>
@@ -66,7 +71,9 @@ async function run(f,ok){try{await f();if(ok)toast(ok,1)}catch(e){toast(e.messag
 const kv=a=>a.map(([l,v])=>`<div><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
 function src(x,nm){if(!x.configured)return `<span class="dot"></span>${nm}: keine Adresse – Reiter <b>Anzeige</b>`;
  return `<span class="dot ${x.ok?'y':'n'}"></span>`+(x.ok?`verbunden, vor ${x.age_s} s`:`<span class="warn">keine Daten${x.error?' ('+x.error+')':''}</span>`)}
-function render(){const d=S['display:0']||{},w=d.ww||{},z=d.zirk||{};
+function render(){const d=S['display:0']||{},w=d.ww||{},z=d.zirk||{},b=d.bad||{};
+ $('bad_c').style.display=b.configured?'':'none';if(b.configured){$('bad_h').textContent=(C&&C['display:0'].hl_name)||'Bad';$('b_st').innerHTML=src(b,'Bad');
+ $('ba').innerHTML='status' in b?kv([['Raum',f1(b.temp,'°C')],['Soll',f1(b.soll,'°C')],['Status',b.status],['Leistung',b.pwr+' W'],['Betrieb',b.on?'ein':'aus'],['Boost',b.boost?'an':'aus']]):''}
  $('ww_st').innerHTML=src(w,'Warmwasser');$('z_st').innerHTML=src(z,'Zirkulation');
  $('ww').innerHTML='temp_s' in w?kv([['Speicher',f1(w.temp_s,'°C')],['Kessel',f1(w.temp_k,'°C')],['Brenner',w.burn?'an':'aus'],['Pumpe',w.pump?'an':'aus'],['Öl heute',f1(w.cons_today,'L')]]):'';
  $('zi').innerHTML='output' in z?kv([['Pumpe',z.output?'an':'aus'],['Temperatur',f1(z.tC,'°C')]]):'';
@@ -79,11 +86,11 @@ function render(){const d=S['display:0']||{},w=d.ww||{},z=d.zirk||{};
 async function load(){try{S=await rpc('Shelly.GetStatus');render()}catch(e){}}
 async function cfg(){C=await rpc('Shelly.GetConfig');const i=await rpc('Shelly.GetDeviceInfo');C._ver=i.ver;$('ti').textContent=i.name||'Pagurus Heizungsanzeige';
  $('u_fl').textContent=`Firmware-Datei hochladen (${i.variant}.bin)`;const d=C['display:0'];
- $('d_wi').value=d.ww_ip||'';$('d_ws').value=d.ww_sid;$('d_zi').value=d.zirk_ip||'';$('d_zt').value=d.zirk_tid;$('d_r').value=d.rotation;
+ $('d_wi').value=d.ww_ip||'';$('d_ws').value=d.ww_sid;$('d_zi').value=d.zirk_ip||'';$('d_zt').value=d.zirk_tid;$('d_r').value=d.rotation;$('d_hi').value=d.hl_ip||'';$('d_hn').value=d.hl_name||'BAD';
  $('s_n').value=C.sys.device.name||'';
  $('q_e').checked=C.mqtt.enable;$('q_s').value=C.mqtt.server||'';$('q_u').value=C.mqtt.user||'';$('q_t').value=C.mqtt.topic_prefix||'';
  $('u_m').value=C.update.mode;$('u_u').value=C.update.url;$('w_m').value=C.wifi.sta.ssid||''}
-function saveD(){run(async()=>{await rpc('Display.SetConfig',{config:{ww_ip:$('d_wi').value,ww_sid:+$('d_ws').value||1,zirk_ip:$('d_zi').value,zirk_tid:$('d_zt').value===''?-1:+$('d_zt').value,rotation:+$('d_r').value}});await cfg();setTimeout(load,3000)},'Gespeichert')}
+function saveD(){run(async()=>{await rpc('Display.SetConfig',{config:{ww_ip:$('d_wi').value,ww_sid:+$('d_ws').value||1,zirk_ip:$('d_zi').value,zirk_tid:$('d_zt').value===''?-1:+$('d_zt').value,rotation:+$('d_r').value,hl_ip:$('d_hi').value,hl_name:$('d_hn').value}});await cfg();setTimeout(load,3000)},'Gespeichert')}
 function scan(){run(async()=>{const r=await rpc('WiFi.Scan');$('w_s').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(x=>`<option>${x.ssid}</option>`).join('');$('w_m').value=''})}
 function saveW(){const s=$('w_m').value||$('w_s').value;if(!s)return toast('Netz wählen');run(()=>rpc('WiFi.SetConfig',{config:{sta:{ssid:s,pass:$('w_p').value}}}),'Gespeichert – Neustart')}
 function saveQ(){const c={enable:$('q_e').checked,server:$('q_s').value,user:$('q_u').value,topic_prefix:$('q_t').value};if($('q_p').value)c.pass=$('q_p').value;run(()=>rpc('MQTT.SetConfig',{config:c}),'Gespeichert')}

@@ -6,6 +6,8 @@
   Adressen von Warmwasser-Logik und Zirkulation in der Weboberfläche, MQTT für die Pagurus Cloud und
   Firmware-Updates über `update.json`. Komponente `display:0`, RPC `Display.*`. Firmware-Stand 1.19.4 wie die
   übrigen ESP32-Varianten; Klima-Varianten unverändert.
+- Zweite Seite **BAD** für einen Heizlüfter (wie AZ_Touch v13.0, mit Taste BETRIEB wie CYD v14): Adresse und Name
+  im Reiter *Anzeige*, Wechsel über die Kopfzeile. Startausgabe auf der seriellen Schnittstelle (115200).
 
 ## Pagurus Cloud 1.27.0
 - Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der
