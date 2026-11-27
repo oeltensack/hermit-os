@@ -17,6 +17,11 @@ nav a.a{background:var(--a)}.badge{background:var(--e);border-radius:9px;padding
 h2{font-size:13px;margin:0 0 12px;color:var(--m);text-transform:uppercase;letter-spacing:.06em}
 h3{font-size:15px;margin:18px 0 6px;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .devs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.room{margin:14px 0;border-radius:12px;background:#141b22;border:1px solid var(--b);border-left:5px solid var(--rc);overflow:hidden}
+.roomh{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;user-select:none}
+.roomh .rn{font-size:17px;font-weight:700;color:var(--rc)}.roomh .rs{font-size:13px;color:var(--m);flex:1}.roomh .ar{color:var(--m);transition:transform .15s}
+.room.zu .ar{transform:rotate(-90deg)}.room.zu .devs{display:none}.room .devs{padding:0 12px 12px}
+.rnav{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}.rnav a{padding:5px 11px;border-radius:14px;background:var(--c);border:1px solid var(--b);border-left:4px solid var(--rc);font-size:13px;cursor:pointer;color:var(--fg)}
 .dev{background:var(--c);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;border:1px solid transparent}
 .dev.off{opacity:.55}.dev.err{border-color:var(--e)}
 .dn{font-weight:600;font-size:16px}.dm{font-size:12px;color:var(--m)}
@@ -291,9 +296,19 @@ async function loadDevs(){DEVS=await api('devices');if(TAB!='dv')return;
 SCN=await api('scenes');$('scbar').innerHTML=SCN.map(x=>`<button class="bt g" onclick="scnRun(${x.id},this)">${esc(x.name)}</button>`).join('');
 const groups={};DEVS.filter(d=>!d.meter_hidden&&!d.combined_into).forEach(d=>(groups[d.room||'']=groups[d.room||'']||[]).push(d));
 const keys=Object.keys(groups).sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'de'));
-$('devs').innerHTML=DEVS.length?keys.map(k=>{const g=groups[k];
-return `<h3><span>${k?esc(k):(keys.length>1?'Ohne Raum':'Alle Geräte')} <span class="l">${g.length}</span></span></h3><div class="devs">${g.map(devCard).join('')}</div>`}).join('')
+ROOMK=keys;const zu=roomsZu(),rn=k=>k?k:(keys.length>1?'Ohne Raum':'Alle Geräte'),rid=k=>'rm_'+encodeURIComponent(k||'-').replace(/%/g,'_');
+$('devs').innerHTML=DEVS.length?(keys.length>2?`<div class="rnav">${keys.map(k=>`<a style="--rc:${roomCol(k)}" onclick="roomGo('${rid(k)}')">${esc(rn(k))}</a>`).join('')}</div>`:'')+keys.map(k=>{const g=groups[k];
+return `<div class="room ${zu.includes(k)?'zu':''}" id="${rid(k)}" style="--rc:${roomCol(k)}"><div class="roomh" onclick="roomTog(this,${keys.indexOf(k)})"><span class="ar">▾</span><span class="rn">${esc(rn(k))}</span><span class="rs">${roomSum(g)}</span><span class="l">${g.length} ${g.length==1?'Gerät':'Geräte'}</span></div><div class="devs">${g.map(devCard).join('')}</div></div>`}).join('')
 :'<div class="empty">Noch keine Geräte. Unter „Einstellungen“ steht, wie sie sich verbinden.</div>'}
+function roomCol(k){if(!k)return 'var(--m)';let h=0;for(const c of k)h=(h*31+c.charCodeAt(0))%360;return `hsl(${h},60%,62%)`}
+function roomSum(g){let on=0,sw=0,w=0,hw=false,t=null,h=null;for(const d of g){const s=d.status||{},c=d.comp||'';
+ if('output' in s&&!s.meter_only){sw++;if(s.output)on++}if(typeof s.apower=='number'){w+=s.apower;hw=true}
+ const chip='output' in s||'apower' in s||c.startsWith('cover:')||c.startsWith('climate:')||c.startsWith('pm1:');
+ if(!chip&&s.temperature&&s.temperature.tC!=null&&t==null)t=s.temperature.tC;if(s.humidity&&s.humidity.rh!=null&&h==null)h=s.humidity.rh}
+ return [t!=null?'🌡 '+fmt(t,1,'°C'):'',h!=null?fmt(h,0,'%'):'',sw?`${on} von ${sw} an`:'',hw&&w>0.5?'⚡ '+fmt(w,0,'W'):''].filter(Boolean).join(' · ')}
+function roomsZu(){try{return JSON.parse(localStorage.getItem('rooms_zu')||'[]')}catch(e){return []}}
+let ROOMK=[];function roomTog(el,i){const k=ROOMK[i],r=el.parentNode;r.classList.toggle('zu');let z=roomsZu().filter(x=>x!==k);if(r.classList.contains('zu'))z.push(k);try{localStorage.setItem('rooms_zu',JSON.stringify(z))}catch(e){}}
+function roomGo(id){const r=$(id);if(!r)return;if(r.classList.contains('zu'))r.querySelector('.roomh').click();r.scrollIntoView({behavior:'smooth',block:'start'})}
 function sw(id){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{}});await loadDevs()})}
 function cvAct(id,a){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{cover:a}});await loadDevs()})}
 function cvPos(id,p){run(async()=>{await api('devices/'+encodeURIComponent(id)+'/switch',{method:'POST',body:{pos:p}});await loadDevs()})}

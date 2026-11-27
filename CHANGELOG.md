@@ -1,5 +1,10 @@
 # Änderungen
 
+## Pagurus Cloud 1.22.9
+- Geräte-Seite: Räume als eigene, farbig markierte Bereiche mit Kopfzeile (Temperatur/Feuchte eines Fühlers im Raum,
+  „x von y an“, Gesamtleistung, Anzahl Geräte). Räume lassen sich zuklappen (merkt sich der Browser);
+  oben Sprungleiste zu jedem Raum.
+
 ## Pagurus OS 1.19.4
 - TCL-Klima: Lernmodus war nicht erreichbar (Methodennamen werden klein verglichen) – behoben.
 
