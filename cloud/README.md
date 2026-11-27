@@ -21,6 +21,8 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
 - **Automatik:** Zeitpläne (Uhrzeit oder Sonnenauf-/untergang ± Minuten, Wochentage, Gerät oder Raum) und
   **Regeln** (Wenn Leistung/Schalter/Ereignis/offline/fertig/URL-Aufruf → schalten, verzögert, automatisch
   wieder aus, Push), mit Zeitfenster; Rollläden: öffnen, schließen oder auf Position
+- **Heizung:** Warmwasser (Ölkessel mit Shelly-Logik-Script), Zirkulationspumpe und Raumheizer (Heizlüfter,
+  Konvektor) mit Live-Werten, Boost und allen Einstellungen; Meldung bei Störung. Die Regelung bleibt auf den Shellys
 - **Meldungen** mit **Push** über ntfy oder Telegram
 - **Firmware-Übersicht** mit Update einzeln oder für alle Geräte
 - **Sicherung** der Geräte-Einstellungen (nachts automatisch) und Zurückspielen, auch auf ein Ersatzgerät

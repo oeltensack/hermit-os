@@ -175,9 +175,9 @@ PUSH_KINDS = {
     "overpower": "Überlast", "overtemp": "Übertemperatur", "offline": "Gerät offline",
     "online": "Gerät wieder online", "reset": "Reset am Gerät", "finished": "Gerät fertig",
     "reminder": "Erinnerung", "fridge": "Kühlgerät-Warnung", "rule": "Regel", "update": "Updates",
-    "window": "Fenster offen (Klima pausiert)",
+    "window": "Fenster offen (Klima pausiert)", "heating": "Heizung-Störung",
 }
-DEFAULT_PUSH = ["overpower", "overtemp", "offline", "finished", "reminder", "fridge", "rule", "window"]
+DEFAULT_PUSH = ["overpower", "overtemp", "offline", "finished", "reminder", "fridge", "rule", "window", "heating"]
 _pushq = queue.Queue()
 
 
@@ -185,7 +185,7 @@ def alert(dev, kind, text, push=True, title=None, prio=None):
     q("INSERT INTO alerts(ts, dev, kind, text) VALUES(?,?,?,?)", (time.time(), dev, kind, text))
     if push and kind in (setting("push_kinds", DEFAULT_PUSH) or []):
         notify(title or PUSH_KINDS.get(kind, "Pagurus Cloud"), text, prio or
-               (5 if kind in ("overpower", "overtemp", "fridge") else 4 if kind in ("finished", "offline") else 3))
+               (5 if kind in ("overpower", "overtemp", "fridge", "heating") else 4 if kind in ("finished", "offline") else 3))
 
 
 def notify(title, text, prio=3):

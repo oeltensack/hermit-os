@@ -31,6 +31,7 @@ import engine
 import fridge
 import gen2
 import hacompat
+import heizung
 import panel
 import portal
 import shade
@@ -252,18 +253,24 @@ def startup():
     if pk is not None and "window" not in pk and not setting("mig_push_window"):
         set_setting("push_kinds", pk + ["window"])
     set_setting("mig_push_window", True)
+    pk = setting("push_kinds")
+    if pk is not None and "heating" not in pk and not setting("mig_push_heating"):
+        set_setting("push_kinds", pk + ["heating"])
+    set_setting("mig_push_heating", True)
     core.start_push()
     BUS.start()
     engine.start(BUS)
     shade.start(BUS)
     winopen.start(BUS)
     climate.start(BUS)
+    heizung.start()
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
     portal.start(devices)
 
 
 app.include_router(hacompat.router)
+app.include_router(heizung.router)
 
 
 @app.get("/")

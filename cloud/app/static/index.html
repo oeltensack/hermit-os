@@ -75,7 +75,7 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 @media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
 <header><h1><img src="/icon-192.png" alt="">Pagurus Cloud</h1>
-<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="kl">Klima</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
+<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="kl">Klima</a><a data-t="hz">Heizung</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
 <section class="tab a" id="dv"><div id="scbar" class="row user-only" style="margin:6px 0 2px"></div><div id="devs"></div></section>
@@ -100,6 +100,13 @@ einen ausgefallenen Kompressor, steigender Verbrauch auf Vereisung oder eine und
 <div class="apps" id="climates" style="grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr))"></div>
 <p class="l">Die Cloud zeichnet jede Minute Raum-, Soll- und Ausblastemperatur, Betrieb und Kompressor auf. Strom und Kosten
 kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
+</section>
+
+<section class="tab" id="hz">
+<div class="row sp"><h3 style="margin:8px 0">Heizung</h3><div class="row"><span class="l" id="hz_ts"></span><button class="bt g s" id="hz_cfgb" onclick="hzCfg()">Geräte</button></div></div>
+<div class="apps" id="hz_list" style="grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))"></div>
+<p class="l">Die Regelung läuft auf den Shellys selbst. Die Cloud liest mit und schreibt Einstellungen und Befehle in die Scripts
+(Warmwasser ab Heizung Logik V13.1, Raumheizer mit Heizlüfter-Script v11 bzw. Konvektor-Logik v1.6). Die Heizer übernehmen Änderungen innerhalb von 5 s.</p>
 </section>
 
 <section class="tab" id="en">
@@ -799,9 +806,130 @@ $('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' �
 $('bk').textContent=(i.broker||location.hostname)+':1883';{const b=i.broker||location.hostname;if(!$('g2_br').value)$('g2_br').value=b;if(!$('g2_net').value&&/^\d+\.\d+\.\d+\.\d+$/.test(b))$('g2_net').value=b.replace(/\.\d+$/,'.0/24')}$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
 let busy=false;
 async function refresh(force){if(busy&&!force)return;busy=true;try{await loadInfo();await loadDevs();await loadAl();
-if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='kl')await loadClimates(force);if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
+if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='kl')await loadClimates(force);if(TAB=='hz')await loadHz();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
 refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+// ---------- Heizung ----------
+let HZ=null;
+const HZ_MODE={tag:'Tagbetrieb',nacht:'Nacht · nur Frostschutz',boost:'Boost',legionellen:'Legionellenschutz',schornsteinfeger:'Schornsteinfeger',init:'Start'};
+const HZ_STW=[0,750,1250,2000];
+// [Schlüssel, Bezeichnung, Einheit, min, max, Schritt, Hinweis, Faktor (Anzeige = Wert / Faktor)]
+const HZ_DEF={aS:'04:30',aE:'21:00',mE:'12:00',tS:55,tM:45,tL:65,fr:8,panH:3,ein:3,aus:1,bMax:7200,drop:0.2,ovMax:8,cl:1,
+kOff:15,kOH:2,kHy:5,kMax:85,kPan:65,rest:60,pan:38,pEin:10,pAus:8,rAus:3,pMin:180,sMax:70,sperr:600,minW:120,lph:2.01};
+const HZ_F=[
+['Zeiten',[['aS','Tagbetrieb ab','time',0,0,0,'vorher startet der Brenner nur als Frostschutz'],['aE','Tagbetrieb bis','time',0,0,0,'danach Nacht: nur Frostschutz'],['mE','Morgen-Soll gilt bis','time',0,0,0,'ab Tagbeginn bis hier gilt „Soll morgens“']]],
+['Warmwasser',[['tS','Soll tagsüber','°C',40,70,1,'auch Ziel für „Jetzt aufheizen“'],['tM','Soll morgens','°C',35,65,1,'höchstens Soll tagsüber'],['ein','Brenner ein bei Soll −','K',1,10,.5],['aus','Brenner aus bei Soll −','K',0,8,.5,'gelerntes Nachheizen gilt, wenn größer'],['tL','Legionellenschutz','°C',55,75,1,'am 1. des Monats, Tagbeginn bis 06:00']]],
+['Nacht / Frostschutz',[['fr','Frostschutz ein unter','°C',3,20,1,'Speicher oder Kessel'],['panH','Frostschutz aus bei +','K',1,10,.5]]],
+['Kessel',[['kMax','Kessel-Obergrenze','°C',70,95,1,'Brenner aus'],['kHy','Hysterese Obergrenze','K',2,15,1],['kOff','Kesselsperre ab Kessel − Speicher','K',5,40,1,'Kessel deutlich wärmer: erst Wärme abgeben'],['kOH','Sperre frei bei −','K',1,10,.5],['pan','Notfall: Speicher unter','°C',30,50,1,'Kesselsperre gilt dann nicht'],['kPan','Notfall heizt bis Kessel','°C',50,85,1]]],
+['Ladepumpe',[['pEin','Pumpe ein ab Kessel − Speicher','K',3,25,1],['rAus','läuft, solange Rücklauf ≥ Speicher +','K',0,15,.5],['pMin','Mindestlaufzeit','s',0,900,10],['pAus','ohne Rücklauffühler: aus unter Δ','K',1,20,1],['rest','Restwärme laden bis Speicher','°C',40,70,1,'auch nachts'],['sMax','Wärme abführen bis Speicher max.','°C',50,80,1,'wenn Kessel nahe Obergrenze']]],
+['Brenner & Boost',[['sperr','Taktsperre','min',0,60,1,'Pause zwischen zwei Brennerstarts',60],['bMax','Boost höchstens','min',10,240,5,'',60],['drop','Zapf-Erkennung: Abfall je Messung','K',.05,2,.05,'startet automatischen Boost (20-s-Takt)'],['ovMax','max. gelerntes Nachheizen','K',0,15,.5],['minW','Flamme erkannt ab','W',0,500,5,'für die Ölzählung'],['lph','Ölverbrauch Düse','L/h',.5,5,.01]]],
+['Cloud',[['cl','wall.dakonet.de darf vorgeben','bool',0,1,1,'überschreibt dann alle 30 s Soll tagsüber, Legionellen und Tagzeiten']]]];
+const hzFault=f=>f.replace('speicher','Speicherfühler').replace('kessel','Kesselfühler').replace(',',' und ');
+const hzStrip=s=>String(s||'').replace(/^[^\p{L}\p{N}]+/u,'').trim();
+const hzT=v=>typeof v=='number'?num(v,1):'–';
+function hzCol(st,err,heat){if(err)return'var(--e)';st=String(st||'');if(heat||/HEIZT/.test(st))return'#f0883e';if(/FROST|FENSTER/.test(st))return'var(--a)';if(/BEREIT/.test(st))return'var(--on)';return'var(--off)'}
+function hzChip(st,err,heat){if(err)return['Störung','r'];st=String(st||'');if(heat||/HEIZT/.test(st))return['heizt','y'];if(/FENSTER/.test(st))return['Fenster offen','b'];if(/FROST/.test(st))return['Frostschutz','b'];if(/VORLAUF|NACHLAUF/.test(st))return['Lüfter',''];if(/BEREIT/.test(st))return['bereit','g'];if(/PAUSE/.test(st))return['Pause',''];return['aus','']}
+const hzBig=(v,u)=>`<div class="row" style="align-items:baseline;gap:6px"><span style="font-size:40px;font-weight:300;line-height:1.1">${hzT(v)}</span><span class="l">${u}</span></div>`;
+const hzCard=(col,inner)=>`<div class="card" style="margin:0;border-left:4px solid ${col};display:flex;flex-direction:column;gap:10px">${inner}</div>`;
+
+function hzWwCard(w){
+if(!w.ok)return hzCard('var(--off)',`<div class="row sp"><span class="dn">${esc(w.name)}</span><span class="tag r">offline</span></div><div class="err-l">${esc(w.ip)}: ${esc(w.err||'')}</div>`);
+const s=w.st,c=w.cfg||{},col=s.fault?'var(--e)':s.burn?'#f0883e':s.pump?'var(--a)':'var(--on)';
+const chip=s.fault?['Störung','r']:s.burn?['Brenner an','y']:s.pump?['Pumpe läuft','b']:['bereit','g'];
+let x=`<div class="row sp"><span class="dn">${esc(w.name)}</span><span class="tag ${chip[1]}">${chip[0]}</span></div>`+hzBig(s.temp_s,'°C Speicher');
+x+=`<div class="kv"><div><div class="v">${typeof s.soll=='number'?num(s.soll,0)+' °C':'–'}</div><div class="l">Soll · ${esc(HZ_MODE[s.mode]||s.mode||'')}</div></div>`+
+`<div><div class="v">${hzT(s.temp_k)} °C</div><div class="l">Kessel${typeof s.temp_r=='number'?' · Rücklauf '+hzT(s.temp_r)+' °C':''}</div></div>`+
+`<div><div class="v">${s.burn?'an'+(s.power>0?' · '+Math.round(s.power)+' W':''):s.lockout_s>0?'Sperre '+Math.ceil(s.lockout_s/60)+' min':'aus'}</div><div class="l">Brenner${s.kessel_sperre?' · Kesselsperre':''}${s.kessel_max?' · Kessel-Max':''}</div></div>`+
+`<div><div class="v">${s.pump?'läuft':'aus'}</div><div class="l">Ladepumpe</div></div>`+
+`<div><div class="v">${fmt(s.cons_today,2,'L')}</div><div class="l">Öl heute · 7 Tage ${fmt(s.cons_week,1,'L')}</div></div>`+
+`<div><div class="v">${fmt(s.nachheiz,1,'K')}</div><div class="l">gelerntes Nachheizen</div></div></div>`;
+if(s.fault)x+=`<div class="err-l">⚠ ${esc(hzFault(s.fault))} – Brenner gesperrt</div>`;
+if(c.cl===1)x+=`<div class="l" style="color:var(--w)">Cloud-Vorgaben von wall.dakonet.de aktiv – Soll und Tagzeiten können überschrieben werden.</div>`;
+if(w.cfg_err)x+=`<div class="l" style="color:var(--w)">${esc(w.cfg_err)}</div>`;
+x+=`<div class="row">${canSw()?`<button class="bt${s.boost_manual?' r':''}" onclick="hzBoost(${!s.boost_manual})">${s.boost_manual?'Boost beenden':'Jetzt aufheizen'}</button>`:''}${isAdmin()&&w.cfg?'<button class="bt g" onclick="hzWW()">Einstellungen</button>':''}<span class="l">Logik ${esc(s.ver||'≤ 12.9')}</span></div>`;
+return hzCard(col,x)}
+
+function hzZirkCard(z){
+if(!z.ok)return hzCard('var(--off)',`<div class="row sp"><span class="dn">${esc(z.name)}</span><span class="tag r">offline</span></div><div class="err-l">${esc(z.ip)}: ${esc(z.err||'')}</div>`);
+return hzCard(z.on?'var(--on)':'var(--off)',`<div class="row sp"><span class="dn">${esc(z.name)}</span><span class="tag ${z.on?'g':''}">${z.on?'läuft':'aus'}</span></div>`+hzBig(z.t,'°C Zirkulation')+
+`<div class="row">${canSw()?`<button class="sw sm ${z.on?'on':''}" onclick="hzZirk(${!z.on})">${z.on?'AN':'AUS'}</button>`:''}<span class="l">${typeof z.w=='number'?Math.round(z.w)+' W':''}</span></div>`)}
+
+function hzRoomCard(r){
+if(!r.ok)return hzCard('var(--off)',`<div class="row sp"><span class="dn">${esc(r.name)}</span><span class="tag r">offline</span></div><div class="err-l">${esc(r.ip||'')}${r.ip?': ':''}${esc(r.err||'')}</div>`);
+const s=r.state,c=r.cfg||{},kv=r.typ=='kv',heat=kv?s.stufe>0:!!s.isH,on=typeof s.on=='boolean'?s.on:!!c.on,boost=!!s.isB;
+const ziel=typeof s.tgt=='number'?s.tgt:(boost?c.bt:(on?c.t:null)),pwr=kv?r.pwr:(s.pwr!=null?+s.pwr:null),ch=hzChip(s.status,s.err,heat),st=r.stats||{};
+const zeit=c.von&&c.von==c.bis?'ganztägig':(c.von?c.von+'–'+c.bis:'');
+let x=`<div class="row sp"><span class="dn">${esc(r.name)}</span><span class="tag ${ch[1]}">${ch[0]}</span></div>`+hzBig(s.temp,'°C Raum');
+x+=`<div class="kv"><div><div class="v">${ziel!=null?num(ziel,1)+' °C':'–'}</div><div class="l">Ziel${boost?' (Boost)':''}</div></div>`+
+`<div><div class="v">${pwr!=null&&!isNaN(pwr)?Math.round(pwr)+' W':'–'}</div><div class="l">Leistung${kv&&s.stufe>0?' · Stufe '+HZ_STW[s.stufe]+' W':''}</div></div>`+
+`<div><div class="v">${fmt(st.d0,2,'kWh')}</div><div class="l">heute · gestern ${fmt(st.d1,2,'kWh')}</div></div>`+
+`<div><div class="v">${on?num(c.t,1)+' °C':'aus'}</div><div class="l">${on?'hält · '+esc(zeit):'nur Frostschutz'}</div></div></div>`;
+x+=`<div class="l">${esc(hzStrip(s.status))}${s.winOpen===true?' · Fenster offen':''}${boost&&s.rest>0?' · Boost noch '+s.rest+' min':''}</div>`;
+if(s.err)x+=`<div class="row sp"><span class="err-l">⚠ ${esc(s.err)}</span>${canSw()?`<button class="bt r s" onclick="hzCmd('${r.id}','ack')">Quittieren</button>`:''}</div>`;
+if(canSw())x+=`<div class="row"><button class="bt${on?'':' g'}" onclick="hzCmd('${r.id}','${on?'off':'on'}')">${on?'Ein':'Aus'}</button><button class="bt${boost?' r':' g'}" onclick="hzCmd('${r.id}','boost_toggle')">${boost?'Boost beenden':'Boost '+num(c.bt,1)+' °C'}</button><button class="bt g" onclick="hzRoom('${r.id}')">Einstellungen</button></div>`;
+return hzCard(hzCol(s.status,s.err,heat),x)}
+
+async function loadHz(){if($('dlg').open)return;HZ=await api('heizung');let x='';
+if(HZ.ww)x+=hzWwCard(HZ.ww);if(HZ.zirk)x+=hzZirkCard(HZ.zirk);HZ.rooms.forEach(r=>x+=hzRoomCard(r));
+$('hz_list').innerHTML=x||'<div class="empty">Noch keine Heizungsgeräte – oben rechts unter „Geräte“ eintragen.</div>';
+$('hz_cfgb').style.display=isAdmin()?'':'none';$('hz_ts').textContent='Stand '+new Date(HZ.ts*1000).toLocaleTimeString('de-DE')}
+const hzAfter=()=>setTimeout(()=>refresh(true),5500);
+function hzBoost(on){run(async()=>{await api('heizung/ww/boost',{method:'POST',body:{on}});await loadHz()},on?'Boost aktiviert':'Boost beendet')}
+function hzZirk(on){run(async()=>{await api('heizung/zirk',{method:'POST',body:{on}});await loadHz()},'Zirkulation '+(on?'ein':'aus'))}
+const HZ_CMD={on:'Betrieb ein',off:'Betrieb aus',boost_toggle:'Boost umgeschaltet',ack:'Störung quittiert'};
+function hzCmd(id,cmd){run(async()=>{await api('heizung/room/'+id+'/cmd',{method:'POST',body:{cmd}});hzAfter()},HZ_CMD[cmd]+' – wird in 5 s übernommen')}
+
+function hzRoom(id){const r=HZ.rooms.find(x=>x.id==id),c=r.cfg||{},kv=r.typ=='kv';
+dlg(`<h2>${esc(r.name)}</h2><div class="f">
+<label>Halten</label><div class="row"><input id="hr_t" type="number" step="0.5" min="5" max="28" value="${c.t??21}" style="width:90px"> °C</div>
+<label>Zeitfenster</label><div class="row"><input id="hr_von" type="time" value="${c.von||'06:00'}"> bis <input id="hr_bis" type="time" value="${c.bis||'22:00'}"></div>
+<label></label><div class="l">Außerhalb nur Frostschutz. Von = bis: ganztägig.</div>
+<label>Boost auf</label><div class="row"><input id="hr_bt" type="number" step="0.5" min="5" max="30" value="${c.bt??24}" style="width:90px"> °C</div>
+<label>Boost-Dauer</label><div class="row"><input id="hr_boost" type="number" step="5" min="5" max="240" value="${c.boost??60}" style="width:90px"> min</div>
+${kv?`<label>${r.state&&r.state.tsrc?'Höchststufe':'Heizstufe'}</label><select id="hr_max">${[1,2,3].map(i=>`<option value="${i}" ${c.max==i?'selected':''}>${HZ_STW[i]} W</option>`).join('')}</select>
+<label></label><div class="l">${r.state&&r.state.tsrc?'Regelt automatisch bis zu dieser Stufe':'Ohne Fühler: feste Stufe, Gerätethermostat regelt'} · nach Neustart des Shelly 750 W</div>`:''}
+</div><div class="row sp" style="margin-top:16px"><span class="l">${esc(r.ip)}</span><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="hzRoomSave('${id}')">Speichern</button></div></div>`)}
+function hzRoomSave(id){const v=k=>$('hr_'+k).value,b={t:+v('t'),von:v('von'),bis:v('bis'),bt:+v('bt'),boost:+v('boost')};if($('hr_max'))b.max=+v('max');
+run(async()=>{await api('heizung/room/'+id+'/cfg',{method:'POST',body:b});closeDlg();hzAfter()},'Gespeichert – wird in 5 s übernommen')}
+
+function hzIn(k,u,mi,ma,st,fa,v){if(u=='time')return`<input id="hw_${k}" type="time" value="${esc(v||'')}">`;if(u=='bool')return`<label class="row"><input id="hw_${k}" type="checkbox" ${v===1?'checked':''}></label>`;
+return`<div class="row"><input id="hw_${k}" type="number" min="${mi}" max="${ma}" step="${st}" value="${v!=null?Math.round(v/(fa||1)*1000)/1000:''}" style="width:100px"> ${u}</div>`}
+function hzWW(def){const w=HZ.ww,c=def?HZ_DEF:w.cfg;
+let h=`<h2>${esc(w.name)} – Einstellungen</h2><div style="max-height:62vh;overflow:auto;padding-right:6px">`;
+HZ_F.forEach(([g,fs])=>{h+=`<h3>${g}</h3><div class="f">`;fs.forEach(([k,l,u,mi,ma,st,hint,fa])=>{h+=`<label>${l}</label>${hzIn(k,u,mi,ma,st,fa,c[k])}`;if(hint)h+=`<label></label><div class="l" style="margin-top:-6px">${hint}</div>`});h+='</div>'});
+h+=`<h3>Gelerntes Nachheizen</h3><div class="f"><label>aktuell ${fmt(w.ov,1,'K')}</label><div class="row"><input id="hw_ov" type="number" min="0" max="${c.ovMax??15}" step="0.5" placeholder="neu" style="width:100px"> K</div></div>`;
+h+=`</div><div class="row sp" style="margin-top:14px"><button class="bt g" onclick="hzWW(1)">Werkswerte eintragen</button><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="hzWWSave()">Speichern</button></div></div>`;dlg(h)}
+function hzWWSave(){const c=HZ.ww.cfg,b={};let bad=[];
+HZ_F.forEach(([,fs])=>fs.forEach(([k,l,u,mi,ma,,,fa])=>{const e=$('hw_'+k);let v;
+if(u=='time'){v=e.value;if(!/^\d\d:\d\d$/.test(v)){bad.push(l);return}}else if(u=='bool')v=e.checked?1:0;
+else{if(e.value===''){bad.push(l);return}const d=parseFloat(e.value);if(isNaN(d)||d<mi||d>ma){bad.push(l);return}v=Math.round(d*(fa||1)*1000)/1000}
+if(v!==c[k]&&!(typeof v=='number'&&Math.abs(v-c[k])<1e-6))b[k]=v}));
+const ov=$('hw_ov').value;if(ov!=='')b.ov=+ov;
+if(bad.length){toast('Bitte prüfen: '+bad.join(', '));return}
+if(!Object.keys(b).length){closeDlg();return}
+run(async()=>{const j=await api('heizung/ww/cfg',{method:'POST',body:b});closeDlg();await loadHz();
+if(j.bad&&j.bad.length){const n={};HZ_F.forEach(([,fs])=>fs.forEach(f=>n[f[0]]=f[1]));toast('Vom Shelly abgelehnt: '+j.bad.map(k=>n[k]||k).join(', '))}else toast('Gespeichert – gilt ab sofort',1)})}
+
+function hzDevSel(id,sel){return`<select id="${id}" style="width:100%"><option value="">– nur IP –</option>${devOpts(sel,d=>!d.id.includes('~')&&!String(d.id).startsWith('blu-'))}</select>`}
+async function hzCfg(){const c=await api('heizung/config');HZ.cfgEdit=c;hzCfgDlg()}
+function hzCfgDlg(){const c=HZ.cfgEdit,T=HZ.types;
+const one=(k,lbl,idl,idk)=>`<h3>${lbl}</h3><div class="f"><label>Anzeigen</label><input type="checkbox" id="hc_${k}_on" ${c[k].on?'checked':''}>
+<label>Name</label><input id="hc_${k}_name" value="${esc(c[k].name)}"><label>Gerät</label>${hzDevSel('hc_'+k+'_dev',c[k].dev)}
+<label>IP</label><input id="hc_${k}_ip" value="${esc(c[k].ip)}" placeholder="falls kein Gerät gewählt"><label>${idl}</label><input id="hc_${k}_${idk}" type="number" value="${c[k][idk]}" style="width:90px"></div>`;
+let h=`<h2>Heizung – Geräte</h2><div style="max-height:62vh;overflow:auto;padding-right:6px">`+one('ww','Warmwasser','Script-ID','sid')+one('zirk','Zirkulation','Fühler-ID','tid');
+h+='<h3>Raumheizer</h3>'+(c.rooms.length?'':'<div class="l">Noch keine.</div>');
+c.rooms.forEach((r,i)=>{h+=`<div class="card" style="background:var(--bg);margin:8px 0"><div class="f"><label>Anzeigen</label><div class="row sp"><input type="checkbox" id="hc_r${i}_on" ${r.on?'checked':''}><button class="bt r s" onclick="hzCfgDel(${i})">Entfernen</button></div>
+<label>Name</label><input id="hc_r${i}_name" value="${esc(r.name)}"><label>Typ</label><select id="hc_r${i}_typ">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${r.typ==k?'selected':''}>${esc(v)}</option>`).join('')}</select>
+<label>Gerät</label>${hzDevSel('hc_r'+i+'_dev',r.dev)}<label>IP</label><input id="hc_r${i}_ip" value="${esc(r.ip)}" placeholder="falls kein Gerät gewählt"></div></div>`});
+h+=`<button class="bt g s" onclick="hzCfgAdd()">+ Heizer</button><p class="l">Mit gewähltem Gerät folgt die Cloud dessen IP automatisch. Die Script-ID ist die Nummer des Logik-Scripts in der Script-Liste des Warmwasser-Shelly.</p></div>
+<div class="row sp" style="margin-top:14px"><span></span><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="hzCfgSave()">Speichern</button></div></div>`;dlg(h)}
+function hzCfgRead(){const c=HZ.cfgEdit,g=(id)=>$(id);
+['ww','zirk'].forEach(k=>{const idk=k=='ww'?'sid':'tid';c[k]={...c[k],on:g(`hc_${k}_on`).checked,name:g(`hc_${k}_name`).value,dev:g(`hc_${k}_dev`).value,ip:g(`hc_${k}_ip`).value.trim(),[idk]:+g(`hc_${k}_${idk}`).value}});
+c.rooms=c.rooms.map((r,i)=>({...r,on:g(`hc_r${i}_on`).checked,name:g(`hc_r${i}_name`).value,typ:g(`hc_r${i}_typ`).value,dev:g(`hc_r${i}_dev`).value,ip:g(`hc_r${i}_ip`).value.trim()}));return c}
+function hzCfgAdd(){const c=hzCfgRead();c.rooms.push({id:'r'+Date.now().toString(36),name:'Neuer Heizer',typ:'hl',dev:'',ip:'',on:true});hzCfgDlg()}
+function hzCfgDel(i){const c=hzCfgRead();c.rooms.splice(i,1);hzCfgDlg()}
+function hzCfgSave(){const c=hzCfgRead();run(async()=>{await api('heizung/config',{method:'POST',body:c});closeDlg();await loadHz()},'Gespeichert')}
 
 // ---------- Beschattung ----------
 let SH=null;

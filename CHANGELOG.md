@@ -1,5 +1,14 @@
 # Änderungen
 
+## Pagurus Cloud 1.23.0
+- Neuer Bereich **Heizung**: Warmwasser (Ölkessel mit Shelly-Logik-Script), Zirkulationspumpe und Raumheizer
+  (Heizlüfter-Script v11, Konvektor-Logik v1.6) an einer Stelle. Live-Werte, Boost, Ein/Aus, Quittieren sowie alle
+  Einstellungen: beim Warmwasser Zeiten, Sollwerte, Kessel, Ladepumpe, Brenner, Cloud-Vorgaben und gelerntes
+  Nachheizen, bei den Heizern Halte-Temperatur, Zeitfenster, Boost und beim Konvektor die Höchststufe.
+  Die Regelung bleibt auf den Shellys; die Cloud spricht sie direkt per HTTP an (kein CORS-Problem wie im Browser).
+  Geräte unter *Heizung → Geräte*: Cloud-Gerät wählen (IP folgt automatisch) oder IP eintragen.
+- Neue Meldungsart „Heizung-Störung“ (Fühlerstörung am Warmwasser, Störung eines Heizers), mit Push.
+
 ## Pagurus Cloud 1.22.9
 - Geräte-Seite: Räume als eigene, farbig markierte Bereiche mit Kopfzeile (Temperatur/Feuchte eines Fühlers im Raum,
   „x von y an“, Gesamtleistung, Anzahl Geräte). Räume lassen sich zuklappen (merkt sich der Browser);
