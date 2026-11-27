@@ -67,6 +67,7 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 .bar{height:10px;background:var(--c2);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--a);border-radius:0 5px 5px 0}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rng a{padding:4px 9px;border-radius:5px;background:var(--bg);font-size:12px;cursor:pointer;color:var(--fg)}.rng a.a{background:var(--a)}
+#se_nav a{font-size:13px;padding:6px 12px}#se [data-sg].sg-off{display:none!important}
 .app.cool{border-color:#2f9be044}.app.alarm{border-color:var(--e);box-shadow:0 0 18px #f8514922}.app.alarm .st{color:var(--e)}.app.cool .st{color:var(--a)}
 .app.cool .ai svg .drum{animation:spin 14s linear infinite;transform-box:fill-box;transform-origin:center}.tl{position:relative}.app.heat{border-color:#e8833a66}.app.heat .st{color:#e8833a}.app.cool2{border-color:#2f9be066}.app.cool2 .st{color:var(--a)}
 .app.paused{border-color:var(--w)}.app.paused .st{color:var(--w)}.tg{padding:4px 9px;font-size:12px}.cltgt{font-size:22px;font-weight:700;min-width:70px;text-align:center}.tl svg{display:block;width:100%;height:auto}
@@ -151,28 +152,30 @@ kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
 <div class="user-only"><button class="bt g" onclick="ackAll()">Alle quittieren</button><button class="bt r" onclick="clrAl()">Alle löschen</button></div></div><div class="scroll"><table id="atab" style="margin-top:10px"></table></div></div></section>
 
 <section class="tab" id="se">
-<div class="card admin-only"><h2>Strom &amp; Standort</h2><div class="f">
+<div class="row sp" style="margin:8px 0"><div class="row rng" id="se_nav"><a data-g="allg">Allgemein</a><a data-g="dev">Geräte</a><a data-g="wd">Wandtafeln</a><a data-g="zu">Zugang</a><a data-g="sys">System</a></div>
+<div class="row"><span class="l" id="me"></span><button class="bt g s" id="lo" onclick="logout()" style="display:none">Abmelden</button></div></div>
+<div data-sg="allg" class="card admin-only"><h2>Strom &amp; Standort</h2><div class="f">
 <label>Strompreis</label><div class="row"><input id="s_price" style="width:110px" inputmode="decimal"> <span class="l">ct/kWh</span></div>
 <label>Breitengrad</label><input id="s_lat" placeholder="z. B. 50,45" inputmode="decimal">
 <label>Längengrad</label><input id="s_lon" placeholder="z. B. 8,66" inputmode="decimal">
 <label>Adresse der Cloud</label><input id="s_pub" placeholder="http://192.168.0.50:8080 (für URL-Auslöser)">
 </div><p class="l">Standort nur für Zeitpläne mit Sonnenauf-/untergang. Kosten werden mit dem aktuellen Preis berechnet.</p><button class="bt" onclick="saveBase()">Speichern</button></div>
 
-<div class="card admin-only"><h2>Wandtafeln (Wall Display)</h2>
+<div data-sg="wd" class="card admin-only"><h2>Wandtafeln (Wall Display)</h2>
 <p class="l">Eigene Bedienseite für das Shelly Wall Display oder ein Tablet: große Kacheln, nach Räumen sortiert, mit Szenen.
 Am Wall Display unter <b>Einstellungen → Home Assistant</b> die Adresse eintragen. Sie enthält einen geheimen Schlüssel – wer sie kennt,
 sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
 <div class="scroll"><table id="pntab"></table></div><button class="bt g" style="margin-top:8px" onclick="pnDlg()">Neue Wandtafel</button>
 <div id="pnlog" style="margin-top:10px"></div></div>
 
-<div class="card admin-only"><h2>Fernzugang-Portal</h2>
+<div data-sg="zu" class="card admin-only"><h2>Fernzugang-Portal</h2>
 <p class="l">PHP-Seite auf einem Webhosting (Ordner <code>portal/</code> im Repo). Die Cloud meldet sich dort von sich aus per HTTPS, holt Schaltbefehle ab und überträgt Zustand und Meldungen – kein offener Port nötig.</p>
 <div class="f"><label>Portal-Adresse</label><input id="po_url" placeholder="https://deine-domain.de/pagurus/">
 <label>Schlüssel</label><input id="po_tok" type="password" autocomplete="new-password" placeholder="SYNC_TOKEN aus config.php">
 <label>Status</label><div id="po_st" class="l">–</div></div>
 <button class="bt" onclick="savePortal()">Speichern</button></div>
 
-<div class="card admin-only"><h2>Shelly Gen2+ mit Original-Firmware anbinden</h2>
+<div data-sg="dev" class="card admin-only"><h2>Shelly Gen2+ mit Original-Firmware anbinden</h2>
 <p class="l">Gen2/Gen3/Gen4 können Shelly Cloud und MQTT gleichzeitig: Die Pagurus Cloud trägt sich am Gerät als MQTT-Server ein, App und Shelly Cloud laufen weiter. Danach startet das Gerät kurz neu (Relais bleiben in ihrem Zustand). Ein Gerät kann nur einen MQTT-Server haben.</p>
 <p class="l">Gen1-Fühler (Door/Window 2, H&amp;T) mit Original-Firmware: vorher den Taster am Gerät kurz drücken, damit er wach ist und gefunden wird. Übernommen werden Temperatur, Helligkeit bzw. Feuchte und Batterie. Bei Gen1 schaltet MQTT die Shelly Cloud ab.</p>
 <div class="f"><label>Netz durchsuchen</label><div class="row"><input id="g2_net" placeholder="192.168.0.0/24 oder 192.168.0.10-80" style="flex:1"><button class="bt g" onclick="g2Scan()">Suchen</button></div>
@@ -180,7 +183,7 @@ sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
 <label>Broker-Adresse für die Geräte</label><input id="g2_br" placeholder="IP dieses Rechners, z. B. 192.168.0.50"></div>
 <div class="scroll"><table id="g2tab" style="margin-top:8px"></table></div></div>
 
-<div class="card admin-only"><h2>Push-Nachrichten</h2><div class="f">
+<div data-sg="allg" class="card admin-only"><h2>Push-Nachrichten</h2><div class="f">
 <label>ntfy-Adresse</label><input id="p_ntfy" placeholder="https://ntfy.sh/pagurus-langes-zufaelliges-thema">
 <label>ntfy-Token</label><input id="p_ntok" type="password" placeholder="optional">
 <label>Telegram-Bot-Token</label><input id="p_ttok" type="password" placeholder="optional">
@@ -189,27 +192,27 @@ sieht und bedient genau die ausgewählten Kacheln, ohne Anmeldung.</p>
 <p class="l">ntfy: App „ntfy“ installieren und das gleiche Thema abonnieren. Das Thema wirkt wie ein Passwort – lang und zufällig wählen oder einen eigenen ntfy-Server nutzen.</p>
 <div class="row"><button class="bt" onclick="savePush()">Speichern</button><button class="bt g" onclick="testPush()">Testnachricht</button></div></div>
 
-<div class="card admin-only"><div class="row sp"><h2 style="margin:0">Firmware</h2><div class="row"><button class="bt g" onclick="fwCheck()">Prüfen</button><button class="bt" id="fw_all" onclick="fwAll()">Alle aktualisieren</button></div></div>
+<div data-sg="dev" class="card admin-only"><div class="row sp"><h2 style="margin:0">Firmware</h2><div class="row"><button class="bt g" onclick="fwCheck()">Prüfen</button><button class="bt" id="fw_all" onclick="fwAll()">Alle aktualisieren</button></div></div>
 <div class="l" id="fw_s" style="margin:6px 0"></div><div class="scroll"><table id="fwtab"></table></div></div>
 
-<div class="card admin-only"><div class="row sp"><h2 style="margin:0">Sicherungen der Geräte-Einstellungen</h2><button class="bt" onclick="bkNow()">Jetzt sichern</button></div>
+<div data-sg="dev" class="card admin-only"><div class="row sp"><h2 style="margin:0">Sicherungen der Geräte-Einstellungen</h2><button class="bt" onclick="bkNow()">Jetzt sichern</button></div>
 <p class="l">Jede Nacht automatisch, die letzten 10 je Gerät. Zurückgespielt werden Name, Zeit, LED, Schalter-/Licht-/Eingangs-Einstellungen und Aktionen – kein WLAN, kein MQTT.</p><div class="scroll"><table id="bktab"></table></div></div>
 
-<div class="card admin-only"><div class="row sp"><h2 style="margin:0">Benutzer</h2><button class="bt" onclick="userDlg()">Benutzer anlegen</button></div>
+<div data-sg="zu" class="card admin-only"><div class="row sp"><h2 style="margin:0">Benutzer</h2><button class="bt" onclick="userDlg()">Benutzer anlegen</button></div>
 <p class="l">Administrator: alles · Benutzer: schalten und quittieren · Betrachter: nur ansehen</p><table id="utab"></table></div>
 
-<div class="card admin-only"><h2>Cloud-Update</h2>
+<div data-sg="sys" class="card admin-only"><h2>Cloud-Update</h2>
 <div class="row sp"><div><div class="v" id="u_v">–</div><div class="l" id="u_s"></div></div>
 <div class="row"><button class="bt g" onclick="updCheck()">Jetzt prüfen</button><button class="bt" id="u_btn" onclick="updInstall()" style="display:none">Jetzt aktualisieren</button></div></div>
 <div class="row" style="margin-top:12px"><label class="l">Modus</label><select id="u_mode" onchange="updCfg()"><option value="off">Aus</option><option value="check">Nur prüfen</option><option value="install">Automatisch installieren</option></select>
 <label class="l">um</label><select id="u_hour" onchange="updCfg()"></select></div>
 <p class="l" id="u_hint"></p><pre id="u_log" style="display:none;white-space:pre-wrap;font-size:11px;background:var(--bg);padding:8px;border-radius:6px;max-height:220px;overflow:auto"></pre></div>
 
-<div class="card"><h2>So verbinden sich Geräte</h2>
+<div data-sg="dev" class="card"><h2>So verbinden sich Geräte</h2>
 <p>Am Gerät unter <b>System → Cloud / MQTT</b> einschalten und als Server <code id="bk">…:1883</code> eintragen, dazu Benutzer und Passwort
 aus der <code>.env</code>. Shelly Plus/Pro (Gen2/Gen3): Einstellungen → MQTT, „RPC status notifications“ und „Generic status update“ einschalten.</p>
 <p class="l">Auf dem Handy: im Browser „Zum Startbildschirm hinzufügen“ – dann startet die Cloud wie eine App.</p>
-<div class="row sp"><span class="l" id="me"></span><button class="bt g" id="lo" onclick="logout()" style="display:none">Abmelden</button></div></div>
+</div>
 </section>
 </main>
 
@@ -715,7 +718,7 @@ function ackAll(){run(async()=>{await api('alerts/ack',{method:'POST',body:{}});
 function clrAl(){if(confirm('Alle Meldungen löschen?'))run(async()=>{await api('alerts',{method:'DELETE'});await loadAl()},'Gelöscht')}
 
 // ---------- Einstellungen ----------
-async function loadSet(){if(!isAdmin())return;const s=await api('settings');
+async function loadSet(){seTab(document.querySelector('#se_nav a.a')?.dataset.g||'allg');if(!isAdmin())return;const s=await api('settings');
 $('s_price').value=num(s.price_ct,2);$('s_lat').value=s.location.lat!=null?num(s.location.lat,4):'';$('s_lon').value=s.location.lon!=null?num(s.location.lon,4):'';$('s_pub').value=s.public_url||'';
 const po=s.portal||{};$('po_url').value=po.url||'';$('po_tok').placeholder=po.token_set?'gesetzt – leer = unverändert':'SYNC_TOKEN aus config.php';
 $('po_st').innerHTML=!po.url?'aus':po.ok===true?`<span style="color:var(--on)">verbunden</span> · zuletzt ${ago(po.last)}${po.active?' · Portal gerade offen':''}`:po.ok===false?`<span style="color:var(--e)">Fehler: ${esc(po.err)}</span>`:'wird verbunden …';
@@ -763,13 +766,17 @@ function testPush(){run(async()=>{await api('push/test',{method:'POST'})},'Testn
 async function loadFw(){const f=await api('firmware');window._FW=f;const upd=f.devices.filter(d=>d.fw_new&&d.online);
 $('fw_s').textContent=(f.hermit_latest?'Aktuelle Pagurus-OS-Version: '+f.hermit_latest:'Pagurus-OS-Version noch nicht geprüft')+(f.checked?' · geprüft '+dt(f.checked):'');
 $('fw_all').disabled=!upd.length;$('fw_all').textContent=upd.length?`Alle aktualisieren (${upd.length})`:'Alle aktuell';
-$('fwtab').innerHTML=f.devices.length?'<tr><th>Gerät</th><th>Modell</th><th>Version</th><th></th></tr>'+f.devices.map(d=>`<tr><td>${esc(d.name||d.id)}</td><td>${esc(d.model)}</td><td>${esc(d.ver||'–')}${d.fw_new?` → <b>${esc(d.fw_new)}</b>`:''}</td><td class="n">${d.fw_new&&d.online?`<button class="bt s" onclick="fwUpd(['${esc(d.id)}'])">Aktualisieren</button>`:d.online?'<span class="l">aktuell</span>':'<span class="l">offline</span>'}</td></tr>`).join(''):'<tr><td class="empty">Keine Geräte.</td></tr>'}
+const fwAll=window._FWALL,fwRows=f.devices.filter(d=>fwAll||(d.fw_new&&d.online));$('fwtab').innerHTML=(f.devices.length?(fwRows.length?'<tr><th>Gerät</th><th>Modell</th><th>Version</th><th></th></tr>':'')+fwRows.map(d=>`<tr><td>${esc(d.name||d.id)}</td><td>${esc(d.model)}</td><td>${esc(d.ver||'–')}${d.fw_new?` → <b>${esc(d.fw_new)}</b>`:''}</td><td class="n">${d.fw_new&&d.online?`<button class="bt s" onclick="fwUpd(['${esc(d.id)}'])">Aktualisieren</button>`:d.online?'<span class="l">aktuell</span>':'<span class="l">offline</span>'}</td></tr>`).join('')+`<tr><td colspan="4"><a class="lk" onclick="window._FWALL=${!fwAll};loadFw()">${fwAll?'Nur Geräte mit Update zeigen':'Alle '+f.devices.length+' Geräte zeigen'}</a></td></tr>`:'<tr><td class="empty">Keine Geräte.</td></tr>')}
 function fwCheck(){run(async()=>{await api('firmware/check',{method:'POST'});await loadFw()},'Geprüft')}
 function fwUpd(devs){if(!confirm(devs.length+' Gerät(e) aktualisieren? Sie starten danach neu, das Relais bleibt im Zustand.'))return;
 run(async()=>{const r=await api('firmware/update',{method:'POST',body:{devices:devs}});const bad=Object.entries(r.result).filter(([k,v])=>v!='gestartet');if(bad.length)toast(bad.map(([k,v])=>devName(k)+': '+v).join('; '));else toast('Update gestartet – die Geräte melden sich in 1–2 Minuten mit der neuen Version',1)})}
 function fwAll(){fwUpd(window._FW.devices.filter(d=>d.fw_new&&d.online).map(d=>d.id))}
-async function loadBk(){const b=await api('backups');window._BK=b;
-$('bktab').innerHTML=b.length?'<tr><th>Gerät</th><th>Gesichert</th><th>Version</th><th></th></tr>'+b.map(x=>`<tr><td>${esc(x.name)}</td><td>${dt(x.ts)}</td><td>${esc(x.ver||'')}</td><td class="n" style="white-space:nowrap"><a class="lk" href="/api/backups/${x.id}">Laden</a> · <a class="lk" onclick="bkDlg(${x.id})">Zurückspielen</a> · <a class="lk" onclick="bkDel(${x.id})" title="Löschen">✕</a></td></tr>`).join(''):'<tr><td class="empty">Noch keine Sicherungen.</td></tr>'}
+async function loadBk(){const b=await api('backups');window._BK=b;const by={};b.forEach(x=>(by[x.dev]=by[x.dev]||[]).push(x));
+const devs=Object.values(by).sort((a,c)=>String(a[0].name).localeCompare(String(c[0].name),'de'));
+const row=(x,sub)=>`<tr${sub?' class="bk_old" data-dev="'+esc(x.dev)+'" style="display:none"':''}><td>${sub?'<span class="l">↳</span>':esc(x.name)}</td><td>${dt(x.ts)}</td><td>${esc(x.ver||'')}</td><td class="n" style="white-space:nowrap"><a class="lk" href="/api/backups/${x.id}">Laden</a> · <a class="lk" onclick="bkDlg(${x.id})">Zurückspielen</a> · <a class="lk" onclick="bkDel(${x.id})" title="Löschen">✕</a></td></tr>`;
+$('bktab').innerHTML=b.length?'<tr><th>Gerät</th><th>Letzte Sicherung</th><th>Version</th><th></th></tr>'+devs.map(L=>row(L[0]).replace('</td>',L.length>1?` <a class="lk" style="font-size:12px" onclick="bkMore(this,'${esc(L[0].dev)}')">+${L.length-1} ältere</a></td>`:'</td>')+L.slice(1).map(x=>row(x,1)).join('')).join(''):'<tr><td class="empty">Noch keine Sicherungen.</td></tr>'}
+function bkMore(a,dev){const on=a.dataset.on!='1';a.dataset.on=on?'1':'';a.textContent=on?'weniger':'+'+document.querySelectorAll(`.bk_old[data-dev="${CSS.escape(dev)}"]`).length+' ältere';
+document.querySelectorAll(`.bk_old[data-dev="${CSS.escape(dev)}"]`).forEach(r=>r.style.display=on?'':'none')}
 function bkNow(){run(async()=>{const r=await api('backups',{method:'POST',body:{}});const bad=Object.entries(r.result).filter(([k,v])=>String(v).startsWith('Fehler'));if(bad.length)toast(bad.map(([k,v])=>devName(k)+': '+v).join('; '));else toast('Gesichert',1);await loadBk()})}
 function bkDel(id){if(!confirm('Sicherung löschen?'))return;run(async()=>{await api('backups/'+id,{method:'DELETE'});await loadBk()})}
 function bkDlg(id){const b=window._BK.find(x=>x.id==id);
@@ -811,6 +818,14 @@ if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='kl')awai
 refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
+
+// ---------- Einstellungen: Unterreiter ----------
+function seTab(g){if(!isAdmin())g='dev';try{localStorage.setItem('seTab',g)}catch(e){}
+document.querySelectorAll('#se_nav a').forEach(a=>a.classList.toggle('a',a.dataset.g==g));
+document.querySelectorAll('#se [data-sg]').forEach(c=>c.classList.toggle('sg-off',c.dataset.sg!=g));
+$('se_nav').style.display=isAdmin()?'':'none'}
+document.querySelectorAll('#se_nav a').forEach(a=>a.onclick=()=>seTab(a.dataset.g));
+{let g='allg';try{g=localStorage.getItem('seTab')||g}catch(e){}seTab(g)}
 // ---------- Heizung ----------
 let HZ=null;
 const HZ_MODE={tag:'Tagbetrieb',nacht:'Nacht · nur Frostschutz',boost:'Boost',legionellen:'Legionellenschutz',schornsteinfeger:'Schornsteinfeger',init:'Start'};

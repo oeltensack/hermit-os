@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.24.1
+- Einstellungen in Unterreiter aufgeteilt: Allgemein (Strom, Standort, Push), Geräte (Anbinden, Firmware, Sicherungen),
+  Wandtafeln, Zugang (Benutzer, Fernzugang), System (Cloud-Update). Der zuletzt gewählte Unterreiter bleibt gemerkt.
+- Sicherungen: je Gerät nur die neueste Zeile, ältere zum Aufklappen. Firmware: nur Geräte mit Update, „Alle Geräte
+  zeigen“ blendet den Rest ein.
+
 ## Pagurus Cloud 1.24.0
 - Heizung: **Warmwasser-Verlauf**. Die Cloud zeichnet jede Minute Speicher, Kessel, Rücklauf, Soll, Brenner,
   Pumpe und Ölzähler auf. Diagramm über 24 h, 3 oder 7 Tage (Brenner und Pumpe als Balken darunter, Werte beim
