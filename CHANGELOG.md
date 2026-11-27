@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus Cloud 1.23.1
+- Heizung: Warmwasser-Logik ohne externe Cloud (ab V13.2) – der Schalter „Cloud darf vorgeben“ wird dann ausgeblendet.
+
 ## Pagurus Cloud 1.23.0
 - Neuer Bereich **Heizung**: Warmwasser (Ölkessel mit Shelly-Logik-Script), Zirkulationspumpe und Raumheizer
   (Heizlüfter-Script v11, Konvektor-Logik v1.6) an einer Stelle. Live-Werte, Boost, Ein/Aus, Quittieren sowie alle

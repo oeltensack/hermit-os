@@ -824,7 +824,7 @@ const HZ_F=[
 ['Kessel',[['kMax','Kessel-Obergrenze','°C',70,95,1,'Brenner aus'],['kHy','Hysterese Obergrenze','K',2,15,1],['kOff','Kesselsperre ab Kessel − Speicher','K',5,40,1,'Kessel deutlich wärmer: erst Wärme abgeben'],['kOH','Sperre frei bei −','K',1,10,.5],['pan','Notfall: Speicher unter','°C',30,50,1,'Kesselsperre gilt dann nicht'],['kPan','Notfall heizt bis Kessel','°C',50,85,1]]],
 ['Ladepumpe',[['pEin','Pumpe ein ab Kessel − Speicher','K',3,25,1],['rAus','läuft, solange Rücklauf ≥ Speicher +','K',0,15,.5],['pMin','Mindestlaufzeit','s',0,900,10],['pAus','ohne Rücklauffühler: aus unter Δ','K',1,20,1],['rest','Restwärme laden bis Speicher','°C',40,70,1,'auch nachts'],['sMax','Wärme abführen bis Speicher max.','°C',50,80,1,'wenn Kessel nahe Obergrenze']]],
 ['Brenner & Boost',[['sperr','Taktsperre','min',0,60,1,'Pause zwischen zwei Brennerstarts',60],['bMax','Boost höchstens','min',10,240,5,'',60],['drop','Zapf-Erkennung: Abfall je Messung','K',.05,2,.05,'startet automatischen Boost (20-s-Takt)'],['ovMax','max. gelerntes Nachheizen','K',0,15,.5],['minW','Flamme erkannt ab','W',0,500,5,'für die Ölzählung'],['lph','Ölverbrauch Düse','L/h',.5,5,.01]]],
-['Cloud',[['cl','wall.dakonet.de darf vorgeben','bool',0,1,1,'überschreibt dann alle 30 s Soll tagsüber, Legionellen und Tagzeiten']]]];
+['Cloud',[['cl','externe Cloud darf vorgeben','bool',0,1,1,'nur bis Logik V13.1: überschreibt alle 30 s Soll tagsüber, Legionellen und Tagzeiten']]]];
 const hzFault=f=>f.replace('speicher','Speicherfühler').replace('kessel','Kesselfühler').replace(',',' und ');
 const hzStrip=s=>String(s||'').replace(/^[^\p{L}\p{N}]+/u,'').trim();
 const hzT=v=>typeof v=='number'?num(v,1):'–';
@@ -845,7 +845,7 @@ x+=`<div class="kv"><div><div class="v">${typeof s.soll=='number'?num(s.soll,0)+
 `<div><div class="v">${fmt(s.cons_today,2,'L')}</div><div class="l">Öl heute · 7 Tage ${fmt(s.cons_week,1,'L')}</div></div>`+
 `<div><div class="v">${fmt(s.nachheiz,1,'K')}</div><div class="l">gelerntes Nachheizen</div></div></div>`;
 if(s.fault)x+=`<div class="err-l">⚠ ${esc(hzFault(s.fault))} – Brenner gesperrt</div>`;
-if(c.cl===1)x+=`<div class="l" style="color:var(--w)">Cloud-Vorgaben von wall.dakonet.de aktiv – Soll und Tagzeiten können überschrieben werden.</div>`;
+if(c.cl===1)x+=`<div class="l" style="color:var(--w)">Cloud-Vorgaben der externen Cloud aktiv – Soll und Tagzeiten können überschrieben werden.</div>`;
 if(w.cfg_err)x+=`<div class="l" style="color:var(--w)">${esc(w.cfg_err)}</div>`;
 x+=`<div class="row">${canSw()?`<button class="bt${s.boost_manual?' r':''}" onclick="hzBoost(${!s.boost_manual})">${s.boost_manual?'Boost beenden':'Jetzt aufheizen'}</button>`:''}${isAdmin()&&w.cfg?'<button class="bt g" onclick="hzWW()">Einstellungen</button>':''}<span class="l">Logik ${esc(s.ver||'≤ 12.9')}</span></div>`;
 return hzCard(col,x)}
@@ -897,11 +897,11 @@ function hzIn(k,u,mi,ma,st,fa,v){if(u=='time')return`<input id="hw_${k}" type="t
 return`<div class="row"><input id="hw_${k}" type="number" min="${mi}" max="${ma}" step="${st}" value="${v!=null?Math.round(v/(fa||1)*1000)/1000:''}" style="width:100px"> ${u}</div>`}
 function hzWW(def){const w=HZ.ww,c=def?HZ_DEF:w.cfg;
 let h=`<h2>${esc(w.name)} – Einstellungen</h2><div style="max-height:62vh;overflow:auto;padding-right:6px">`;
-HZ_F.forEach(([g,fs])=>{h+=`<h3>${g}</h3><div class="f">`;fs.forEach(([k,l,u,mi,ma,st,hint,fa])=>{h+=`<label>${l}</label>${hzIn(k,u,mi,ma,st,fa,c[k])}`;if(hint)h+=`<label></label><div class="l" style="margin-top:-6px">${hint}</div>`});h+='</div>'});
+HZ_F.forEach(([g,fs])=>{fs=fs.filter(f=>f[0] in w.cfg);if(!fs.length)return;h+=`<h3>${g}</h3><div class="f">`;fs.forEach(([k,l,u,mi,ma,st,hint,fa])=>{h+=`<label>${l}</label>${hzIn(k,u,mi,ma,st,fa,c[k])}`;if(hint)h+=`<label></label><div class="l" style="margin-top:-6px">${hint}</div>`});h+='</div>'});
 h+=`<h3>Gelerntes Nachheizen</h3><div class="f"><label>aktuell ${fmt(w.ov,1,'K')}</label><div class="row"><input id="hw_ov" type="number" min="0" max="${c.ovMax??15}" step="0.5" placeholder="neu" style="width:100px"> K</div></div>`;
 h+=`</div><div class="row sp" style="margin-top:14px"><button class="bt g" onclick="hzWW(1)">Werkswerte eintragen</button><div class="row"><button class="bt g" onclick="closeDlg()">Abbrechen</button><button class="bt" onclick="hzWWSave()">Speichern</button></div></div>`;dlg(h)}
 function hzWWSave(){const c=HZ.ww.cfg,b={};let bad=[];
-HZ_F.forEach(([,fs])=>fs.forEach(([k,l,u,mi,ma,,,fa])=>{const e=$('hw_'+k);let v;
+HZ_F.forEach(([,fs])=>fs.forEach(([k,l,u,mi,ma,,,fa])=>{const e=$('hw_'+k);if(!e)return;let v;
 if(u=='time'){v=e.value;if(!/^\d\d:\d\d$/.test(v)){bad.push(l);return}}else if(u=='bool')v=e.checked?1:0;
 else{if(e.value===''){bad.push(l);return}const d=parseFloat(e.value);if(isNaN(d)||d<mi||d>ma){bad.push(l);return}v=Math.round(d*(fa||1)*1000)/1000}
 if(v!==c[k]&&!(typeof v=='number'&&Math.abs(v-c[k])<1e-6))b[k]=v}));
