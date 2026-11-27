@@ -76,7 +76,7 @@ dialog::backdrop{background:#000a}dialog h2{margin-bottom:14px}
 @media(max-width:600px){.sw{width:58px;height:58px}main{padding:6px}.card{padding:12px}.hm{display:none}header{position:static}}
 </style></head><body>
 <header><h1><img src="/icon-192.png" alt="">Pagurus Cloud</h1>
-<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="kl">Klima</a><a data-t="hz">Heizung</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="se">Einstellungen</a></nav>
+<nav id="nav"><a data-t="dv" class="a">Geräte</a><a data-t="wa">Wäsche</a><a data-t="kg">Kühlgeräte</a><a data-t="kl">Klima</a><a data-t="hz">Heizung</a><a data-t="en">Energie</a><a data-t="sh">Beschattung</a><a data-t="au">Automatik</a><a data-t="al">Meldungen<span class="badge" id="nb" style="display:none"></span></a><a data-t="sc" class="admin-only">Scripte</a><a data-t="se">Einstellungen</a></nav>
 <span class="l" id="hs"></span></header>
 <main>
 <section class="tab a" id="dv"><div id="scbar" class="row user-only" style="margin:6px 0 2px"></div><div id="devs"></div></section>
@@ -150,6 +150,13 @@ kommen vom gekoppelten Energiemesser (Gerät bearbeiten → Energiemesser).</p>
 
 <section class="tab" id="al"><div class="card"><div class="row sp"><h2 style="margin:0">Meldungen</h2>
 <div class="user-only"><button class="bt g" onclick="ackAll()">Alle quittieren</button><button class="bt r" onclick="clrAl()">Alle löschen</button></div></div><div class="scroll"><table id="atab" style="margin-top:10px"></table></div></div></section>
+
+<section class="tab" id="sc">
+<div class="row sp"><h3 style="margin:8px 0">Scripte</h3><div class="row"><span class="l" id="sc_ts"></span><button class="bt g s" onclick="run(()=>loadSc(1))">Neu einlesen</button><button class="bt s" onclick="scEdit()">Neues Script</button></div></div>
+<div class="card"><h2>Auf den Geräten</h2><p class="l">Alle Shelly Gen2+ mit Original-Firmware. Version aus der ersten Kommentarzeile des Scripts (z. B. <code>// … v11.4</code>).
+Beim Speichern sichert die Cloud vorher den alten Code (je Script die letzten 20 Fassungen) und prüft nach dem Start, ob es läuft.</p><div id="sc_devs"></div></div>
+<div class="card"><h2>Bibliothek</h2><p class="l">Scripte zentral pflegen und auf ein oder mehrere Geräte übertragen.</p><div id="sc_lib"></div></div>
+</section>
 
 <section class="tab" id="se">
 <div class="row sp" style="margin:8px 0"><div class="row rng" id="se_nav"><a data-g="allg">Allgemein</a><a data-g="dev">Geräte</a><a data-g="wd">Wandtafeln</a><a data-g="zu">Zugang</a><a data-g="sys">System</a></div>
@@ -814,10 +821,67 @@ $('hs').textContent=(i.mqtt?'Broker verbunden':'⚠ Broker nicht verbunden')+' �
 $('bk').textContent=(i.broker||location.hostname)+':1883';{const b=i.broker||location.hostname;if(!$('g2_br').value)$('g2_br').value=b;if(!$('g2_net').value&&/^\d+\.\d+\.\d+\.\d+$/.test(b))$('g2_net').value=b.replace(/\.\d+$/,'.0/24')}$('me').textContent=ME.open?'Ohne Anmeldung (keine Benutzer angelegt)':'Angemeldet als '+ME.name;$('lo').style.display=ME.open?'none':''}
 let busy=false;
 async function refresh(force){if(busy&&!force)return;busy=true;try{await loadInfo();await loadDevs();await loadAl();
-if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='kl')await loadClimates(force);if(TAB=='hz')await loadHz();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
+if(TAB=='wa')await loadApps();if(TAB=='kg')await loadFridges();if(TAB=='kl')await loadClimates(force);if(TAB=='hz')await loadHz();if(TAB=='sc'&&force)await loadSc();if(TAB=='en'&&force)await loadEn();if(TAB=='au'&&force)await loadAuto();if(TAB=='sh')await loadShade();if(TAB=='se'&&force)await loadSet()}catch(e){if(e.message!='login')console.warn(e)}busy=false}
 refresh(true);setInterval(()=>{if(!$('dlg').open&&!document.hidden)refresh()},5000);
 if('serviceWorker' in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
+
+// ---------- Scripte ----------
+let SC=null,SCL=[];
+async function loadSc(refresh){if(!isAdmin())return;$('sc_devs').innerHTML=SC?$('sc_devs').innerHTML:'<div class="empty">Lese Scripte von den Geräten …</div>';
+[SC,SCL]=await Promise.all([api('scripts'+(refresh?'?refresh=1':'')),api('scriptlib')]);scRender()}
+function scRender(){const D=SC.devices.filter(d=>d.scripts.length||d.err);
+$('sc_ts').textContent='eingelesen '+ago(SC.ts);
+$('sc_devs').innerHTML=D.length?D.map(d=>`<div style="margin:0 0 14px"><div class="row sp" style="border-bottom:1px solid var(--b);padding:4px 0"><span><b>${esc(d.name)}</b> <span class="l">${esc(d.ip||'')} · ${esc(d.model||'')}</span></span>
+${d.online&&!d.err?`<a class="lk" style="font-size:12px" onclick="scNew('${esc(d.dev)}')">+ Script</a>`:''}</div>
+${d.err?`<div class="err-l">${esc(d.err)}</div>`:''}<div class="scroll"><table>${d.scripts.map(s=>`<tr><td style="width:34px" class="l">#${s.id}</td>
+<td><b>${esc(s.name||'–')}</b>${s.title?`<div class="l">${esc(s.title)}</div>`:''}</td><td>${s.ver?`<span class="tag b">v${esc(s.ver)}</span>`:'<span class="l">–</span>'}</td>
+<td>${s.running?'<span class="tag g">läuft</span>':'<span class="tag">gestoppt</span>'} ${s.enable?'<span class="tag">Autostart</span>':''}${(s.errors||[]).length?` <span class="tag r">${esc(s.errors.join(', '))}</span>`:''}</td>
+<td class="n l">${s.mem_free!=null?'frei '+num(s.mem_free/1024,1)+' kB':''}</td>
+<td class="n" style="white-space:nowrap"><a class="lk" onclick="scEdit({dev:'${esc(d.dev)}',sid:${s.id}})">Bearbeiten</a> · <a class="lk" onclick="scDo('${esc(d.dev)}',${s.id},'${s.running?'stop':'start'}')">${s.running?'Stoppen':'Starten'}</a> · <a class="lk" onclick="scDo('${esc(d.dev)}',${s.id},'${s.enable?'disable':'enable'}')">Autostart ${s.enable?'aus':'an'}</a></td></tr>`).join('')}</table></div></div>`).join(''):'<div class="empty">Keine Gen2+-Geräte mit Scripten gefunden.</div>';
+$('sc_lib').innerHTML=SCL.length?'<table><tr><th>Name</th><th>Version</th><th>Geändert</th><th class="n">Größe</th><th></th></tr>'+SCL.map(x=>`<tr><td><b>${esc(x.name)}</b>${x.title?`<div class="l">${esc(x.title)}</div>`:''}</td><td>${x.ver?'<span class="tag b">v'+esc(x.ver)+'</span>':'–'}</td><td>${dt(x.ts)}</td><td class="n">${num(x.size/1024,1)} kB</td>
+<td class="n" style="white-space:nowrap"><a class="lk" onclick="scEdit({lid:${x.id}})">Bearbeiten</a> · <a class="lk" onclick="scLibDel(${x.id})">✕</a></td></tr>`).join('')+'</table>':'<div class="l">Noch leer. Ein Script vom Gerät mit „In Bibliothek“ übernehmen oder oben „Neues Script“.</div>'}
+function scDo(dev,sid,action){run(async()=>{await api(`scripts/${encodeURIComponent(dev)}/${sid}/do`,{method:'POST',body:{action}});SC=await api('scripts');scRender()},{start:'Gestartet',stop:'Gestoppt',enable:'Autostart an',disable:'Autostart aus'}[action])}
+function scLibDel(id){if(!confirm('Script aus der Bibliothek löschen? Auf den Geräten bleibt es.'))return;run(async()=>{await api('scriptlib/'+id,{method:'DELETE'});SCL=await api('scriptlib');scRender()},'Gelöscht')}
+function scHead(code){for(const l of code.split('\n').slice(0,6)){const t=l.trim();if(!t.startsWith('//')){if(t)break;continue}const m=t.match(/(?<![\w.])[Vv](\d+(?:\.\d+){0,2})(?![\w.])/);if(m)return 'v'+m[1]}return''}
+function scDevName(dev){const d=SC&&SC.devices.find(x=>x.dev==dev);return d?d.name:dev}
+let SCE=null;
+async function scEdit(o){o=o||{};let code='',name='',hist=[],title='';
+try{if(o.lid){const x=await api('scriptlib/'+o.lid);code=x.code;name=x.name}
+else if(o.dev!=null){const x=await api(`scripts/${encodeURIComponent(o.dev)}/${o.sid}`);code=x.code;hist=x.hist;const s=SC.devices.find(d=>d.dev==o.dev).scripts.find(s=>s.id==o.sid);name=s.name}}catch(e){toast(e.message);return}
+SCE={...o,name,hist};
+title=o.dev!=null?`${esc(scDevName(o.dev))} · Script #${o.sid} „${esc(name)}“`:o.lid?'Bibliothek · '+esc(name):'Neues Script (Bibliothek)';
+const devOptsSc=SC.devices.filter(d=>d.online&&!d.err).map(d=>`<optgroup label="${esc(d.name)}">${d.scripts.map(s=>`<option value="${esc(d.dev)}|${s.id}">#${s.id} ${esc(s.name)}${s.ver?' v'+esc(s.ver):''}</option>`).join('')}<option value="${esc(d.dev)}|new">+ neues Script auf ${esc(d.name)}</option></optgroup>`).join('');
+const d=dlg(`<h2>${title}</h2>
+${o.dev==null?`<div class="row" style="margin-bottom:8px"><label class="l">Name</label><input id="sce_n" value="${esc(name)}" style="flex:1"></div>`:''}
+<textarea id="sce_c" spellcheck="false" style="width:100%;height:58vh;font:12.5px/1.45 ui-monospace,Consolas,monospace;tab-size:2;white-space:pre;resize:vertical"></textarea>
+<div class="row sp" style="margin-top:6px"><span class="l" id="sce_i"></span>${hist.length?`<span class="row"><span class="l">Frühere Fassung</span><select id="sce_h" onchange="scHist(this.value)"><option value="">–</option>${hist.map(h=>`<option value="${h.id}">${dt(h.ts)} · ${esc(h.note||'')}</option>`).join('')}</select></span>`:''}</div>
+<div class="row sp" style="margin-top:12px"><div class="row">${o.dev!=null?`<button class="bt g" onclick="scToLib()">In Bibliothek</button>`:`<select id="sce_t" style="max-width:320px"><option value="">Übertragen auf …</option>${devOptsSc}</select><button class="bt g" onclick="scPushLib()">Übertragen</button>`}</div>
+<div class="row"><button class="bt g" onclick="closeDlg()">Schließen</button>${o.dev!=null?`<button class="bt" onclick="scSave()">Auf Gerät speichern</button>`:`<button class="bt" onclick="scLibSave()">In Bibliothek speichern</button>`}</div></div>`);
+d.style.width='min(1150px,97vw)';d.addEventListener('close',()=>{d.style.width=''},{once:true});
+const ta=$('sce_c');ta.value=code;SCE.orig=code;scInfo();
+ta.oninput=scInfo;ta.onkeydown=e=>{if(e.key=='Tab'){e.preventDefault();const a=ta.selectionStart,b=ta.selectionEnd;ta.setRangeText('  ',a,b,'end');scInfo()}
+if((e.ctrlKey||e.metaKey)&&e.key=='s'){e.preventDefault();o.dev!=null?scSave():scLibSave()}}}
+function scInfo(){const c=$('sce_c').value,b=new TextEncoder().encode(c).length;$('sce_i').textContent=`${c.split('\n').length} Zeilen · ${num(b/1024,1)} kB${scHead(c)?' · erkannt '+scHead(c):''}${c!==SCE.orig?' · geändert':''}`}
+async function scHist(id){if(!id)return;const h=await api('scripts-hist/'+id);if($('sce_c').value!==SCE.orig&&!confirm('Ungespeicherte Änderungen verwerfen und die frühere Fassung laden?')){$('sce_h').value='';return}$('sce_c').value=h.code;scInfo();toast('Frühere Fassung geladen – mit „Auf Gerät speichern“ zurückspielen',1)}
+async function scPut(dev,sid,code,note){const r=await api(`scripts/${encodeURIComponent(dev)}/${sid}`,{method:'POST',body:{code,note}});
+if(!r.ok){toast('Übertragen, aber das Script läuft nicht'+(r.errors&&r.errors.length?': '+r.errors.join(', '):'')+' – unter „Frühere Fassung“ zurückholen');return false}
+toast(r.running?'Übertragen und gestartet'+(r.mem_free!=null?' · frei '+num(r.mem_free/1024,1)+' kB':''):'Übertragen (Script war gestoppt)',1);return true}
+function scSave(){const c=$('sce_c').value;if(c===SCE.orig){toast('Keine Änderung');return}
+if(!confirm(`Script #${SCE.sid} auf ${scDevName(SCE.dev)} überschreiben? Der alte Code wird vorher gesichert. Läuft das Script, wird es kurz gestoppt und neu gestartet.`))return;
+run(async()=>{const ok=await scPut(SCE.dev,SCE.sid,c,'Bearbeitet in der Cloud');SC=await api('scripts');scRender();if(ok)closeDlg();else{const x=await api(`scripts/${encodeURIComponent(SCE.dev)}/${SCE.sid}`);SCE.hist=x.hist}})}
+function scToLib(){const c=$('sce_c').value,n=prompt('Name in der Bibliothek',SCE.name||'script');if(!n)return;
+run(async()=>{const ex=SCL.find(x=>x.name==n);if(ex&&!confirm(`„${n}“ gibt es schon – überschreiben?`))return;await api('scriptlib',{method:'POST',body:{id:ex?ex.id:undefined,name:n,code:c,note:'von '+scDevName(SCE.dev)+' #'+SCE.sid}});SCL=await api('scriptlib');scRender()},'In Bibliothek gespeichert')}
+function scLibSave(){const n=$('sce_n').value.trim(),c=$('sce_c').value;if(!n){toast('Name fehlt');return}
+run(async()=>{const r=await api('scriptlib',{method:'POST',body:{id:SCE.lid,name:n,code:c}});SCE.lid=r.id;SCE.orig=c;SCL=await api('scriptlib');scRender();scInfo()},'In Bibliothek gespeichert')}
+function scPushLib(){const t=$('sce_t').value,c=$('sce_c').value;if(!t){toast('Ziel wählen');return}const[dev,sid]=t.split('|');
+if(sid=='new'){const n=prompt('Name des neuen Scripts auf dem Gerät',($('sce_n').value||'script').slice(0,30));if(!n)return;
+if(!confirm(`Neues Script „${n}“ auf ${scDevName(dev)} anlegen, starten und auf Autostart setzen?`))return;
+run(async()=>{const r=await api(`scripts/${encodeURIComponent(dev)}/new`,{method:'POST',body:{name:n,code:c,start:true,enable:true}});SC=await api('scripts');scRender();toast(r.ok===false?'Angelegt, läuft aber nicht: '+(r.errors||[]).join(', '):'Angelegt und gestartet',r.ok!==false)});return}
+if(!confirm(`Script #${sid} auf ${scDevName(dev)} mit diesem Code überschreiben? Der alte Code wird vorher gesichert.`))return;
+run(async()=>{await scPut(dev,+sid,c,'Aus Bibliothek: '+($('sce_n').value||''));SC=await api('scripts');scRender()})}
+function scNew(dev){const n=prompt('Name des neuen Scripts','script');if(!n)return;
+run(async()=>{await api(`scripts/${encodeURIComponent(dev)}/new`,{method:'POST',body:{name:n,start:false,enable:false}});SC=await api('scripts');scRender()},'Leeres Script angelegt')}
 
 // ---------- Einstellungen: Unterreiter ----------
 function seTab(g){if(!isAdmin())g='dev';try{localStorage.setItem('seTab',g)}catch(e){}

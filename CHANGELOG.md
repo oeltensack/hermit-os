@@ -1,5 +1,12 @@
 # Änderungen
 
+## Pagurus Cloud 1.25.0
+- Neuer Reiter **Scripte** (nur Administratoren): alle Scripte der Shelly Gen2+ mit Version (aus der ersten
+  Kommentarzeile), Zustand, Autostart und freiem Speicher. Code in der Cloud bearbeiten und auf das Gerät speichern,
+  starten/stoppen, Autostart, neue Scripte anlegen. Vor jedem Überschreiben sichert die Cloud den alten Code (je Script
+  die letzten 20 Fassungen, zurückholbar) und prüft nach dem Start, ob das Script läuft.
+- **Bibliothek:** Scripte zentral pflegen und auf ein oder mehrere Geräte übertragen.
+
 ## Pagurus Cloud 1.24.1
 - Einstellungen in Unterreiter aufgeteilt: Allgemein (Strom, Standort, Push), Geräte (Anbinden, Firmware, Sicherungen),
   Wandtafeln, Zugang (Benutzer, Fernzugang), System (Cloud-Update). Der zuletzt gewählte Unterreiter bleibt gemerkt.

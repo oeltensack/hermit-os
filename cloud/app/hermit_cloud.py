@@ -32,6 +32,7 @@ import fridge
 import gen2
 import hacompat
 import heizung
+import scripts
 import panel
 import portal
 import shade
@@ -264,6 +265,7 @@ def startup():
     winopen.start(BUS)
     climate.start(BUS)
     heizung.start()
+    scripts.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
     threading.Thread(target=updater_loop, daemon=True).start()
     portal.start(devices)
@@ -271,6 +273,7 @@ def startup():
 
 app.include_router(hacompat.router)
 app.include_router(heizung.router)
+app.include_router(scripts.router)
 
 
 @app.get("/")

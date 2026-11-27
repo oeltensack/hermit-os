@@ -24,6 +24,8 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
 - **Heizung:** Warmwasser (Ölkessel mit Shelly-Logik-Script), Zirkulationspumpe und Raumheizer (Heizlüfter,
   Konvektor) mit Live-Werten, Boost und allen Einstellungen; Warmwasser-Verlauf mit Brennerstarts und Öl je Tag;
   Meldung bei Störung. Die Regelung bleibt auf den Shellys
+- **Scripte:** Shelly-Scripte aller Gen2+-Geräte mit Version anzeigen, in der Cloud bearbeiten und übertragen,
+  mit Sicherung der vorigen Fassung und Bibliothek zum Verteilen auf mehrere Geräte
 - **Meldungen** mit **Push** über ntfy oder Telegram
 - **Firmware-Übersicht** mit Update einzeln oder für alle Geräte
 - **Sicherung** der Geräte-Einstellungen (nachts automatisch) und Zurückspielen, auch auf ein Ersatzgerät
