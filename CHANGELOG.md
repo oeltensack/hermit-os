@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.26.0
+- Beschattung: neue Bedingung **Lichtsensor**. Ein Helligkeitsfühler vor Ort (z. B. Shelly BLU Motion oder
+  BLU Door/Window) mit Schwelle in Lux entscheidet, ob die Sonne scheint – genauer als die Einstrahlung aus dem
+  Wetter. Beim Beschatten gilt 60 % der Schwelle, damit kurze Wolken die Rollläden nicht hochfahren. Meldet der
+  Sensor 30 Minuten nichts, nimmt die Regel wieder die Wetter-Einstrahlung und zeigt das als Hinweis an.
+
 ## Pagurus Cloud 1.25.1
 - Scripte: Übertragen auf die Shellys schlug mit „Missing or bad argument 'code'“ fehl, sobald der Code Zeichen
   außerhalb von Latin-1 enthielt (z. B. Gedankenstrich, Emojis). Die Cloud sendet RPC jetzt als UTF-8 statt mit

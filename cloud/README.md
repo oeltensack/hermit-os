@@ -115,6 +115,7 @@ eine Regel anlegen:
 | Beschatten auf | Position in % offen (0 = zu) – Rollläden ohne Positionssteuerung fahren ganz zu |
 | Temperatur | Fühler oder Wetter; an ab … °C, aus unter … °C (Abstand verhindert Hin und Her) |
 | Innentemperatur, Höchstwert heute, Einstrahlung | zusätzliche Bedingungen, leer = egal |
+| Lichtsensor | Helligkeit vor Ort (BLU Motion, BLU Door/Window …) ≥ Schwelle in lx; ersetzt die Einstrahlung aus dem Wetter. Meldet der Sensor 30 min nichts, gilt wieder die Einstrahlung |
 | Verzögerung | so lange müssen die Bedingungen anhalten (Standard 5 min an, 15 min aus) |
 | Danach | ganz öffnen, vorige Position oder stehen lassen |
 

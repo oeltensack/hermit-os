@@ -119,7 +119,7 @@ def sensors():
     return out
 
 
-def source_value(src):
+def source_value(src, max_age=6 * 3600):
     """'wx:temp', 'wx:tmax', 'wx:radiation' … oder 'dev:<id>|<comp>' -> (Wert, Text)."""
     if not src:
         return None, ""
@@ -133,7 +133,7 @@ def source_value(src):
         r = q("SELECT value, ts FROM sensors WHERE dev=? AND comp=?", (dev, comp), one=True)
         if not r:
             return None, "Fühler meldet nichts"
-        if time.time() - r["ts"] > 6 * 3600:               # H&T meldet selten, 6 h gelten noch
+        if time.time() - r["ts"] > max_age:                 # H&T meldet selten, 6 h gelten noch
             return None, "Fühler-Wert zu alt"
         return r["value"], ""
     return None, "Quelle unbekannt"
@@ -196,7 +196,7 @@ def frost_block():
 # ======================= Regeln =======================
 DEFAULT = {"covers": [], "azimuth": 180, "width": 70, "elev_min": 10, "elev_max": 90, "pos": 20,
            "temp_src": "wx:temp", "temp_on": 24, "temp_off": 21, "in_src": "", "in_on": 23,
-           "fc_on": None, "rad_min": 0, "delay_on": 5, "delay_off": 15, "from": "", "to": "", "days": 127,
+           "fc_on": None, "rad_min": 0, "lux_src": "", "lux_on": 0, "delay_on": 5, "delay_off": 15, "from": "", "to": "", "days": 127,
            "end": "open"}
 
 
@@ -239,7 +239,20 @@ def evaluate(c, active):
             ok = False; why.append("keine Vorhersage")
         elif tm < float(c["fc_on"]):
             ok = False; why.append(f"Höchstwert heute {tm:.0f} °C < {float(c['fc_on']):g} °C")
-    if float(c.get("rad_min") or 0) > 0:
+    # Nur bei Sonne: Lichtsensor vor Ort; faellt er aus (oder Wert aelter als 30 min), gilt die Einstrahlung aus dem Wetter
+    lux_used = False
+    if c.get("lux_src") and float(c.get("lux_on") or 0) > 0:
+        lx, err = source_value(c["lux_src"], max_age=1800)
+        if lx is not None:
+            lux_used = True
+            lim = float(c["lux_on"]) * (0.6 if active else 1)    # bei kurzen Wolken nicht gleich hochfahren
+            if lx < lim:
+                ok = False; why.append(f"Helligkeit {lx:.0f} lx < {lim:.0f}")
+        elif float(c.get("rad_min") or 0) <= 0:
+            why.append(f"Lichtsensor: {err or 'kein Wert'} – ohne Einstrahlungsgrenze nicht geprüft")
+        else:
+            why.append(f"Lichtsensor: {err or 'kein Wert'} – Wetter-Einstrahlung gilt")
+    if not lux_used and float(c.get("rad_min") or 0) > 0:
         rad = WX.get("radiation") if WX.get("ok") else None
         lim = float(c["rad_min"]) * (0.6 if active else 1)       # bei kurzen Wolken nicht gleich hochfahren
         if rad is None:
@@ -345,9 +358,10 @@ def rules_view():
 def save_rule(d):
     c = {k: d.get(k, v) for k, v in DEFAULT.items()}
     c["covers"] = [str(x) for x in (d.get("covers") or [])]
-    for k in ("azimuth", "width", "elev_min", "elev_max", "pos", "temp_on", "temp_off", "in_on", "rad_min",
+    for k in ("azimuth", "width", "elev_min", "elev_max", "pos", "temp_on", "temp_off", "in_on", "rad_min", "lux_on",
               "delay_on", "delay_off", "days"):
         c[k] = float(str(c[k]).replace(",", ".")) if c[k] not in (None, "") else DEFAULT[k]
+    c["lux_src"] = str(c.get("lux_src") or "")
     c["fc_on"] = float(str(d["fc_on"]).replace(",", ".")) if d.get("fc_on") not in (None, "") else None
     c["pos"] = max(0, min(100, int(c["pos"])))
     c["days"] = int(c["days"])
