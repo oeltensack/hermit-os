@@ -4,8 +4,11 @@
 # holt den neuen Stand von GitHub und baut die Container neu.
 CLOUD="${HERMIT_CLOUD_DIR:?HERMIT_CLOUD_DIR fehlt}"
 # Uhrzeiten im Protokoll in deutscher Zeit. POSIX-Regel statt Europe/Berlin: funktioniert auch ohne tzdata
-# im Updater-Image (busybox date); der Container wird beim Update nicht neu gebaut.
-case "$TZ" in ""|UTC|Etc/UTC|Europe/Berlin) export TZ="CET-1CEST,M3.5.0,M10.5.0/3" ;; esac
+# im Updater-Image (busybox date). NUR fuer date setzen – nicht exportieren: docker compose wuerde TZ sonst an die
+# Cloud weitergeben (TZ: ${TZ:-Europe/Berlin}), und die erwartet einen Zonennamen.
+LOCAL_TZ="CET-1CEST,M3.5.0,M10.5.0/3"
+case "$TZ" in CET-1CEST*) unset TZ ;; esac          # falls von einer aelteren Fassung noch gesetzt
+now() { TZ="$LOCAL_TZ" date "$@"; }
 REPO="$(dirname "$CLOUD")"
 DATA="$CLOUD/data"
 SRC_TGZ="https://codeload.github.com/oeltensack/pagurus-os/tar.gz/refs/heads/main"
@@ -13,7 +16,7 @@ mkdir -p "$DATA"
 [ -f "$CLOUD/docker-compose.yml" ] || { echo "Falscher Pfad $CLOUD – docker compose im Ordner cloud/ starten"; sleep 3600; exit 1; }
 
 do_update() {
-  echo "== $(date '+%d.%m.%Y %H:%M:%S') Update startet"
+  echo "== $(now '+%d.%m.%Y %H:%M:%S') Update startet"
   if [ -d "$REPO/.git" ]; then
     cd "$REPO" || return 1
     git config --global --add safe.directory "$REPO"
@@ -32,7 +35,7 @@ do_update() {
   echo "-- Container neu starten"
   docker compose up -d mosquitto cloud || return 1
   docker image prune -f >/dev/null 2>&1
-  echo "== FERTIG $(date '+%d.%m.%Y %H:%M:%S')"
+  echo "== FERTIG $(now '+%d.%m.%Y %H:%M:%S')"
 }
 
 # Waechter: laeuft die Cloud nicht (beendet) oder antwortet sie 4 min lang nicht, wird sie wieder gestartet.
@@ -58,7 +61,7 @@ watchdog() {
   esac
 }
 wd_log() {
-  echo "== $(date '+%d.%m.%Y %H:%M:%S') $*" >> "$DATA/watchdog.log"
+  echo "== $(now '+%d.%m.%Y %H:%M:%S') $*" >> "$DATA/watchdog.log"
   tail -n 200 "$DATA/watchdog.log" > "$DATA/watchdog.tmp" 2>/dev/null && mv "$DATA/watchdog.tmp" "$DATA/watchdog.log"
 }
 

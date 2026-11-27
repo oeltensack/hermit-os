@@ -15,7 +15,11 @@ from zoneinfo import ZoneInfo
 
 DATA = Path(os.environ.get("DATA_DIR", "/data"))
 DB_PATH = DATA / "cloud.db"
-TZ = ZoneInfo(os.environ.get("TZ", "Europe/Berlin"))
+try:
+    TZ = ZoneInfo(os.environ.get("TZ") or "Europe/Berlin")
+except Exception:                       # z. B. POSIX-Regel "CET-1CEST,..." statt Zonenname: nicht am Start scheitern
+    TZ = ZoneInfo("Europe/Berlin")
+    os.environ["TZ"] = "Europe/Berlin"
 KEEP_POWER_DAYS = int(os.environ.get("KEEP_POWER_DAYS", "31"))
 OFFLINE_AFTER = int(os.environ.get("OFFLINE_AFTER", "180"))
 OFFLINE_ALERT_AFTER = int(os.environ.get("OFFLINE_ALERT_AFTER", "120"))   # kurze Aussetzer nicht melden

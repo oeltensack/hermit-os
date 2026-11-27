@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.5
+- **Behoben:** Nach einem Update über den Updater startete die Cloud nicht mehr („ZoneInfoNotFoundError … CET-1CEST“).
+  Der Updater hatte seit 1.27.2 für die Protokoll-Uhrzeiten `TZ` als POSIX-Regel gesetzt, und `docker compose` gab
+  das an die Cloud weiter. Jetzt gilt die Regel nur noch für die Uhrzeiten im Protokoll; außerdem fällt die Cloud bei
+  einer unbrauchbaren `TZ` auf Europe/Berlin zurück, statt abzubrechen.
+
 ## Pagurus Cloud 1.27.4
 - **Wächter:** Der Updater prüft jede Minute, ob die Cloud läuft und antwortet. Ist der Container beendet, startet er
   ihn wieder; antwortet die Cloud 4 Minuten lang nicht, startet er sie neu. Jeder Eingriff steht mit den letzten
