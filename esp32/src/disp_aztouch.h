@@ -353,7 +353,11 @@ bool acRpc(const String& m, JsonVariantConst p, JsonObject o, String& e) {
 
 // ======================= Start / Schleife =======================
 void dispBegin() {
+  Serial.printf("\n[disp] Pagurus OS %s %s, Reset-Grund %d, Heap %u\n", FW_VERSION, DEV_VARIANT,
+                (int)esp_reset_reason(), ESP.getFreeHeap());
   dispLoadCfg();
+  Serial.printf("[disp] Quellen: ww %s/%d, zirk %s/%d, Drehung %d\n", dcfg.wwIp.c_str(), dcfg.wwSid,
+                dcfg.zIp.c_str(), dcfg.zTid, dcfg.rot);
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW);
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
@@ -363,12 +367,16 @@ void dispBegin() {
   esp_task_wdt_init(WDT_SEKUNDEN, true);
 #endif
   esp_task_wdt_add(NULL);
+  Serial.println("[disp] tft.begin");
   tft.begin();
+  Serial.printf("[disp] ILI9341 ID %02X %02X %02X\n", tft.readcommand8(ILI9341_RDMODE),
+                tft.readcommand8(ILI9341_RDMADCTL), tft.readcommand8(ILI9341_RDSELFDIAG));
   tft.setRotation(dcfg.rot);
   ts.begin();
   ts.setRotation(dcfg.rot == 3 ? 1 : 3);
   tft.fillScreen(C_BG);
   centered(0, 100, 320, 30, "Pagurus Heizung", &FreeSansBold12pt7b, C_TEXT);
+  Serial.println("[disp] Startbild gezeichnet");
 }
 
 void dispLoop() {
