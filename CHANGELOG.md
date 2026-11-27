@@ -1,5 +1,11 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.3
+- Fertig-Erkennung: im Dialog des Geräts neuer Link **„Regel ‚bei fertig' anlegen“** – öffnet eine vorbereitete Regel
+  (Auslöser „Gerät fertig“, Aktion Push-Nachricht), die sich um Schalten, Szenen oder Rollläden erweitern lässt.
+- Regeln mit Auslöser „Gerät fertig“/„Gerät startet“ bieten nur Geräte mit Fertig-Erkennung an und sagen, wo man sie
+  einrichtet, falls noch keine da ist.
+
 ## Pagurus Cloud 1.27.2
 - Update-Protokoll: Uhrzeiten in deutscher Zeit statt UTC (der Updater-Container hatte keine Zeitzone), „FERTIG“
   jetzt mit Datum. Greift ab dem nächsten Update ohne Neubau des Updaters; `docker-compose.yml` und das
