@@ -124,5 +124,9 @@ Erstes Aufspielen per USB (der alte Sketch hat kein OTA):
 esptool.py --chip esp32 --port COM5 write_flash 0x0 hermit-aztouch-esp32-factory.bin
 ```
 
+Das Komplettabbild überschreibt auch die gespeicherten Einstellungen (WLAN, Adressen, MQTT). Spätere Versionen
+deshalb über die Weboberfläche einspielen (*System* → *Firmware-Datei hochladen*, `hermit-aztouch-esp32.bin`)
+oder per Update – dann bleibt alles erhalten.
+
 Danach mit `hermit-aztouch-xxxxxx` verbinden → `http://192.168.33.1` → *WLAN* → Netz und Passwort →
 nach dem Neustart unter der neuen IP Reiter *Anzeige* (Adressen) und *MQTT* (Cloud).

@@ -45,7 +45,7 @@ Messwerte (Temperaturen, Lüfter, Verdichter) werden nicht aufgezeichnet.</div>
 </section>
 <section class="tab" id="w"><div class="card"><h2>WLAN</h2>
 <div id="ws" class="l"></div><label>Netz</label><select id="w_s"></select><button class="bt" style="margin-top:6px" onclick="scan()">Netze suchen</button>
-<label>oder Name von Hand</label><input id="w_m"><label>Passwort</label><input id="w_p" type="password">
+<label>oder Name von Hand (gilt, wenn oben nichts gewählt ist)</label><input id="w_m"><label>Passwort</label><input id="w_p" type="password">
 <div class="row"><button class="bt p" onclick="saveW()">Speichern und neu starten</button></div></div></section>
 <section class="tab" id="q"><div class="card"><h2>MQTT (Pagurus Cloud)</h2>
 <div class="chk"><input type="checkbox" id="q_e"><span>MQTT einschalten</span></div>
@@ -102,8 +102,8 @@ async function cfg(){C=await rpc('Shelly.GetConfig');const i=await rpc('Shelly.G
 function set(p){busy=true;run(async()=>{await rpc('Climate.Set',p);busy=false;setTimeout(load,300)}).finally(()=>busy=false)}
 function tog(){const c=S['climate:0']||{};set({on:!c.output})}
 function tgt(d){const c=S['climate:0']||{},L=lim(c);pendT=Math.max(L.mn,Math.min(L.mx,Math.round(((pendT!=null?pendT:c.target_C||24)+d*L.st)/L.st)*L.st));render();clearTimeout(tTimer);tTimer=setTimeout(()=>{const t=pendT;pendT=null;set({target_C:t})},700)}
-function scan(){run(async()=>{const r=await rpc('WiFi.Scan');$('w_s').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(x=>`<option>${x.ssid}</option>`).join('');$('w_m').value=''})}
-function saveW(){const s=$('w_m').value||$('w_s').value;if(!s)return toast('Netz wählen');run(()=>rpc('WiFi.SetConfig',{config:{sta:{ssid:s,pass:$('w_p').value}}}),'Gespeichert – Neustart')}
+function scan(){run(async()=>{const r=await rpc('WiFi.Scan');const seen=new Set();$('w_s').innerHTML='<option value="">– Netz wählen –</option>'+r.results.sort((a,b)=>b.rssi-a.rssi).filter(x=>x.ssid&&!seen.has(x.ssid)&&seen.add(x.ssid)).map(x=>`<option>${x.ssid}</option>`).join('')})}
+function saveW(){const s=($('w_s').value||$('w_m').value).trim();if(!s)return toast('Netz wählen oder Namen eintragen');if(!confirm(`Mit „${s}“ verbinden? Das Gerät startet danach neu.`))return;run(()=>rpc('WiFi.SetConfig',{config:{sta:{ssid:s,pass:$('w_p').value}}}),'Gespeichert – Neustart')}
 function saveQ(){const c={enable:$('q_e').checked,server:$('q_s').value,user:$('q_u').value,topic_prefix:$('q_t').value};if($('q_p').value)c.pass=$('q_p').value;run(()=>rpc('MQTT.SetConfig',{config:c}),'Gespeichert')}
 function saveS(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('s_n').value}}});await rpc('Climate.SetConfig',{config:{beep:$('s_b').checked}});if(C['temperature:0'])await rpc('Temperature.SetConfig',{config:{offset_C:+$('s_o').value||0}});await cfg()},'Gespeichert')}
 function saveU(){run(()=>rpc('Sys.SetConfig',{config:{update:{mode:$('u_m').value,url:$('u_u').value}}}),'Gespeichert')}

@@ -8,6 +8,8 @@
   übrigen ESP32-Varianten; Klima-Varianten unverändert.
 - Zweite Seite **BAD** für einen Heizlüfter (wie AZ_Touch v13.0, mit Taste BETRIEB wie CYD v14): Adresse und Name
   im Reiter *Anzeige*, Wechsel über die Kopfzeile. Startausgabe auf der seriellen Schnittstelle (115200).
+- WLAN-Seite (Anzeige und Klima): nach „Netze suchen“ ist kein Netz mehr vorausgewählt – vorher wurde beim Speichern
+  ohne Auswahl das stärkste fremde Netz übernommen. Rückfrage mit dem Netznamen vor dem Speichern.
 
 ## Pagurus Cloud 1.27.0
 - Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der

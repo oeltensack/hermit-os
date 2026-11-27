@@ -495,7 +495,13 @@ void drawSetup() {
       line("   " + String(DEV_PREFIX) + "-" + mac.substring(6), C_OK);
       line("2. im Browser 192.168.33.1", C_TEXT);
       line("   Reiter WLAN", C_TEXT);
-    } else line("Verbinde mit " + cfg.ssid + " ...", C_TEXT);
+    } else {
+      line("Verbinde mit", C_TEXT);
+      line("   " + cfg.ssid, C_OK);
+      line("Klappt es nicht (Name/Passwort),", C_DIM);
+      line("kommt nach 1 min wieder der", C_DIM);
+      line("Zugangspunkt zum Einrichten.", C_DIM);
+    }
   } else {
     line("Verbunden: " + WiFi.localIP().toString(), C_OK);
     line("Adressen eintragen:", C_ORANGE);

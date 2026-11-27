@@ -45,7 +45,7 @@ label{display:block;font-size:12px;color:var(--m);margin:10px 0 4px}input,select
 <div class="row"><button class="bt p" onclick="saveD()">Speichern</button></div></div></section>
 <section class="tab" id="w"><div class="card"><h2>WLAN</h2>
 <div id="ws" class="l"></div><label>Netz</label><select id="w_s"></select><button class="bt" style="margin-top:6px" onclick="scan()">Netze suchen</button>
-<label>oder Name von Hand</label><input id="w_m"><label>Passwort</label><input id="w_p" type="password">
+<label>oder Name von Hand (gilt, wenn oben nichts gewählt ist)</label><input id="w_m"><label>Passwort</label><input id="w_p" type="password">
 <div class="row"><button class="bt p" onclick="saveW()">Speichern und neu starten</button></div></div></section>
 <section class="tab" id="q"><div class="card"><h2>MQTT (Pagurus Cloud)</h2>
 <div class="row" style="align-items:center"><input type="checkbox" id="q_e" style="width:auto"><span>MQTT einschalten</span></div>
@@ -91,8 +91,8 @@ async function cfg(){C=await rpc('Shelly.GetConfig');const i=await rpc('Shelly.G
  $('q_e').checked=C.mqtt.enable;$('q_s').value=C.mqtt.server||'';$('q_u').value=C.mqtt.user||'';$('q_t').value=C.mqtt.topic_prefix||'';
  $('u_m').value=C.update.mode;$('u_u').value=C.update.url;$('w_m').value=C.wifi.sta.ssid||''}
 function saveD(){run(async()=>{await rpc('Display.SetConfig',{config:{ww_ip:$('d_wi').value,ww_sid:+$('d_ws').value||1,zirk_ip:$('d_zi').value,zirk_tid:$('d_zt').value===''?-1:+$('d_zt').value,rotation:+$('d_r').value,hl_ip:$('d_hi').value,hl_name:$('d_hn').value}});await cfg();setTimeout(load,3000)},'Gespeichert')}
-function scan(){run(async()=>{const r=await rpc('WiFi.Scan');$('w_s').innerHTML=r.results.sort((a,b)=>b.rssi-a.rssi).map(x=>`<option>${x.ssid}</option>`).join('');$('w_m').value=''})}
-function saveW(){const s=$('w_m').value||$('w_s').value;if(!s)return toast('Netz wählen');run(()=>rpc('WiFi.SetConfig',{config:{sta:{ssid:s,pass:$('w_p').value}}}),'Gespeichert – Neustart')}
+function scan(){run(async()=>{const r=await rpc('WiFi.Scan');const seen=new Set();$('w_s').innerHTML='<option value="">– Netz wählen –</option>'+r.results.sort((a,b)=>b.rssi-a.rssi).filter(x=>x.ssid&&!seen.has(x.ssid)&&seen.add(x.ssid)).map(x=>`<option>${x.ssid}</option>`).join('')})}
+function saveW(){const s=($('w_s').value||$('w_m').value).trim();if(!s)return toast('Netz wählen oder Namen eintragen');if(!confirm(`Mit „${s}“ verbinden? Das Gerät startet danach neu.`))return;run(()=>rpc('WiFi.SetConfig',{config:{sta:{ssid:s,pass:$('w_p').value}}}),'Gespeichert – Neustart')}
 function saveQ(){const c={enable:$('q_e').checked,server:$('q_s').value,user:$('q_u').value,topic_prefix:$('q_t').value};if($('q_p').value)c.pass=$('q_p').value;run(()=>rpc('MQTT.SetConfig',{config:c}),'Gespeichert')}
 function saveS(){run(async()=>{await rpc('Sys.SetConfig',{config:{device:{name:$('s_n').value}}});await cfg()},'Gespeichert')}
 function saveU(){run(()=>rpc('Sys.SetConfig',{config:{update:{mode:$('u_m').value,url:$('u_u').value}}}),'Gespeichert')}
