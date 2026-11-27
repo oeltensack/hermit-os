@@ -34,9 +34,9 @@
 
 #if defined(DEV_DISPLAY)
 // Heizungsanzeige AZ-Touch MOD 2,4" (ESP32)
-#define DEV_PREFIX  "hermit-aztouch"
-#define DEV_MODEL   "HERMIT-AZTOUCH-ESP32"
-#define DEV_VARIANT "hermit-aztouch-esp32"
+#define DEV_PREFIX  "pagurus-aztouch"
+#define DEV_MODEL   "PAGURUS-AZTOUCH-ESP32"
+#define DEV_VARIANT "pagurus-aztouch-esp32"
 #define DEV_APP     "HeatDisplay"
 #define DEF_BEEP    false
 #elif defined(AC_MIDEA)

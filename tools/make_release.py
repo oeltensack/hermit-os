@@ -59,7 +59,7 @@ for env, name in VARIANTS.items():
 # Env -> (Name, Chip, Adresse des Bootloaders: ESP32 0x1000, ESP32-C3 0x0)
 ESP32 = {"tclac": ("hermit-tclac-esp32", "esp32", "0x1000"),
          "midea_c3": ("hermit-midea-esp32c3", "esp32c3", "0x0"),
-         "aztouch": ("hermit-aztouch-esp32", "esp32", "0x1000")}
+         "aztouch": ("pagurus-aztouch-esp32", "esp32", "0x1000")}
 boot_app0 = next(pathlib.Path.home().glob(".platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"))
 esptool = str(next(pathlib.Path.home().glob(".platformio/packages/tool-esptoolpy/esptool.py")))
 for env, (name, chip, boot) in ESP32.items():
@@ -93,6 +93,10 @@ for name, lname in ONE_MB.items():
     files[name] = {"url": f"bin/{name}.bin.gz", "sha256": hashlib.sha256(gz).hexdigest(), "size": len(gz),
                    "loader": f"bin/{lname}.bin.gz", "loader_sha256": hashlib.sha256(ldr).hexdigest()}
 
+# Uebergang: AZ-Touch hiess bis 1.19.4 hermit-aztouch-esp32 - alte Kennung zeigt auf die neue Datei
+if "pagurus-aztouch-esp32" in files:
+    files["hermit-aztouch-esp32"] = dict(files["pagurus-aztouch-esp32"])
+
 (ROOT / "update.json").write_text(json.dumps({"version": version, "files": files}, separators=(",", ":")) + "\n")
 print(f"update.json fuer Version {version} geschrieben")
 
@@ -120,7 +124,7 @@ MODELS = {
 }
 EXTRA = {"Klima-TCL-ESP32": ["hermit-tclac-esp32.bin", "hermit-tclac-esp32-factory.bin"],
          "Klima-Midea-ESP32-C3": ["hermit-midea-esp32c3.bin", "hermit-midea-esp32c3-factory.bin"],
-         "Heizungsanzeige-AZ-Touch": ["hermit-aztouch-esp32.bin", "hermit-aztouch-esp32-factory.bin"]}
+         "Heizungsanzeige-AZ-Touch": ["pagurus-aztouch-esp32.bin", "pagurus-aztouch-esp32-factory.bin"]}
 dist = ROOT / "dist"
 dist.mkdir(exist_ok=True)
 for f in dist.glob("*.zip"):

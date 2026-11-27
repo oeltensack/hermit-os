@@ -13,7 +13,7 @@
   nicht ab. Knitterschutz eines fertigen Trockners (kurze Drehungen) zählt weiterhin nicht als neuer Lauf.
 
 ## Pagurus OS ESP32: Heizungsanzeige AZ-Touch
-- Neue Variante **`hermit-aztouch-esp32`**: die Heizungsanzeige (bisher Arduino-Sketch AZ_Touch_Heizung v12.1)
+- Neue Variante **`pagurus-aztouch-esp32`**: die Heizungsanzeige (bisher Arduino-Sketch AZ_Touch_Heizung v12.1)
   auf Pagurus OS. Gleiche Anzeige und Bedienung (Boost, Zirkulation), aber WLAN über den Zugangspunkt,
   Adressen von Warmwasser-Logik und Zirkulation in der Weboberfläche, MQTT für die Pagurus Cloud und
   Firmware-Updates über `update.json`. Komponente `display:0`, RPC `Display.*`. Firmware-Stand 1.19.4 wie die
@@ -27,6 +27,9 @@
 - AZ-Touch: neue Oberfläche – dunkle Karten, große Zahlen, schlanke Balken mit Soll-Marke, runde Tasten, Seite BAD mit
   Ring um die Raumtemperatur; Umlaute und Gradzeichen. Gezeichnet wird nur, was sich ändert (kein Flackern mehr).
   Liest von der Warmwasser-Logik `status` (Soll, Rücklauf, Fühlerstörung), bei älterer Logik weiter `api_data`.
+- AZ-Touch heißt jetzt **`pagurus-aztouch-esp32`** (Gerät `pagurus-aztouch-…`, Zugangspunkt `pagurus-aztouch-xxxxxx`,
+  Modell `PAGURUS-AZTOUCH-ESP32`). Ein Gerät mit der bisherigen Kennung findet das Update weiterhin; danach meldet es
+  sich unter dem neuen Namen in der Cloud (der alte Eintrag kann gelöscht werden).
 
 ## Pagurus Cloud 1.27.0
 - Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der

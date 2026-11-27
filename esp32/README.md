@@ -90,7 +90,7 @@ Jede Datei wird vor dem Umschalten per SHA-256 geprüft.
 - Kommt keine Antwort von der Anlage, zeigt die Oberfläche „Keine Antwort“ – dann TX/RX prüfen
   (`Climate.SetConfig` mit `{"swap_pins": true}` tauscht sie ohne Umlöten).
 
-## Heizungsanzeige AZ-Touch (`hermit-aztouch-esp32`)
+## Heizungsanzeige AZ-Touch (`pagurus-aztouch-esp32`)
 
 Die Anzeige der Arduino-Sketche *AZ_Touch_Heizung* (v12.1) auf Pagurus OS: AZ-Touch MOD 2,4" (ESP32,
 ILI9341, XPT2046). Gleiche Bedienung in neuer, dunkler Oberfläche – Speicher (mit Soll) und Kessel (mit Rücklauf),
@@ -100,7 +100,7 @@ Verbrauch heute; Tasten **SOLL −**, **BETRIEB** ein/aus, **BOOST** (bei Störu
 Tipp auf die Kopfzeile, nach 2 Minuten zurück zu HEIZUNG; abgefragt wird nur die sichtbare Seite. Soll und Betrieb
 schreibt das Display in `hl_cfg` (die übrigen Einstellungen bleiben), Boost und Quittieren in `hl_cmd`. Anders als im Sketch:
 
-- **Kein WLAN und keine Adressen im Programm.** WLAN über den Zugangspunkt `hermit-aztouch-xxxxxx`
+- **Kein WLAN und keine Adressen im Programm.** WLAN über den Zugangspunkt `pagurus-aztouch-xxxxxx`
   (192.168.33.1), die Adressen im Reiter *Anzeige* der Weboberfläche: Shelly mit der Warmwasser-Logik und
   Nummer des Logik-Scripts (liest `/script/<Nr>/api_data`, Boost über `boost_trigger`), Shelly der
   Zirkulation und Nummer des Temperaturfühlers (`Switch.GetStatus`/`Switch.Set` für `switch:0`,
@@ -121,12 +121,12 @@ schreibt das Display in `hl_cfg` (die übrigen Einstellungen bleiben), Boost und
 Erstes Aufspielen per USB (der alte Sketch hat kein OTA):
 
 ```
-esptool.py --chip esp32 --port COM5 write_flash 0x0 hermit-aztouch-esp32-factory.bin
+esptool.py --chip esp32 --port COM5 write_flash 0x0 pagurus-aztouch-esp32-factory.bin
 ```
 
 Das Komplettabbild überschreibt auch die gespeicherten Einstellungen (WLAN, Adressen, MQTT). Spätere Versionen
-deshalb über die Weboberfläche einspielen (*System* → *Firmware-Datei hochladen*, `hermit-aztouch-esp32.bin`)
+deshalb über die Weboberfläche einspielen (*System* → *Firmware-Datei hochladen*, `pagurus-aztouch-esp32.bin`)
 oder per Update – dann bleibt alles erhalten.
 
-Danach mit `hermit-aztouch-xxxxxx` verbinden → `http://192.168.33.1` → *WLAN* → Netz und Passwort →
+Danach mit `pagurus-aztouch-xxxxxx` verbinden → `http://192.168.33.1` → *WLAN* → Netz und Passwort →
 nach dem Neustart unter der neuen IP Reiter *Anzeige* (Adressen) und *MQTT* (Cloud).

@@ -21,7 +21,7 @@ Alles läuft lokal; wer eine Übersicht will, nimmt die optionale **[Pagurus Clo
 | **1-MB-Steckdose mit ESP8285** (Touch-Taste, ohne Messung) | `hermit-plug1m` | `switch:0` wie Plus Plug S ohne Messung | Relais, Touch-Taste, LED je Relais/WLAN; Wechsel von ESPHome/Tasmota über eigenen 1-MB-Loader |
 | **TCL-/Kesser-Klimaanlage** mit ESP32 am UART (statt Tuya-Modul/ESPHome) | `hermit-tclac-esp32` | `climate:0`, DHT22 als `temperature:0`/`humidity:0` | Modus, Soll-/Raumtemperatur, Lüfter, Swing, Eco/Turbo/Leise; Anleitung in [esp32/README.md](esp32/README.md) |
 | **Midea-Klimaanlage** (auch Dimstal, Comfee, Qlima, Electrolux, Artel …) mit ESP32-C3 am UART (statt WLAN-Stick/ESPHome) | `hermit-midea-esp32c3` | `climate:0` | Modus, Soll (0,5 °C)/Raum-/Außentemperatur, Lüfter, Swing, Eco/Turbo/Leise/Nacht, Anzeige; Fähigkeiten fragt die Firmware bei der Anlage ab; Anleitung in [esp32/README.md](esp32/README.md) |
-| **AZ-Touch MOD 2,4"** (ESP32, ILI9341 + Touch) als **Heizungsanzeige** | `hermit-aztouch-esp32` | `display:0` | Speicher, Kessel, Brenner, Pumpe, Öl heute, Boost und Zirkulation per Touch – liest die Shelly-Heizungslogik; Anleitung in [esp32/README.md](esp32/README.md) |
+| **AZ-Touch MOD 2,4"** (ESP32, ILI9341 + Touch) als **Heizungsanzeige** | `pagurus-aztouch-esp32` | `display:0` | Speicher, Kessel, Brenner, Pumpe, Öl heute, Boost und Zirkulation per Touch – liest die Shelly-Heizungslogik; Anleitung in [esp32/README.md](esp32/README.md) |
 
 > Shelly ist eine Marke der Shelly Group. Pagurus OS ist ein unabhängiges Projekt ohne Verbindung zum
 > Hersteller. Benutzung auf eigene Gefahr – die Geräte arbeiten mit Netzspannung.
