@@ -18,6 +18,9 @@
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include <Fonts/FreeSans9pt7b.h>
+#include <Fonts/FreeSans12pt7b.h>
+#include <Fonts/FreeSansBold18pt7b.h>
+#include <Fonts/FreeSansBold24pt7b.h>
 
 // --- Pins AZ-Touch MOD (SPI an VSPI: SCK 18, MISO 19, MOSI 23) ---
 #define TFT_CS    5
@@ -51,18 +54,12 @@
 #define HL_CMD_HOLD_MS    8000UL     // nach Tastendruck so lange die eigene Anzeige behalten
 #define PAGE_TIMEOUT_MS   120000UL
 
-#define C_BG 0x0000
-#define C_HEADER 0x0010
-#define C_TEXT 0xFFFF
-#define C_ACCENT 0x03EF
-#define C_ORANGE 0xFD20
-#define C_ALERT 0xF800
-#define C_OK 0x07E0
-#define C_BTN_OFF 0x2124
-#define C_BAR_BG 0x10A2
-#define C_LED_OFF 0x10A2
-#define C_DIM 0xAD55
-#define C_GREY 0xAD55
+constexpr uint16_t RGB565(uint8_t r, uint8_t g, uint8_t b) { return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3); }
+constexpr uint16_t C_BG = RGB565(0x0B, 0x0F, 0x14), C_CARD = RGB565(0x16, 0x1C, 0x24), C_TRACK = RGB565(0x26, 0x30, 0x3B),
+  C_LINE = RGB565(0x3A, 0x44, 0x4F), C_TEXT = RGB565(0xE6, 0xE9, 0xEC), C_DIM = RGB565(0x8A, 0x96, 0xA3),
+  C_BLUE = RGB565(0x2F, 0x9B, 0xE0), C_ORANGE = RGB565(0xF0, 0x88, 0x3E), C_TEAL = RGB565(0x1D, 0x9E, 0x75),
+  C_TEAL_D = RGB565(0x04, 0x34, 0x2C), C_RED = RGB565(0xE2, 0x4B, 0x4A), C_RED_D = RGB565(0x50, 0x13, 0x13),
+  C_AMBER = RGB565(0xEF, 0x9F, 0x27), C_AMBER_D = RGB565(0x41, 0x24, 0x02);
 
 #define AC_METHODS "Display.GetStatus", "Display.GetConfig", "Display.SetConfig", "Display.Boost", "Display.Zirk", "Display.Page",
 
@@ -77,8 +74,10 @@ struct DispCfg {
 } dcfg;
 
 struct DispData {
-  float s = 0, k = 0, cons = 0, zt = 0;
+  float s = 0, k = 0, r = 0, soll = 0, cons = 0, zt = 0;
+  bool sOk = false, kOk = false, rOk = false, sollOk = false;
   bool burn = false, pump = false, boost = false, zOn = false, zHasT = false;
+  String fault;                        // Fuehlerstoerung der Logik (status: fault)
   uint32_t wwAt = 0, zAt = 0;          // letzte gueltige Antwort (millis), 0 = nie
   uint32_t wwNext = 0, zNext = 0;      // naechste Abfrage
   String wwErr, zErr;
@@ -87,10 +86,12 @@ struct DispData {
 struct BadData {
   bool tempOk = false; float temp = 0; bool sollOk = false; float soll = 20; int boostMin = 60;
   int pwr = 0; bool boost = false, heat = false, fan = false, on = true; int rest = 0; float today = -1;
-  String status, err; uint16_t stCol = C_GREY;
+  bool win = false;                    // Fenster offen
+  String status, err; uint16_t stCol = C_DIM;
   uint32_t at = 0, cfgAt = 0, next = 0, cmdUntil = 0, sollChg = 0; bool sollPend = false, onPend = false;
 } bd;
 int page = 0;                          // 0 = HEIZUNG, 1 = BAD
+String num1(float v) { return String(v, 1); }
 uint32_t lastTouch = 0;
 
 enum Screen { SC_NONE, SC_SETUP, SC_MAIN, SC_UPDATE };
@@ -144,12 +145,22 @@ String wwUrl(const char* ep) { return "http://" + dcfg.wwIp + "/script/" + Strin
 
 void fetchWW() {
   if (!dcfg.wwIp.length()) return;
-  String e, b = dGet(wwUrl("api_data"), e);
+  // status (Logik ab V13) hat Soll, Ruecklauf und Stoerung; aeltere Logik: api_data
+  static bool useStatus = true;
+  String e, b = dGet(wwUrl(useStatus ? "status" : "api_data"), e);
+  if (!b.length() && useStatus && e.startsWith("HTTP 404")) { useStatus = false; b = dGet(wwUrl("api_data"), e); }
   JsonDocument d;
   if (b.length() && !deserializeJson(d, b)) {
-    dd.s = d["temp_s"] | 0.0f; dd.k = d["temp_k"] | 0.0f;        // null (Fuehlerstoerung) -> 0,0 wie bisher
+    dd.sOk = d["temp_s"].is<float>(); dd.s = d["temp_s"] | 0.0f;
+    dd.kOk = d["temp_k"].is<float>(); dd.k = d["temp_k"] | 0.0f;
+    dd.rOk = d["temp_r"].is<float>(); dd.r = d["temp_r"] | 0.0f;
+    dd.sollOk = d["soll"].is<float>(); dd.soll = d["soll"] | 0.0f;
     dd.pump = (d["pump"] | 0) == 1; dd.burn = (d["burn"] | 0) == 1;
-    dd.cons = d["cons_today"] | 0.0f; dd.boost = (d["boost"] | 0) == 1;
+    dd.cons = d["cons_today"] | 0.0f;
+    dd.boost = d["boost_manual"].is<bool>() ? d["boost_manual"].as<bool>() : (d["boost"] | 0) == 1;
+    String f = d["fault"] | "";
+    f.replace("speicher", "Speicher"); f.replace("kessel", "Kessel"); f.replace(",", ", ");
+    dd.fault = f;
     dd.wwAt = millis(); dd.wwErr = ""; dd.wwNext = millis() + 5000;
   } else {
     dd.wwErr = e.length() ? e : "Antwort ungültig";
@@ -227,6 +238,7 @@ bool kvsSet(const char* key, const String& value) {
 }
 
 // Umlaute fuer die Display-Schrift ersetzen, Emojis und andere Sonderzeichen weglassen
+// Text vom Script fuer das Display: Umlaute und ° bleiben (dtext zeichnet sie), Emojis u. a. fallen weg
 String asciiDe(const char* s) {
   String o;
   if (!s) return o;
@@ -234,16 +246,9 @@ String asciiDe(const char* s) {
   while (*p) {
     unsigned char c = *p;
     if (c < 0x80) { o += (char)c; p++; continue; }
-    if (c == 0xC3 && p[1]) {
-      switch (p[1]) {
-        case 0xA4: o += "ae"; break; case 0xB6: o += "oe"; break; case 0xBC: o += "ue"; break;
-        case 0x84: o += "Ae"; break; case 0x96: o += "Oe"; break; case 0x9C: o += "Ue"; break;
-        case 0x9F: o += "ss"; break; default: break;
-      }
-      p += 2; continue;
-    }
-    if (c == 0xC2 && p[1] == 0xB0) { p += 2; continue; }      // Gradzeichen
+    if ((c == 0xC3 || (c == 0xC2 && p[1] == 0xB0)) && p[1]) { o += (char)c; o += (char)p[1]; p += 2; continue; }
     p++;
+    while ((*p & 0xC0) == 0x80) p++;                           // Rest eines Mehrbyte-Zeichens
   }
   o.trim();
   return o;
@@ -283,18 +288,19 @@ void fetchBad() {
     if (d["on"].is<bool>()) bd.on = d["on"].as<bool>();
   }
   bd.err = asciiDe(d["err"] | "");
+  bd.win = d["winOpen"].is<bool>() && d["winOpen"].as<bool>();
   const char* st = d["status"] | "";
   bool vor = strstr(st, "VORLAUF"), nach = strstr(st, "NACHLAUF");
   bd.fan = bd.heat || vor || nach;
-  if (bd.err.length())               { bd.status = "STOERUNG: " + bd.err; bd.stCol = C_ALERT; }
-  else if (strstr(st, "FENSTER"))    { bd.status = "Fenster offen";       bd.stCol = C_ACCENT; }
-  else if (strstr(st, "FROST"))      { bd.status = "Frostschutz heizt";   bd.stCol = C_ACCENT; }
-  else if (bd.heat)                  { bd.status = d["isB"] | false ? "HEIZT (Boost)" : "HEIZT"; bd.stCol = C_ORANGE; }
-  else if (vor)                      { bd.status = "Vorlauf (Luefter)";   bd.stCol = C_TEXT; }
-  else if (nach)                     { bd.status = "Nachlauf (Luefter)";  bd.stCol = C_TEXT; }
-  else if (strstr(st, "BEREIT"))     { bd.status = "Bereit, Soll erreicht"; bd.stCol = C_OK; }
-  else if (strstr(st, "PAUSE"))      { bd.status = asciiDe(st);           bd.stCol = C_GREY; }
-  else                               { bd.status = "AUS";                 bd.stCol = C_GREY; }
+  if (bd.err.length())               { bd.status = "Störung: " + bd.err; bd.stCol = C_RED; }
+  else if (strstr(st, "FENSTER"))    { bd.status = "Fenster offen";       bd.stCol = C_BLUE; }
+  else if (strstr(st, "FROST"))      { bd.status = "Frostschutz heizt";   bd.stCol = C_BLUE; }
+  else if (bd.heat)                  { bd.status = (d["isB"] | false) ? "Heizt (Boost)" : "Heizt auf " + num1(bd.soll) + " °C"; bd.stCol = C_ORANGE; }
+  else if (vor)                      { bd.status = "Vorlauf (Lüfter)";   bd.stCol = C_TEXT; }
+  else if (nach)                     { bd.status = "Nachlauf (Lüfter)";  bd.stCol = C_TEXT; }
+  else if (strstr(st, "BEREIT"))     { bd.status = "Bereit, Soll erreicht"; bd.stCol = C_TEAL; }
+  else if (strstr(st, "PAUSE"))      { bd.status = asciiDe(st);           bd.stCol = C_DIM; }
+  else                               { bd.status = "Aus";                 bd.stCol = C_DIM; }
   bd.at = millis(); if (!bd.at) bd.at = 1;
   dataDirty = true;
 }
@@ -339,44 +345,110 @@ void badBoost() {
 }
 
 // ======================= Zeichnen =======================
-void centered(int x, int y, int w, int h, const String& text, const GFXfont* f, uint16_t color) {
-  tft.setFont(f); tft.setTextColor(color);
-  int16_t x1, y1; uint16_t tw, th; tft.getTextBounds(text, 0, 0, &x1, &y1, &tw, &th);
-  tft.setCursor(x + (w - tw) / 2, y + (h + th) / 2 - 4); tft.print(text);
+// Dunkles, flaches Design: Karten auf fast schwarzem Grund, grosse Zahlen, schlanke Balken, runde Tasten.
+// Gezeichnet wird nur, was sich geaendert hat (kein Flackern). Umlaute und Gradzeichen zeichnet dtext()
+// selbst, weil die GFX-Schriften nur ASCII enthalten.
+String cache[24];                      // zuletzt gezeichneter Inhalt je Element
+enum { K_TITLE, K_CLOCK, K_S, K_K, K_OIL, K_ZI, K_B1, K_B2, K_RING, K_LEFT, K_RIGHT, K_STAT, K_BB0, K_BB1, K_BB2, K_BB3 };
+bool chg(int i, const String& k) { if (cache[i] == k) return false; cache[i] = k; return true; }
+void cacheClear() { for (auto& c : cache) c = ""; }
+
+// Breite eines Texts (UTF-8 mit Umlauten und °) in einer GFX-Schrift
+char umlBase(uint8_t n) {               // zweites Byte von C3 xx -> Grundbuchstabe
+  switch (n) { case 0x84: return 'A'; case 0x96: return 'O'; case 0x9C: return 'U';
+               case 0xA4: return 'a'; case 0xB6: return 'o'; case 0xBC: return 'u'; default: return 0; }
 }
 
-void bar(int x, int y, int w, int h, float val, float mn, float mx, uint16_t color) {
-  tft.drawRect(x, y, w, h, C_TEXT);
-  tft.fillRect(x + 1, y + 1, w - 2, h - 2, C_BAR_BG);
-  float c = constrain(val, mn, mx);
-  int mw = map((long)(c * 10), (long)(mn * 10), (long)(mx * 10), 0, w - 2);
-  if (mw > 0) tft.fillRect(x + 1, y + 1, mw, h - 2, color);
+int dwidth(const String& s, const GFXfont* f) {
+  int w = 0;
+  auto adv = [&](uint8_t c) { return (c >= f->first && c <= f->last) ? f->glyph[c - f->first].xAdvance : 0; };
+  for (size_t i = 0; i < s.length(); i++) {
+    uint8_t c = s[i];
+    if (c == 0xC3 && i + 1 < s.length()) {
+      uint8_t n = s[++i];
+      if (n == 0x9F) w += 2 * adv('s'); else if (umlBase(n)) w += adv(umlBase(n));
+    } else if (c == 0xC2 && i + 1 < s.length() && (uint8_t)s[i + 1] == 0xB0) { i++; w += f->yAdvance / 3; }
+    else if (c < 0x80) w += adv(c);
+  }
+  return w;
 }
 
-void led(int x, int y, char label, bool active, uint16_t col) {
-  tft.fillCircle(x, y, 11, active ? col : C_LED_OFF);
-  tft.drawCircle(x, y, 11, C_TEXT);
-  tft.setFont(&FreeSansBold9pt7b); tft.setTextColor(C_TEXT);
-  tft.setCursor(x - 5, y + 5); tft.print(label);
+// Text zeichnen; align 0 = links, 1 = Mitte, 2 = rechts (x ist dann Mitte bzw. rechter Rand), y = Grundlinie
+void dtext(int x, int y, const String& s, const GFXfont* f, uint16_t col, int align = 0) {
+  if (align) x -= align == 1 ? dwidth(s, f) / 2 : dwidth(s, f);
+  tft.setFont(f); tft.setTextColor(col); tft.setTextSize(1);
+  int cap = f->yAdvance * 3 / 5, xh = f->yAdvance * 9 / 20, dot = f->yAdvance >= 40 ? 3 : 2;
+  for (size_t i = 0; i < s.length(); i++) {
+    uint8_t c = s[i];
+    bool uml = false, upper = false;
+    if (c == 0xC3 && i + 1 < s.length()) {
+      uint8_t n = s[++i];
+      if (n == 0x9F) { tft.setCursor(x, y); tft.print("ss"); x = tft.getCursorX(); continue; }
+      upper = n == 0x84 || n == 0x96 || n == 0x9C;
+      c = umlBase(n);
+      if (!c) continue;
+      uml = true;
+    } else if (c == 0xC2 && i + 1 < s.length() && (uint8_t)s[i + 1] == 0xB0) {
+      i++;
+      int r = f->yAdvance / 11 + 1;
+      tft.drawCircle(x + r + 1, y - cap + r, r, col);
+      if (r > 2) tft.drawCircle(x + r + 1, y - cap + r, r - 1, col);
+      x += f->yAdvance / 3; continue;
+    } else if (c >= 0x80) continue;
+    tft.setCursor(x, y); tft.print((char)c);
+    int nx = tft.getCursorX();
+    if (uml) {
+      int w = nx - x, top = y - (upper ? cap : xh) - dot - 2;
+      tft.fillRect(x + w * 3 / 10, top, dot, dot, col);
+      tft.fillRect(x + w * 6 / 10, top, dot, dot, col);
+    }
+    x = nx;
+  }
 }
 
-void value(int x, int y, const String& text, const GFXfont* f, uint16_t color, int w, int h) {
-  tft.fillRect(x, y, w, h, C_BG);
-  tft.setFont(f); tft.setTextColor(color);
-  tft.setCursor(x, y + h - 5); tft.print(text);
+String fitText(String s, const GFXfont* f, int maxW) {
+  while (s.length() > 1 && dwidth(s, f) > maxW) s.remove(s.length() - 1);
+  return s;
 }
+
+// Balken: Spur, Fuellung, optional Soll-Marke
+void slim(int x, int y, int w, float v, float mn, float mx, uint16_t col, float mark = NAN) {
+  tft.fillRoundRect(x, y, w, 4, 2, C_TRACK);
+  int fw = (int)((constrain(v, mn, mx) - mn) / (mx - mn) * w);
+  if (fw > 3) tft.fillRoundRect(x, y, fw, 4, 2, col);
+  if (!isnan(mark)) tft.fillRect(x + (int)((constrain(mark, mn, mx) - mn) / (mx - mn) * w) - 1, y - 3, 2, 10, C_TEXT);
+}
+
+// Taste: an = gefuellt mit dunkler Schrift, aus = nur Rahmen
+void pill(int x, int y, int w, int h, bool on, uint16_t fill, uint16_t dark, const String& l1, const String& l2,
+          const GFXfont* f1 = &FreeSansBold12pt7b) {
+  tft.fillRoundRect(x, y, w, h, 14, on ? fill : C_BG);
+  if (!on) { tft.drawRoundRect(x, y, w, h, 14, C_LINE); tft.drawRoundRect(x + 1, y + 1, w - 2, h - 2, 13, C_LINE); }
+  uint16_t t1 = on ? dark : C_TEXT, t2 = on ? dark : C_DIM;
+  if (l2.length()) { dtext(x + w / 2, y + h / 2 + 2, fitText(l1, f1, w - 10), f1, t1, 1);
+                     dtext(x + w / 2, y + h / 2 + 19, fitText(l2, &FreeSans9pt7b, w - 10), &FreeSans9pt7b, t2, 1); }
+  else dtext(x + w / 2, y + h / 2 + 9, l1, f1, t1, 1);
+}
+
+void card(int x, int y, int w, int h) { tft.fillRoundRect(x, y, w, h, 8, C_CARD); }
+
+// Statuspunkt mit Text rechtsbuendig an x
+void flag(int xr, int y, const String& s, bool on, uint16_t col) {
+  dtext(xr, y, s, &FreeSans9pt7b, on ? col : C_LINE, 2);
+}
+
+bool wwStale() { return dcfg.wwIp.length() && (!dd.wwAt || millis() - dd.wwAt > STALE_MS); }
 
 void drawHeader() {
-  bool stale = page == 0 ? dcfg.wwIp.length() && (!dd.wwAt || millis() - dd.wwAt > STALE_MS) : !badOnline();
-  tft.fillRect(0, 0, 110, 30, C_HEADER);
-  tft.setFont(&FreeSansBold9pt7b); tft.setTextColor(stale ? C_ORANGE : C_TEXT);
-  tft.setCursor(5, 20);
-  String t = page == 0 ? String("HEIZUNG") : dcfg.hlName.substring(0, 9);
-  tft.print(t);
-  if (dcfg.hlIp.length()) {                                     // Pfeil: Kopfzeile antippen wechselt die Seite
-    int16_t x1, y1; uint16_t tw, th; tft.getTextBounds(t, 0, 0, &x1, &y1, &tw, &th);
-    int x = 5 + tw + 8; if (x > 100) x = 100;
-    tft.fillTriangle(x, 9, x, 21, x + 8, 15, C_GREY);
+  bool stale = page == 0 ? wwStale() : !badOnline();
+  String t = page == 0 ? String("Heizung") : dcfg.hlName;
+  if (!chg(K_TITLE, t + stale + page)) return;
+  tft.fillRect(0, 0, 150, 26, C_BG);
+  dtext(10, 18, t, &FreeSansBold9pt7b, stale ? C_ORANGE : C_TEXT);
+  if (dcfg.hlIp.length()) {                                     // Seitenpunkte: Kopfzeile antippen wechselt
+    int x = 10 + dwidth(t, &FreeSansBold9pt7b) + 12;
+    tft.fillCircle(x, 13, 3, page == 0 ? C_TEXT : C_LINE);
+    tft.fillCircle(x + 10, 13, 3, page == 1 ? C_TEXT : C_LINE);
   }
 }
 
@@ -387,63 +459,135 @@ void drawClock() {
   char t[6], d[16];
   strftime(t, sizeof t, "%H:%M", &ti);
   snprintf(d, sizeof d, "%s %d.%02d.", days[ti.tm_wday], ti.tm_mday, ti.tm_mon + 1);
-  tft.fillRect(110, 0, 210, 29, C_HEADER);
-  tft.setFont(&FreeSansBold9pt7b); tft.setTextColor(C_TEXT);
-  tft.setCursor(140, 20); tft.print(d);
-  tft.setCursor(250, 20); tft.print(t);
+  if (!chg(K_CLOCK, String(d) + t)) return;
+  tft.fillRect(150, 0, 170, 26, C_BG);
+  int tw = dwidth(t, &FreeSansBold9pt7b);
+  dtext(310, 18, t, &FreeSansBold9pt7b, C_TEXT, 2);
+  dtext(310 - tw - 8, 18, d, &FreeSans9pt7b, C_DIM, 2);
 }
 
 void drawBase() {
+  cacheClear();
   tft.fillScreen(C_BG);
-  tft.fillRect(0, 0, 320, 30, C_HEADER);
-  tft.drawFastHLine(0, 30, 320, 0x7BEF);
   drawHeader(); drawClock();
-  tft.setFont(&FreeSans9pt7b); tft.setTextColor(C_DIM);
-  if (page == 0) {
-    tft.setCursor(10, 50); tft.print("Speicher:");
-    tft.setCursor(10, 100); tft.print("Kessel:");
-    tft.setCursor(10, 155); tft.print("Verbrauch heute:");
-  } else {
-    tft.setCursor(10, 50); tft.print("Raum:");
-    tft.setCursor(10, 100); tft.print("Soll:");
+}
+
+// Grosser Wert mit kleiner Einheit, z. B. 47.5 °C
+void bigVal(int x, int y, const String& v, uint16_t col, const String& unit) {
+  dtext(x, y, v, &FreeSansBold24pt7b, col);
+  dtext(x + dwidth(v, &FreeSansBold24pt7b) + 3, y, unit, &FreeSans12pt7b, C_DIM);
+}
+
+void drawData() {
+  drawHeader();
+  bool ok = !wwStale();
+  uint16_t vcol = ok ? C_TEXT : C_DIM;
+  // Speicher
+  String k = num1(dd.s) + dd.pump + dd.sollOk + dd.soll + ok + dd.sOk;
+  if (chg(K_S, k)) {
+    card(6, 30, 151, 96);
+    dtext(16, 48, "Speicher", &FreeSans9pt7b, C_DIM);
+    flag(148, 48, "Pumpe", dd.pump, C_BLUE);
+    bigVal(14, 92, dd.sOk ? num1(dd.s) : String("--.-"), vcol, "°C");
+    dtext(16, 110, dd.sollOk ? "Soll " + String((int)roundf(dd.soll)) + " °C" : String(""), &FreeSans9pt7b, C_DIM);
+    slim(16, 116, 131, dd.s, MIN_TEMP_SPEICHER, MAX_TEMP_SPEICHER, C_BLUE, dd.sollOk ? dd.soll : NAN);
   }
+  // Kessel
+  k = num1(dd.k) + dd.burn + num1(dd.r) + dd.rOk + dd.fault + ok + dd.kOk;
+  if (chg(K_K, k)) {
+    card(163, 30, 151, 96);
+    dtext(173, 48, "Kessel", &FreeSans9pt7b, C_DIM);
+    flag(305, 48, "Brenner", dd.burn, C_ORANGE);
+    bigVal(171, 92, dd.kOk ? num1(dd.k) : String("--.-"), ok ? C_ORANGE : C_DIM, "°C");
+    if (dd.fault.length()) dtext(173, 110, "Fühlerstörung", &FreeSans9pt7b, C_RED);
+    else if (dd.rOk) dtext(173, 110, "Rücklauf " + String((int)roundf(dd.r)) + " °C", &FreeSans9pt7b, C_DIM);
+    slim(173, 116, 131, dd.k, MIN_TEMP_KESSEL, MAX_TEMP_KESSEL, C_ORANGE);
+  }
+  // Oel heute / Zirkulation
+  if (chg(K_OIL, num1(dd.cons) + ok)) {
+    card(6, 132, 151, 34);
+    dtext(16, 154, "Öl heute", &FreeSans9pt7b, C_DIM);
+    dtext(148, 155, num1(dd.cons) + " L", &FreeSansBold9pt7b, vcol, 2);
+  }
+  if (chg(K_ZI, String(dd.zHasT) + num1(dd.zt) + (dd.zAt != 0))) {
+    card(163, 132, 151, 34);
+    dtext(173, 154, "Leitung", &FreeSans9pt7b, C_DIM);
+    dtext(305, 155, dd.zHasT ? num1(dd.zt) + " °C" : String("--"), &FreeSansBold9pt7b, C_TEXT, 2);
+  }
+  // Tasten
+  if (chg(K_B1, String(dd.boost))) pill(6, 174, 151, 60, dd.boost, C_RED, C_RED_D, "Boost", dd.boost ? "läuft" : "aus");
+  if (chg(K_B2, String(dd.zOn))) pill(163, 174, 151, 60, dd.zOn, C_TEAL, C_TEAL_D, "Zirkulation", dd.zOn ? "an" : "aus");
 }
 
-String fitText(String text, const GFXfont* f, int maxW) {
-  tft.setFont(f);
-  int16_t x1, y1; uint16_t tw, th;
-  tft.getTextBounds(text, 0, 0, &x1, &y1, &tw, &th);
-  while (text.length() > 1 && tw > maxW) { text.remove(text.length() - 1); tft.getTextBounds(text, 0, 0, &x1, &y1, &tw, &th); }
-  return text;
-}
-
-void btn(int x, int w, uint16_t bg, uint16_t fg, const String& l1, const String& l2, const GFXfont* f2) {
-  tft.fillRoundRect(x, 175, w, 55, 8, bg); tft.drawRoundRect(x, 175, w, 55, 8, C_TEXT);
-  centered(x, 180, w, 25, l1, &FreeSansBold9pt7b, fg);
-  centered(x, f2 == &FreeSansBold12pt7b ? 202 : 205, w, f2 == &FreeSansBold12pt7b ? 28 : 25, l2, f2, fg);
+// Ring (270°-Bogen) aus Vierecken: cx/cy Mitte, r Radius aussen, th Dicke, von a0 bis a1 Grad (0 = rechts, im Uhrzeigersinn)
+void arc(int cx, int cy, int r, int th, float a0, float a1, uint16_t col) {
+  for (float a = a0; a < a1; a += 3) {
+    float b = min(a + 3.5f, a1);
+    float c0 = cosf(a * DEG_TO_RAD), s0 = sinf(a * DEG_TO_RAD), c1 = cosf(b * DEG_TO_RAD), s1 = sinf(b * DEG_TO_RAD);
+    int x0 = cx + c0 * r, y0 = cy + s0 * r, x1 = cx + c1 * r, y1 = cy + s1 * r;
+    int x2 = cx + c0 * (r - th), y2 = cy + s0 * (r - th), x3 = cx + c1 * (r - th), y3 = cy + s1 * (r - th);
+    tft.fillTriangle(x0, y0, x1, y1, x2, y2, col);
+    tft.fillTriangle(x1, y1, x3, y3, x2, y2, col);
+  }
 }
 
 void drawBad() {
   drawHeader();
   bool on = badOnline();
-  value(180, 35, on && bd.tempOk ? String(bd.temp, 1) + " C" : String("--.- C"), &FreeSansBold12pt7b, C_TEXT, 100, 20);
-  bar(10, 60, 270, 12, on && bd.tempOk ? bd.temp : MIN_TEMP_BAD, MIN_TEMP_BAD, MAX_TEMP_BAD, C_ACCENT);
-  led(300, 66, 'L', on && bd.fan, C_ACCENT);
-  value(180, 85, bd.sollOk ? String(bd.soll, 1) + " C" : String("--.- C"), &FreeSansBold12pt7b, bd.sollPend ? C_TEXT : C_ORANGE, 100, 20);
-  led(300, 100, 'H', on && bd.heat, C_ALERT);
+  const int cx = 160, cy = 92, R = 54;
+  float t = on && bd.tempOk ? bd.temp : NAN;
+  String k = (isnan(t) ? String("-") : num1(t)) + bd.sollOk + num1(bd.soll) + bd.sollPend + bd.heat;
+  if (chg(K_RING, k)) {
+    tft.fillRect(cx - R - 4, 32, 2 * R + 8, 2 * R + 20, C_BG);
+    arc(cx, cy, R, 8, 135, 405, C_TRACK);
+    if (!isnan(t)) {
+      float f = constrain((t - MIN_TEMP_BAD) / (MAX_TEMP_BAD - MIN_TEMP_BAD), 0.0f, 1.0f);
+      if (f > 0.01f) arc(cx, cy, R, 8, 135, 135 + 270 * f, bd.heat ? C_ORANGE : C_BLUE);
+    }
+    if (bd.sollOk) {                                             // Soll-Marke
+      float a = (135 + 270 * constrain((bd.soll - MIN_TEMP_BAD) / (MAX_TEMP_BAD - MIN_TEMP_BAD), 0.0f, 1.0f)) * DEG_TO_RAD;
+      tft.drawLine(cx + cosf(a) * (R + 2), cy + sinf(a) * (R + 2), cx + cosf(a) * (R - 10), cy + sinf(a) * (R - 10), C_TEXT);
+      tft.drawLine(cx + cosf(a) * (R + 2) + 1, cy + sinf(a) * (R + 2), cx + cosf(a) * (R - 10) + 1, cy + sinf(a) * (R - 10), C_TEXT);
+    }
+    String v = isnan(t) ? String("--.-") : num1(t);
+    int w = dwidth(v, &FreeSansBold18pt7b);
+    dtext(cx - w / 2 - 4, cy + 13, v, &FreeSansBold18pt7b, isnan(t) ? C_DIM : C_TEXT);
+    dtext(cx + w / 2 - 2, cy + 13, "°", &FreeSansBold18pt7b, C_DIM);
+    dtext(cx, cy + 56, bd.sollOk ? "Soll " + num1(bd.soll) + "°" : String("Soll --"), &FreeSans9pt7b,
+          bd.sollPend ? C_ORANGE : C_DIM, 1);
+  }
+  if (chg(K_LEFT, String(on) + bd.pwr + num1(bd.today))) {
+    card(6, 40, 92, 108);
+    dtext(52, 62, "jetzt", &FreeSans9pt7b, C_DIM, 1);
+    dtext(52, 84, on ? String(bd.pwr) + " W" : String("-- W"), &FreeSansBold9pt7b, C_TEXT, 1);
+    dtext(52, 112, "heute", &FreeSans9pt7b, C_DIM, 1);
+    dtext(52, 134, bd.today >= 0 ? String(bd.today, 2) + " kWh" : String("--"), &FreeSansBold9pt7b, C_TEXT, 1);
+  }
+  if (chg(K_RIGHT, String(on) + bd.fan + bd.heat + bd.win)) {
+    card(222, 40, 92, 108);
+    struct { const char* l; bool v; uint16_t c; } F[] = {{"Lüfter", on && bd.fan, C_BLUE}, {"Heizt", on && bd.heat, C_ORANGE},
+                                                         {"Fenster", on && bd.win, C_BLUE}};
+    for (int i = 0; i < 3; i++) {
+      int y = 66 + i * 28;
+      tft.fillCircle(236, y - 5, 4, F[i].v ? F[i].c : C_LINE);
+      dtext(246, y, F[i].l, &FreeSans9pt7b, F[i].v ? C_TEXT : C_DIM);
+    }
+  }
   String st = on ? bd.status : String(bd.at ? "Keine Verbindung" : "Verbinde ...");
-  value(10, 112, fitText(st, &FreeSansBold9pt7b, 272), &FreeSansBold9pt7b, on ? bd.stCol : C_ALERT, 280, 22);
-  String info = on ? String(bd.pwr) + " W" : String("-- W");
-  if (bd.today >= 0) info += "   |   heute " + String(bd.today, 2) + " kWh";
-  value(10, 138, info, &FreeSans9pt7b, C_GREY, 300, 22);
-  // Tasten: SOLL - | BETRIEB | BOOST/QUITTIEREN | SOLL +   (je 72 px, 6 px Abstand)
-  btn(6, 72, C_BTN_OFF, C_TEXT, "SOLL", "-", &FreeSansBold12pt7b);
-  btn(84, 72, bd.on ? C_OK : C_BTN_OFF, bd.on ? C_BG : C_TEXT, "BETRIEB", bd.on ? "EIN" : "AUS", &FreeSans9pt7b);
+  if (chg(K_STAT, st + bd.stCol + on)) {
+    tft.fillRect(0, 153, 320, 20, C_BG);
+    dtext(160, 169, fitText(st, &FreeSansBold9pt7b, 300), &FreeSansBold9pt7b, on ? bd.stCol : C_RED, 1);
+  }
   bool fault = on && bd.err.length();
-  uint16_t bc = fault ? C_ORANGE : (bd.boost ? C_ALERT : C_BTN_OFF), tc = (fault || bd.boost) ? C_BG : C_TEXT;
-  if (fault) btn(162, 72, bc, tc, "STOER.", "QUITT.", &FreeSans9pt7b);
-  else btn(162, 72, bc, tc, "BOOST", bd.boost ? (bd.rest > 0 ? String(bd.rest) + " min" : String("AN")) : String("AUS"), &FreeSans9pt7b);
-  btn(240, 72, C_BTN_OFF, C_TEXT, "SOLL", "+", &FreeSansBold12pt7b);
+  if (chg(K_BB0, "m")) pill(6, 176, 54, 58, false, 0, 0, "-", "", &FreeSansBold18pt7b);
+  if (chg(K_BB1, String(bd.on))) pill(66, 176, 91, 58, bd.on, C_TEAL, C_TEAL_D, "Betrieb", bd.on ? "ein" : "aus", &FreeSansBold9pt7b);
+  String b2 = fault ? String("Q") : String(bd.boost) + bd.rest;
+  if (chg(K_BB2, b2)) {
+    if (fault) pill(163, 176, 91, 58, true, C_AMBER, C_AMBER_D, "Störung", "quittieren", &FreeSansBold9pt7b);
+    else pill(163, 176, 91, 58, bd.boost, C_RED, C_RED_D, "Boost",
+              bd.boost ? (bd.rest > 0 ? String(bd.rest) + " min" : String("an")) : String("aus"), &FreeSansBold9pt7b);
+  }
+  if (chg(K_BB3, "p")) pill(260, 176, 54, 58, false, 0, 0, "+", "", &FreeSansBold18pt7b);
 }
 
 void showPage(int p) {
@@ -452,69 +596,45 @@ void showPage(int p) {
   if (page == 1) { bd.next = 0; bd.cfgAt = 0; } else { dd.wwNext = 0; dd.zNext = 0; }
 }
 
-void drawData() {
-  drawHeader();
-  value(180, 35, String(dd.s, 1) + " C", &FreeSansBold12pt7b, C_TEXT, 100, 20);
-  bar(10, 60, 270, 12, dd.s, MIN_TEMP_SPEICHER, MAX_TEMP_SPEICHER, C_ACCENT);
-  led(300, 66, 'P', dd.pump, C_ACCENT);
-  value(180, 85, String(dd.k, 1) + " C", &FreeSansBold12pt7b, C_ORANGE, 100, 20);
-  bar(10, 110, 270, 10, dd.k, MIN_TEMP_KESSEL, MAX_TEMP_KESSEL, C_ORANGE);
-  led(300, 115, 'B', dd.burn, C_ALERT);
-  value(180, 140, String(dd.cons, 1) + " L", &FreeSansBold12pt7b, C_TEXT, 100, 20);
-
-  uint16_t bc = dd.boost ? C_ALERT : C_BTN_OFF, bt = dd.boost ? C_BG : C_TEXT;
-  tft.fillRoundRect(10, 175, 145, 55, 8, bc); tft.drawRoundRect(10, 175, 145, 55, 8, C_TEXT);
-  centered(10, 180, 145, 25, "BOOST", &FreeSansBold9pt7b, bt);
-  centered(10, 205, 145, 25, dd.boost ? "AN" : "AUS", &FreeSans9pt7b, bt);
-
-  uint16_t zc = dd.zOn ? C_OK : C_BTN_OFF, zt = dd.zOn ? C_BG : C_TEXT;
-  tft.fillRoundRect(165, 175, 145, 55, 8, zc); tft.drawRoundRect(165, 175, 145, 55, 8, C_TEXT);
-  centered(165, 180, 145, 25, "ZIRKULATION", &FreeSansBold9pt7b, zt);
-  String zs = String(dd.zOn ? "AN" : "AUS");
-  if (dd.zHasT) zs += " | " + String(dd.zt, 1) + " C";
-  centered(165, 205, 145, 25, zs, &FreeSans9pt7b, zt);
-}
-
 // Einrichtung: Zugangspunkt bzw. Adresse der Weboberflaeche anzeigen
 void drawSetup() {
   bool sta = WiFi.status() == WL_CONNECTED;
   String key = String(sta) + WiFi.localIP().toString() + apActive;
   if (screen == SC_SETUP && key == setupKey) return;
-  setupKey = key; screen = SC_SETUP;
+  setupKey = key; screen = SC_SETUP; cacheClear();
   tft.fillScreen(C_BG);
-  tft.fillRect(0, 0, 320, 30, C_HEADER);
-  tft.setFont(&FreeSansBold9pt7b); tft.setTextColor(C_TEXT);
-  tft.setCursor(5, 20); tft.print("PAGURUS HEIZUNG  " FW_VERSION);
-  tft.setFont(&FreeSans9pt7b); tft.setTextColor(C_TEXT);
-  int y = 60;
-  auto line = [&](const String& s, uint16_t c) { tft.setTextColor(c); tft.setCursor(10, y); tft.print(s); y += 24; };
+  dtext(10, 22, "Pagurus Heizung", &FreeSansBold12pt7b, C_TEXT);
+  dtext(310, 22, FW_VERSION, &FreeSans9pt7b, C_DIM, 2);
+  int y = 58;
+  auto line = [&](const String& s, uint16_t c, const GFXfont* f) { dtext(16, y, s, f, c); y += 25; };
+  card(6, 36, 308, 196);
   if (!sta) {
     if (apActive) {
-      line("WLAN einrichten:", C_ORANGE);
-      line("1. mit dem WLAN verbinden", C_TEXT);
-      line("   " + String(DEV_PREFIX) + "-" + mac.substring(6), C_OK);
-      line("2. im Browser 192.168.33.1", C_TEXT);
-      line("   Reiter WLAN", C_TEXT);
+      line("WLAN einrichten", C_ORANGE, &FreeSansBold9pt7b);
+      line("1. Mit diesem WLAN verbinden:", C_TEXT, &FreeSans9pt7b);
+      line("   " + String(DEV_PREFIX) + "-" + mac.substring(6), C_TEAL, &FreeSansBold9pt7b);
+      line("2. Im Browser 192.168.33.1", C_TEXT, &FreeSans9pt7b);
+      line("   öffnen, Reiter WLAN", C_TEXT, &FreeSans9pt7b);
     } else {
-      line("Verbinde mit", C_TEXT);
-      line("   " + cfg.ssid, C_OK);
-      line("Klappt es nicht (Name/Passwort),", C_DIM);
-      line("kommt nach 1 min wieder der", C_DIM);
-      line("Zugangspunkt zum Einrichten.", C_DIM);
+      line("Verbinde mit", C_TEXT, &FreeSans9pt7b);
+      line("   " + cfg.ssid, C_TEAL, &FreeSansBold9pt7b);
+      line("Klappt es nicht (Name/Passwort),", C_DIM, &FreeSans9pt7b);
+      line("kommt nach 1 min wieder der", C_DIM, &FreeSans9pt7b);
+      line("Zugangspunkt zum Einrichten.", C_DIM, &FreeSans9pt7b);
     }
   } else {
-    line("Verbunden: " + WiFi.localIP().toString(), C_OK);
-    line("Adressen eintragen:", C_ORANGE);
-    line("http://" + WiFi.localIP().toString(), C_TEXT);
-    line("Reiter Anzeige", C_TEXT);
+    line("Verbunden: " + WiFi.localIP().toString(), C_TEAL, &FreeSansBold9pt7b);
+    line("Adressen eintragen:", C_ORANGE, &FreeSans9pt7b);
+    line("http://" + WiFi.localIP().toString(), C_TEXT, &FreeSansBold9pt7b);
+    line("Reiter Anzeige", C_TEXT, &FreeSans9pt7b);
   }
 }
 
 void drawUpdate() {
   screen = SC_UPDATE;
   tft.fillScreen(C_BG);
-  centered(0, 90, 320, 30, "Firmware-Update ...", &FreeSansBold12pt7b, C_ORANGE);
-  centered(0, 130, 320, 30, "nicht ausschalten", &FreeSans9pt7b, C_TEXT);
+  dtext(160, 110, "Firmware-Update", &FreeSansBold12pt7b, C_ORANGE, 1);
+  dtext(160, 140, "nicht ausschalten", &FreeSans9pt7b, C_DIM, 1);
 }
 
 // Vor dem Update: Watchdog aus (Download dauert laenger), Hinweis anzeigen
@@ -628,7 +748,7 @@ void dispBegin() {
   ts.begin();
   ts.setRotation(dcfg.rot == 3 ? 1 : 3);
   tft.fillScreen(C_BG);
-  centered(0, 100, 320, 30, "Pagurus Heizung", &FreeSansBold12pt7b, C_TEXT);
+  dtext(160, 118, "Pagurus Heizung", &FreeSansBold12pt7b, C_TEXT, 1);
   Serial.println("[disp] Startbild gezeichnet");
 }
 
@@ -657,9 +777,9 @@ void dispLoop() {
     } else if (y > 160) {
       touchLock = millis() + (page ? 250 : 400);                // entprellen (Soll +/- etwas schneller)
       if (page == 0) { if (x < 160) doBoost(); else doZirk(-1); }
-      else if (x < 81) badSoll(-HL_SOLL_STEP);
-      else if (x < 159) badOnOff();
-      else if (x < 237) badBoost();
+      else if (x < 63) badSoll(-HL_SOLL_STEP);
+      else if (x < 160) badOnOff();
+      else if (x < 257) badBoost();
       else badSoll(HL_SOLL_STEP);
       dataDirty = true;
     }

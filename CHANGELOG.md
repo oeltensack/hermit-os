@@ -24,6 +24,9 @@
   ohne Auswahl das stärkste fremde Netz übernommen. Rückfrage mit dem Netznamen vor dem Speichern.
 - AZ-Touch: Scheitert ein Firmware-Update (Download, Prüfsumme), blieb die Anzeige auf „Firmware-Update …“ stehen
   und der Watchdog aus. Jetzt geht es mit Watchdog normal weiter.
+- AZ-Touch: neue Oberfläche – dunkle Karten, große Zahlen, schlanke Balken mit Soll-Marke, runde Tasten, Seite BAD mit
+  Ring um die Raumtemperatur; Umlaute und Gradzeichen. Gezeichnet wird nur, was sich ändert (kein Flackern mehr).
+  Liest von der Warmwasser-Logik `status` (Soll, Rücklauf, Fühlerstörung), bei älterer Logik weiter `api_data`.
 
 ## Pagurus Cloud 1.27.0
 - Heizung: **Duschen und Baden erkennen.** Die Cloud wertet die minütliche Warmwasser-Aufzeichnung aus: Fällt der

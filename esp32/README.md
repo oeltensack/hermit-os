@@ -93,8 +93,8 @@ Jede Datei wird vor dem Umschalten per SHA-256 geprüft.
 ## Heizungsanzeige AZ-Touch (`hermit-aztouch-esp32`)
 
 Die Anzeige der Arduino-Sketche *AZ_Touch_Heizung* (v12.1) auf Pagurus OS: AZ-Touch MOD 2,4" (ESP32,
-ILI9341, XPT2046). Gleiches Bild und gleiche Bedienung – Speicher und Kessel mit Balken, Pumpe (P),
-Brenner (B), Öl heute, unten links **BOOST**, unten rechts **ZIRKULATION** mit Temperatur. Optional eine zweite
+ILI9341, XPT2046). Gleiche Bedienung in neuer, dunkler Oberfläche – Speicher (mit Soll) und Kessel (mit Rücklauf),
+Pumpe, Brenner, Öl heute, Leitungstemperatur der Zirkulation, unten links **BOOST**, unten rechts **ZIRKULATION** mit Temperatur. Optional eine zweite
 Seite **BAD** für einen Heizlüfter (Script ab v11) wie in v13.0: Raum, Soll, Status, Lüfter (L), Heizung (H), Leistung,
 Verbrauch heute; Tasten **SOLL −**, **BETRIEB** ein/aus, **BOOST** (bei Störung **QUITTIEREN**), **SOLL +**. Wechsel durch
 Tipp auf die Kopfzeile, nach 2 Minuten zurück zu HEIZUNG; abgefragt wird nur die sichtbare Seite. Soll und Betrieb
