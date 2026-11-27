@@ -1,5 +1,8 @@
 # Änderungen
 
+## Pagurus OS 1.19.4
+- TCL-Klima: Lernmodus war nicht erreichbar (Methodennamen werden klein verglichen) – behoben.
+
 ## Pagurus OS 1.19.3
 - TCL-Klima: „Fernbedienungstasten lernen“ auf der Modul-Webseite. Zeichnet auf, welche Bytes im Zustand der Anlage
   sich ändern, wenn an der Fernbedienung eine Funktion geschaltet wird (für Sleep, Health, 8 °C, I Feel).

@@ -87,8 +87,8 @@ void acSetConfig(JsonVariantConst c) {
 // Weitere Methoden: Lernmodus fuer Fernbedienungstasten (Klima.Learn {on}, Klima.Changes)
 #define AC_METHODS "Klima.Learn", "Klima.Changes",
 bool acRpc(const String& m, JsonVariantConst p, JsonObject o, String&) {
-  if (m == "Klima.Learn") { ac.learnStart(p["on"] | true); o["learn"] = ac.learn; return true; }
-  if (m == "Klima.Changes") {
+  if (m == "klima.learn") { ac.learnStart(p["on"] | true); o["learn"] = ac.learn; return true; }
+  if (m == "klima.changes") {
     o["learn"] = ac.learn; o["now"] = millis();
     JsonArray a = o["changes"].to<JsonArray>();
     for (int k = 0; k < ac.chgN; k++) {                 // aelteste zuerst
