@@ -1,5 +1,9 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.6
+- Klima-Verlauf: Die Leistungsbalken werden mindestens auf 500 W skaliert. Bisher füllte bei einem Gerät, das den
+  ganzen Tag nur im Standby lief (z. B. 12 W), schon der Standby die Balken voll aus und sah aus wie Dauerbetrieb.
+
 ## Pagurus Cloud 1.27.5
 - **Behoben:** Nach einem Update über den Updater startete die Cloud nicht mehr („ZoneInfoNotFoundError … CET-1CEST“).
   Der Updater hatte seit 1.27.2 für die Protokoll-Uhrzeiten `TZ` als POSIX-Regel gesetzt, und `docker compose` gab

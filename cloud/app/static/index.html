@@ -483,7 +483,7 @@ if(!S.length)return `<div class="empty" style="padding:20px">Noch keine Aufzeich
 const tv=S.flatMap(p=>[p[1],p[2],p[3]]).filter(v=>v!=null);let lo=Math.floor(Math.min(...tv)-1),hi=Math.ceil(Math.max(...tv)+1);if(hi-lo<6){hi+=3;lo-=3}
 const top=6,bot=H-30,Y=v=>top+(bot-top)*(1-(v-lo)/(hi-lo)),pmax=Math.max(...S.map(p=>p[7]||0));
 let g='';for(let v=Math.ceil(lo/5)*5;v<=hi;v+=5)g+=`<line x1="0" x2="${W2}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2a333c"/><text x="2" y="${Y(v)-2}" font-size="9" fill="#8a96a3">${v}°</text>`;
-if(pmax>0){let a='';S.forEach(p=>{if(p[7]>0){const h=(p[7]/pmax)*(bot-top)*0.45;a+=`<rect x="${X(p[0])}" y="${bot-h}" width="${W2/288+0.3}" height="${h}"/>`}});g+=`<g fill="#2f9be0" fill-opacity=".25">${a}</g><text x="${W2-2}" y="${top+8}" font-size="9" fill="#2f9be0" text-anchor="end">max ${num(pmax,0)} W</text>`}
+if(pmax>0){const psc=Math.max(pmax,500);let a='';S.forEach(p=>{if(p[7]>0){const h=Math.max(0.5,(p[7]/psc)*(bot-top)*0.45);a+=`<rect x="${X(p[0])}" y="${bot-h}" width="${W2/288+0.3}" height="${h}"/>`}});g+=`<g fill="#2f9be0" fill-opacity=".25">${a}</g><text x="${W2-2}" y="${top+8}" font-size="9" fill="#2f9be0" text-anchor="end">max ${num(pmax,0)} W</text>`}
 const line=(i,col,extra)=>{let d='',prev=null;S.forEach(p=>{if(p[i]==null){prev=null;return}d+=(prev==null||p[0]-prev>900?'M':'L')+X(p[0]).toFixed(1)+','+Y(p[i]).toFixed(1);prev=p[0]});return d?`<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" ${extra||''}/>`:''};
 g+=line(3,'#e8833a','stroke-opacity=".7"')+line(2,'#8a96a3','stroke-dasharray="4 3"')+line(1,'#e6e9ec');
 S.forEach(p=>{if(p[4])g+=`<rect x="${X(p[0])}" y="${bot+3}" width="${W2/288+0.3}" height="${p[5]?7:4}" fill="${p[6]=='heat'?'#e8833a':p[6]=='cool'?'#2f9be0':'#8a96a3'}"/>`});
