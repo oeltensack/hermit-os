@@ -1,5 +1,10 @@
 # Änderungen
 
+## Pagurus Cloud 1.27.7
+- Klimaanlagen mit „Nur Anzeige“ sperren jetzt nur noch das Ein-/Ausschalten von Hand. Solltemperatur, Modus,
+  Lüfter, Swing, Eco/Turbo/Leise und Anzeige lassen sich wieder bedienen. Vorher waren alle Bedienelemente
+  ausgeblendet. Die Karte zeigt dann „🔒 Ein/Aus gesperrt“.
+
 ## Pagurus Cloud 1.27.6
 - Klima-Verlauf: Die Leistungsbalken werden mindestens auf 500 W skaliert. Bisher füllte bei einem Gerät, das den
   ganzen Tag nur im Standby lief (z. B. 12 W), schon der Standby die Balken voll aus und sah aus wie Dauerbetrieb.

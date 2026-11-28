@@ -429,7 +429,7 @@ const pw=CL.reduce((t,c)=>t+(c.meter&&c.meter.online&&c.meter.apower||0),0),e=CL
 $('kl_sum').textContent=CL.some(c=>c.meter)?`jetzt ${fmt(pw,0,'W')} · heute ${kwh(e)}`:'';
 $('climates').innerHTML=CL.length?CL.map(clCard).join(''):'<div class="card empty" style="grid-column:1/-1">Noch keine Klimaanlage verbunden.<br>TCL-/Kesser-Anlagen mit Pagurus OS (ESP32) erscheinen hier automatisch.</div>';
 document.querySelectorAll('#climates .clc').forEach(b=>clHover(b,CL.find(c=>c.dev==b.dataset.dev)))}
-function clCard(c){const s=c.status||{},id=esc(c.dev),on=!!s.output,link=s.link!==false,p=c.winopen&&c.winopen.paused,t=s.target_C??24,ok=c.online&&link&&canSw()&&!c.locked;
+function clCard(c){const s=c.status||{},id=esc(c.dev),on=!!s.output,link=s.link!==false,p=c.winopen&&c.winopen.paused,t=s.target_C??24,ok=c.online&&link&&canSw(),okSw=ok&&!c.locked;
 const cls=!c.online||!link?'off':p?'paused':on?(s.mode=='heat'?'heat':s.mode=='cool'?'cool2':'running'):'';
 const st=!c.online?'offline':!link?'Klimagerät antwortet nicht':p?'Pausiert':on?(CLM[s.mode]||s.mode)+' · '+fmt(t,t%1?1:0,'°C'):'Aus';
 const sub=p?esc(c.winopen.reason||'Fenster offen'):on?`Lüfter ${esc(clFanTxt(s))}${s.compressor?' · Kompressor läuft':''}`:'';
@@ -437,8 +437,8 @@ const tg=(k,l)=>`<button class="bt ${s[k]?'':'g'} tg" onclick="clSet('${id}',{${
 const m=c.meter,tod=c.today||{};
 return `<div class="app ${cls}"><div class="ah"><div class="ai" style="color:${on&&s.mode=='heat'?'#e8833a':'var(--a)'}">${FAN_I}</div>
 <div style="flex:1;min-width:0"><div class="row sp"><span class="dn">${esc(c.name)}</span><span class="l">${esc(c.room||'')}</span></div>
-<div class="st">${st}</div><div class="l">${sub}${c.locked?' · 🔒 nur Anzeige':''}</div></div>
-<button class="sw ${on?'on':''}" ${ok?'':'disabled'} onclick="clSet('${id}',{on:${!on}})">${on?'AN':'AUS'}</button></div>
+<div class="st">${st}</div><div class="l">${sub}${c.locked?' · 🔒 Ein/Aus gesperrt':''}</div></div>
+<button class="sw ${on?'on':''}" ${okSw?'':'disabled'} ${c.locked?'title="Nur Anzeige – Ein/Aus von Hand gesperrt"':''} onclick="clSet('${id}',{on:${!on}})">${on?'AN':'AUS'}</button></div>
 ${ok?`<div class="row" style="gap:6px"><button class="bt g" onclick="clSet('${id}',{target_C:${clStep(s,-1)}})">−</button><span class="cltgt">${fmt(t,t%1?1:0,'°C')}</span><button class="bt g" onclick="clSet('${id}',{target_C:${clStep(s,1)}})">+</button>
 <select onchange="clSet('${id}',{mode:this.value})" style="width:auto">${clModes(s).map(([k,v])=>`<option value="${k}" ${s.mode==k?'selected':''}>${v}</option>`).join('')}</select>
 <select onchange="clSet('${id}',{fan:this.value})" style="width:auto">${clFans(s).map(([k,v])=>`<option value="${k}" ${s.fan==k?'selected':''}>Lüfter ${v}</option>`).join('')}</select>

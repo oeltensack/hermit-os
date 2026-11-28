@@ -410,8 +410,9 @@ async def dev_switch(dev: str, request: Request):
 async def dev_climate(dev: str, request: Request):
     """Klimaanlage (Pagurus OS ESP32): Modus, Solltemperatur, Luefter, Swing, Eco/Turbo/Leise/Nacht."""
     need(request, "user")
-    not_locked(get_dev(dev))
     d = await request.json()
+    if "on" in d:                       # "Nur Anzeige" sperrt bei Klimageraeten nur Ein/Aus
+        not_locked(get_dev(dev))
     p = {"id": 0}
     for k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep", "display", "display_toggle"):
         if k in d:
